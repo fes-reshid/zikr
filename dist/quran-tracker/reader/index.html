@@ -1062,6 +1062,10 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         { code: 'amharic', label: 'Amharic' },
         { code: 'somali', label: 'Somali' }
     ];
+    // Always offered, with no network call needed: id 0 doubles as "no
+    // translation was requested", which loadVerses() already treats as
+    // falsy, so nothing else has to special-case it.
+    var NONE_TRANSLATION = { id: 0, code: 'none', label: 'Arabic only (no translation)', name: '' };
 
     function $(id) { return document.getElementById(id); }
 
@@ -1240,8 +1244,14 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         return patterns.some(function (pattern) { return pattern.test(text); });
     }
 
-    /** One entry per LANGUAGE_CHOICES language Quran.com actually offers. */
+    /**
+     * "Arabic only" plus one entry per LANGUAGE_CHOICES language Quran.com
+     * actually offers — always at least the one entry, so a failed fetch
+     * degrades to the same Arabic-only reading the reader always had before
+     * translations existed, rather than a broken or disabled selector.
+     */
     async function resolveTranslations() {
+        var options = [NONE_TRANSLATION];
         try {
             var data = await getJson(API + '/resources/translations');
             var all = (data && data.translations) || [];
@@ -1251,7 +1261,6 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
                 (byLanguage[lang] = byLanguage[lang] || []).push(t);
             });
 
-            var options = [];
             LANGUAGE_CHOICES.forEach(function (choice) {
                 var candidates = byLanguage[choice.code] || [];
                 var found = null;
@@ -1271,11 +1280,10 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
                     });
                 }
             });
-            return options;
         } catch (err) {
             console.error('Could not load the translation list', err);
-            return [];
         }
+        return options;
     }
 
     function buildTranslationOptions(options) {
@@ -1802,10 +1810,10 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     });
 
     translationSelector.addEventListener('change', function (event) {
-        var id = Number(event.target.value);
-        if (!id) return;
-        translationId = id;
-        var chosen = translationOptions.filter(function (o) { return o.id === id; })[0];
+        var raw = event.target.value;
+        if (raw === '') return; // the loading placeholder, not a real choice
+        translationId = Number(raw); // 0 is a real choice here: "Arabic only"
+        var chosen = translationOptions.filter(function (o) { return o.id === translationId; })[0];
         writeStore('quran_translation_lang', chosen ? chosen.code : '');
         reloadTranslation();
     });
@@ -1898,22 +1906,18 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
             }
         }
 
+        // Always has at least NONE_TRANSLATION, so the selector is never
+        // empty or disabled the way the reciter one can be.
         translationOptions = await translationPromise;
-        if (!translationOptions.length) {
-            translationSelector.innerHTML = '';
-            var noTranslation = document.createElement('option');
-            noTranslation.value = '';
-            noTranslation.textContent = 'No translation available';
-            translationSelector.appendChild(noTranslation);
-            translationSelector.disabled = true;
-        } else {
-            buildTranslationOptions(translationOptions);
+        buildTranslationOptions(translationOptions);
 
-            var rememberedLang = readStore('quran_translation_lang');
-            var preferred = translationOptions.filter(function (o) { return o.code === rememberedLang; })[0];
-            translationId = (preferred || translationOptions[0]).id;
-            translationSelector.value = String(translationId);
-        }
+        var rememberedLang = readStore('quran_translation_lang');
+        var preferred = translationOptions.filter(function (o) { return o.code === rememberedLang; })[0];
+        // Default to a translated reading (English, if Quran.com offered
+        // it) rather than "Arabic only" — that stays an explicit choice.
+        var defaultOption = preferred || translationOptions[1] || translationOptions[0];
+        translationId = defaultOption.id;
+        translationSelector.value = String(translationId);
 
         await loadJuz(currentJuz);
     })();

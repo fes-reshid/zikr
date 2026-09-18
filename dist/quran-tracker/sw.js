@@ -9,7 +9,7 @@
  * CACHE carries the build id, so a deploy creates a new cache and the old one
  * is deleted on activate rather than serving a stale page forever.
  */
-var CACHE = 'quran-tracker-7d6da2909c2a';
+var CACHE = 'quran-tracker-a86aac6166e3';
 var SCOPE_PATH = new URL(self.registration.scope).pathname;
 
 var SHELL = [

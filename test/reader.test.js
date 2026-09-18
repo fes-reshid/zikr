@@ -79,14 +79,16 @@ const TRANSLATIONS = [
     { id: 142, name: 'Somali Translation', author_name: 'Mahmud Muhammad Abduh', language_name: 'somali' }
 ];
 
-function stubVerses(juz) {
+// withTranslation mirrors the real API: it only sends a `translations`
+// array back when the request actually asked for one.
+function stubVerses(juz, withTranslation) {
     const verses = [];
     for (let i = 1; i <= VERSE_COUNT; i++) {
-        verses.push({
-            verse_key: juz + ':' + i,
-            text_uthmani: 'نَصٌّ عَرَبِيٌّ ' + i,
-            translations: [{ text: 'Translation of verse ' + i + '<sup foot_note="3">1</sup>' }]
-        });
+        const verse = { verse_key: juz + ':' + i, text_uthmani: 'نَصٌّ عَرَبِيٌّ ' + i };
+        if (withTranslation) {
+            verse.translations = [{ text: 'Translation of verse ' + i + '<sup foot_note="3">1</sup>' }];
+        }
+        verses.push(verse);
     }
     return { verses, pagination: { current_page: 1, next_page: null, total_pages: 1 } };
 }
@@ -140,7 +142,7 @@ async function openReader(browser, opts) {
             }
             return json(stubAudio(juz));
         }
-        return json(stubVerses(juz));
+        return json(stubVerses(juz, url.includes('translations=')));
     });
 
     if (options.profile !== null) {
@@ -227,7 +229,11 @@ function readLog(page) {
             ['English', 'Oromo', 'Amharic', 'Somali'].every((lang) =>
                 translationOptions.some((o) => o.label === lang)),
             JSON.stringify(translationOptions));
-        check('English is selected by default', await page.inputValue('#translation-selector') === '20');
+        check('an Arabic-only option is offered too',
+            translationOptions.some((o) => o.value === '0' && /arabic only/i.test(o.label)),
+            JSON.stringify(translationOptions));
+        check('a translated reading is the default, not Arabic-only',
+            await page.inputValue('#translation-selector') === '20');
 
         const cards = await page.$$('.verse');
         check('every verse renders', cards.length === VERSE_COUNT, cards.length);
@@ -406,6 +412,39 @@ function readLog(page) {
         await context.close();
     }
 
+    // --- Arabic only --------------------------------------------------------
+    {
+        const { context, page, calls } = await openReader(browser, { query: '?juz=7&autoplay=0' });
+        await page.waitForFunction(() => document.querySelectorAll('.verse').length > 0);
+        check('a translation renders by default',
+            (await page.$('.verse .verse-tr')) !== null);
+
+        calls.api.length = 0;
+        await page.selectOption('#translation-selector', '0');
+        await page.waitForFunction(
+            () => document.querySelectorAll('.verse').length > 0, { timeout: 8000 });
+        await page.waitForTimeout(300);
+
+        check('choosing Arabic only refetches verses with no translation requested',
+            calls.api.some((u) => u.includes('by_juz/7') && !u.includes('translations=')),
+            calls.api.join(' | '));
+        check('no translation paragraph is rendered',
+            (await page.$('.verse .verse-tr')) === null);
+        check('the Arabic text is still there',
+            (await page.textContent('.verse .verse-ar')).includes('نَصٌّ عَرَبِيٌّ'));
+        check('the translator name is dropped from the sub-heading',
+            !/·.+·/.test((await page.textContent('#page-sub'))),
+            await page.textContent('#page-sub'));
+
+        await page.reload();
+        await page.waitForSelector('.verse', { timeout: 10000 });
+        check('Arabic-only is remembered across a reload too',
+            await page.inputValue('#translation-selector') === '0');
+        check('and no translation still renders after the reload',
+            (await page.$('.verse .verse-tr')) === null);
+        await context.close();
+    }
+
     // --- Degrading -------------------------------------------------------
     {
         const { context, page } = await openReader(browser, {
@@ -553,7 +592,7 @@ function readLog(page) {
                 const juzMatch = url.match(/by_juz\/(\d+)/);
                 const juz = juzMatch ? Number(juzMatch[1]) : 1;
                 if (url.includes('/recitations/')) return json(stubAudio(juz));
-                return json(stubVerses(juz));
+                return json(stubVerses(juz, url.includes('translations=')));
             });
             await context.addInitScript(FAKE_CLOUD);
             // No local profile: the account is the only source of today's juz.
