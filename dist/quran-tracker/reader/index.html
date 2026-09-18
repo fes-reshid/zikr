@@ -194,6 +194,22 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
   }
   .notice-good{ background:var(--green-bg); border-color:#a9c9b9; color:var(--green-dark); font-weight:600; }
 
+  /* ---------- Today's reading strip ---------- */
+  /* Always marks TODAY, whichever juz happens to be open below — the label
+     says so explicitly so that is never ambiguous. */
+  .today-strip{
+    max-width:860px; margin:0 auto 18px; display:flex; align-items:center;
+    justify-content:space-between; gap:14px; flex-wrap:wrap;
+    background:var(--parchment); border:1.5px solid var(--gold-soft);
+    border-radius:14px; padding:14px 20px;
+  }
+  .today-strip .label{ margin:0; font-size:16px; color:var(--ink-brown); }
+  .today-strip.done{ background:var(--green-bg); border-color:#a9c9b9; }
+  .today-strip.done .label{ color:var(--green-dark); font-weight:600; }
+  @media (max-width:430px){
+    .today-strip{ flex-direction:column; align-items:stretch; text-align:center; }
+  }
+
   /* ---------- Verses ---------- */
   .verses{ max-width:860px; margin:0 auto; }
   .verse{
@@ -329,6 +345,13 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
           Follow the recitation
         </label>
       </div>
+    </div>
+
+    <div class="today-strip" id="reading-status">
+      <p class="label" id="reading-status-label">Mark today&rsquo;s Qur&rsquo;ān reading</p>
+      <button type="button" class="btn btn-primary" id="mark-read-btn">
+        <span id="mark-read-label">Mark as read</span>
+      </button>
     </div>
 
     <div class="notice is-hidden" id="notice"></div>
@@ -818,31 +841,6 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 })();
 </script>
 <script>
-/* The account sheets live on the tracker; this button goes there. */
-(function () {
-    'use strict';
-    var button = document.getElementById('account-btn');
-    if (!button || !window.QuranAccount) return;
-
-    function render(state) {
-        button.classList.toggle('is-hidden', !state.available);
-        if (state.signedIn) {
-            button.textContent = state.user.displayName || state.user.username;
-            button.classList.add('signed-in');
-        } else {
-            button.textContent = 'Sign in';
-            button.classList.remove('signed-in');
-        }
-    }
-
-    window.QuranAccount.onChange(render);
-    button.addEventListener('click', function () {
-        location.href = '../?account=1';
-    });
-    window.QuranAccount.start([], null);
-})();
-</script>
-<script>
 /* src/core.js, inlined by build.js — edit the source, not this file. */
 /*
  * Pure date / tracking logic for the Quran daily tracker.
@@ -1086,6 +1084,11 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var seek = $('seek');
     var timeNow = $('time-now');
     var timeTotal = $('time-total');
+    var accountBtn = $('account-btn');
+    var readingStatus = $('reading-status');
+    var readingStatusLabel = $('reading-status-label');
+    var markReadBtn = $('mark-read-btn');
+    var markReadLabel = $('mark-read-label');
 
     var PLAY_PATH = 'M8 5v14l11-7z';
     var PAUSE_PATH = 'M6 5h4v14H6zm8 0h4v14h-4z';
@@ -1107,6 +1110,12 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var currentIndex = -1;
     var loadToken = 0;
 
+    // Kept only for today's due-juz label and the reading log below — the
+    // reader has no name/greeting of its own like the tracker does.
+    var userProfile = readStore(PROFILE_KEY);
+    var readingLog = readStore(LOG_KEY) || {};
+    var Account = window.QuranAccount;
+
     function readJuzFromUrl() {
         var raw = new URLSearchParams(location.search).get('juz');
         var n = parseInt(raw, 10);
@@ -1123,6 +1132,53 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     function todayKey() {
         return Core.formatDateKey(new Date());
+    }
+
+    /*
+     * The juz due today, from whichever the visitor actually has: a
+     * signed-in account is authoritative once it has answered; otherwise
+     * whatever cycle this device knows locally (its own, or one written here
+     * earlier by the tracker after signing in there).
+     */
+    function todayDueJuz() {
+        if (Account && Account.state.signedIn && Account.state.apiReady &&
+            Account.state.settings && Account.state.settings.startDate) {
+            return Core.juzForDate(Account.state.settings.startDate, todayKey());
+        }
+        if (userProfile && userProfile.startDate) {
+            return Core.juzForDate(userProfile.startDate, todayKey());
+        }
+        return null;
+    }
+
+    /*
+     * "Mark as read" always means today — whichever juz happens to be open
+     * in the reader below is a separate thing, so the label says which day
+     * and juz this button actually acts on rather than leaving it implied.
+     */
+    function renderReadingStatus() {
+        var isRead = !!readingLog[todayKey()];
+        var due = todayDueJuz();
+
+        readingStatusLabel.textContent = due
+            ? (isRead ? 'Juz ' + due + ' marked as read today' : 'Today’s reading — Juz ' + due)
+            : (isRead ? 'Marked as read today' : 'Mark today’s Qur’ān reading');
+
+        readingStatus.classList.toggle('done', isRead);
+        markReadBtn.className = 'btn ' + (isRead ? 'btn-done' : 'btn-primary');
+        markReadLabel.textContent = isRead ? 'Completed' : 'Mark as read';
+    }
+
+    /** The one place today's read state is ever written, from any source. */
+    function setTodayRead(value) {
+        var key = todayKey();
+        if (value) readingLog[key] = true; else delete readingLog[key];
+        writeStore(LOG_KEY, readingLog);
+        renderReadingStatus();
+
+        // Local storage is what this page draws from; the account call is
+        // fire-and-forget so marking a day never waits on the network.
+        if (Account && Account.state.signedIn) Account.setDay(key, value);
     }
 
     function showNotice(text, good) {
@@ -1562,28 +1618,27 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         writeStore(PLACE_KEY, { juz: currentJuz, index: 0 });
         setPlayIcon(false);
 
-        var profile = readStore(PROFILE_KEY);
-        if (!profile || !profile.startDate) {
+        var dueToday = todayDueJuz();
+        if (!dueToday) {
             showNotice('Juz ' + currentJuz + ' finished. Set up the tracker to record it.');
             return;
         }
-
-        var key = todayKey();
-        var dueToday = Core.juzForDate(profile.startDate, key);
         if (Number(currentJuz) !== Number(dueToday)) {
             showNotice('Juz ' + currentJuz + ' finished. Today’s juz is ' + dueToday +
                 ', so nothing was ticked off.');
             return;
         }
 
-        var log = readStore(LOG_KEY) || {};
-        log[key] = true;
-        writeStore(LOG_KEY, log);
+        setTodayRead(true);
         showNotice('Juz ' + currentJuz + ' finished and marked as read for today. ' +
             'Jazāk Allāhu khayran.', true);
     }
 
     // --- Events --------------------------------------------------------
+    markReadBtn.addEventListener('click', function () {
+        setTodayRead(!readingLog[todayKey()]);
+    });
+
     playBtn.addEventListener('click', function () {
         if (audio.paused) {
             if (!audio.currentSrc && playlist.length) setCurrent(Math.max(currentIndex, 0), true);
@@ -1684,9 +1739,35 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     window.addEventListener('orientationchange', syncPlayerSpace);
     syncPlayerSpace();
 
+    // --- Account -------------------------------------------------------
+    /* The account sheets live on the tracker; this button goes there. */
+    function renderAccountButton(state) {
+        if (!accountBtn) return;
+        accountBtn.classList.toggle('is-hidden', !state.available);
+        if (state.signedIn) {
+            accountBtn.textContent = state.user.displayName || state.user.username;
+            accountBtn.classList.add('signed-in');
+        } else {
+            accountBtn.textContent = 'Sign in';
+            accountBtn.classList.remove('signed-in');
+        }
+    }
+
+    if (accountBtn) {
+        accountBtn.addEventListener('click', function () { location.href = '../?account=1'; });
+    }
+    if (Account) {
+        Account.onChange(function (state) {
+            renderAccountButton(state);
+            renderReadingStatus();
+        });
+        Account.start(Object.keys(readingLog), null);
+    }
+
     // --- Start ---------------------------------------------------------
     setupMediaSession();
     setPlayIcon(false);
+    renderReadingStatus();
 
     (async function start() {
         try {

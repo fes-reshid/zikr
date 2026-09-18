@@ -9,6 +9,8 @@
  *   npm run test:reader
  */
 const path = require('path');
+const http = require('http');
+const fs = require('fs');
 
 let chromium;
 try {
@@ -357,6 +359,181 @@ function readLog(page) {
         check('it still opens without a tracker profile',
             (await page.$$('.verse')).length === VERSE_COUNT);
         await context.close();
+    }
+
+    // --- Manual "Mark as read" button, no account signed in ---------------
+    {
+        const { context, page } = await openReader(browser, { query: '?juz=7&autoplay=0' });
+        check('the strip starts unmarked',
+            (await page.textContent('#mark-read-label')).trim() === 'Mark as read');
+        await page.click('#mark-read-btn');
+        await page.waitForTimeout(150);
+        check('clicking marks today read locally', (await readLog(page))[TODAY] === true);
+        check('the button flips to Completed',
+            (await page.textContent('#mark-read-label')).trim() === 'Completed');
+        check('the strip label says which juz was marked',
+            (await page.textContent('#reading-status-label')).includes('7'),
+            await page.textContent('#reading-status-label'));
+
+        await page.click('#mark-read-btn');
+        await page.waitForTimeout(150);
+        check('clicking again clears it', (await readLog(page))[TODAY] === undefined);
+        check('the button reverts', (await page.textContent('#mark-read-label')).trim() === 'Mark as read');
+        await context.close();
+    }
+
+    // --- Signed in: the account is authoritative, and every write syncs ---
+    // (Previously the reader never told a signed-in account about a
+    // completion at all — neither the manual button nor auto-finish — so a
+    // read marked here could be silently lost the next time the tracker
+    // pulled the account's days. This exercises the fix end to end.)
+    {
+        const DIST = path.resolve(__dirname, '..', 'dist');
+        const PORT = Number(process.env.READER_ACCOUNT_PORT || 8847);
+        const BASE = 'http://localhost:' + PORT;
+        const store = { settings: { startDate: CYCLE_START, timezone: 'America/Los_Angeles',
+                                     remindHour: 20, pushReminders: false }, days: [] };
+        const apiCalls = [];
+
+        const server = http.createServer((req, res) => {
+            const url = new URL(req.url, BASE);
+            if (url.pathname.endsWith('/kids-quest-cloud.js')) {
+                res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
+                return res.end('/* stubbed by the test */');
+            }
+            if (url.pathname.startsWith('/quran-tracker/api/')) {
+                const route = url.pathname.replace('/quran-tracker/api/', '');
+                let body = '';
+                req.on('data', (c) => { body += c; });
+                req.on('end', () => {
+                    let parsed = null;
+                    try { parsed = JSON.parse(body); } catch (e) { /* none */ }
+                    apiCalls.push({ method: req.method, route, body: parsed });
+                    const reply = (code, payload) => {
+                        res.writeHead(code, { 'content-type': 'application/json' });
+                        res.end(JSON.stringify(payload));
+                    };
+                    if (route === 'me') return reply(200, { settings: store.settings, days: store.days });
+                    if (route === 'readings') {
+                        const set = new Set(store.days);
+                        if (parsed.read === false) set.delete(parsed.day); else set.add(parsed.day);
+                        store.days = [...set].sort().reverse();
+                        return reply(200, { ok: true, days: store.days });
+                    }
+                    if (route === 'settings') {
+                        Object.assign(store.settings, parsed || {});
+                        return reply(200, { ok: true, settings: store.settings });
+                    }
+                    return reply(200, { ok: true, days: store.days });
+                });
+                return;
+            }
+            let file = path.join(DIST, decodeURIComponent(url.pathname));
+            if (url.pathname.endsWith('/')) file = path.join(file, 'index.html');
+            if (!file.startsWith(DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+                res.writeHead(404); return res.end('not found');
+            }
+            const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
+            res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'text/plain' });
+            fs.createReadStream(file).pipe(res);
+        });
+        await new Promise((resolve) => server.listen(PORT, resolve));
+
+        const FAKE_CLOUD = () => {
+            var user = { uid: 'uid-amina123', username: 'amina123', displayName: 'amina123', fullName: '' };
+            window.KidsCloud = {
+                onStudentAuth: function (cb) { cb(user); },
+                getIdToken: function () { return Promise.resolve('id-token-amina123'); }
+            };
+            window.dispatchEvent(new Event('kidscloud-ready'));
+        };
+
+        async function openSignedInReader(query) {
+            const context = await browser.newContext({ timezoneId: 'America/Los_Angeles' });
+            await context.route('https://fonts.googleapis.com/**', (r) =>
+                r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+            await context.route('https://fonts.gstatic.com/**', (r) =>
+                r.fulfill({ status: 200, contentType: 'font/woff2', body: '' }));
+            await context.route('https://verses.quran.com/**', (r) =>
+                r.fulfill({ status: 200, contentType: 'audio/wav', body: WAV }));
+            await context.route('https://api.quran.com/**', (r) => {
+                const url = r.request().url();
+                const json = (body) => r.fulfill({
+                    status: 200, contentType: 'application/json', body: JSON.stringify(body)
+                });
+                if (url.includes('/resources/recitations')) return json({ recitations: RECITATIONS });
+                if (url.includes('/resources/translations')) return json({ translations: TRANSLATIONS });
+                const juzMatch = url.match(/by_juz\/(\d+)/);
+                const juz = juzMatch ? Number(juzMatch[1]) : 1;
+                if (url.includes('/recitations/')) return json(stubAudio(juz));
+                return json(stubVerses(juz));
+            });
+            await context.addInitScript(FAKE_CLOUD);
+            // No local profile: the account is the only source of today's juz.
+            await context.addInitScript(() => { try { localStorage.clear(); } catch (e) { /* ignore */ } });
+            const page = await context.newPage();
+            const errors = [];
+            page.on('pageerror', (e) => errors.push(String(e)));
+            await page.clock.install({ time: new Date(TODAY + 'T10:00:00-07:00') });
+            await page.goto(BASE + '/quran-tracker/reader/' + query);
+            await page.waitForSelector('.verse', { timeout: 10000 });
+            await page.waitForFunction(
+                () => /Juz \d/.test((document.getElementById('reading-status-label') || {}).textContent || ''),
+                { timeout: 8000 }
+            ).catch(() => {});
+            return { context, page, errors };
+        }
+
+        {
+            const { context, page, errors } = await openSignedInReader('?juz=7&autoplay=0');
+            check('signed-in reader shows the account in the header',
+                (await page.textContent('#account-btn')).trim() === 'amina123');
+            check("today's due juz is drawn from the account, not a local profile",
+                (await page.textContent('#reading-status-label')).includes('7'),
+                await page.textContent('#reading-status-label'));
+
+            apiCalls.length = 0;
+            await page.click('#mark-read-btn');
+            await page.waitForTimeout(300);
+            check('manual mark-as-read updates the local log',
+                (await readLog(page))[TODAY] === true);
+            check('manual mark-as-read syncs to the account',
+                apiCalls.some((c) => c.route === 'readings' && c.body &&
+                    c.body.day === TODAY && c.body.read === true),
+                JSON.stringify(apiCalls));
+
+            apiCalls.length = 0;
+            await page.click('#mark-read-btn');
+            await page.waitForTimeout(300);
+            check('clicking again clears it locally', (await readLog(page))[TODAY] === undefined);
+            check('and syncs the un-mark to the account',
+                apiCalls.some((c) => c.route === 'readings' && c.body &&
+                    c.body.day === TODAY && c.body.read === false),
+                JSON.stringify(apiCalls));
+
+            check('no uncaught page errors while signed in', errors.length === 0, errors.join(' | '));
+            await context.close();
+        }
+
+        {
+            apiCalls.length = 0;
+            const { context, page, errors } = await openSignedInReader('?juz=7');
+            await page.waitForFunction(
+                () => /marked as read/i.test((document.getElementById('notice') || {}).textContent || ''),
+                { timeout: 25000 }
+            ).catch(() => {});
+            check('finishing the juz while signed in still ticks the local log',
+                (await readLog(page))[TODAY] === true);
+            check('and now also syncs the auto-completion to the account (previously lost)',
+                apiCalls.some((c) => c.route === 'readings' && c.body &&
+                    c.body.day === TODAY && c.body.read === true),
+                JSON.stringify(apiCalls));
+            check('no uncaught page errors on auto-finish while signed in',
+                errors.length === 0, errors.join(' | '));
+            await context.close();
+        }
+
+        server.close();
     }
 
     await browser.close();
