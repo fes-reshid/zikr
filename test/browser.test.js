@@ -30,13 +30,6 @@ function check(name, ok, detail) {
     console.log((ok ? 'ok   ' : 'FAIL ') + name + (detail !== undefined ? '  -> ' + detail : ''));
 }
 
-// The app only relies on Tailwind for `.hidden`; stub just that so visibility
-// assertions stay meaningful without reaching the network.
-const TAILWIND_STUB =
-    "var s=document.createElement('style');" +
-    "s.textContent='.hidden{display:none !important}';" +
-    'document.head.appendChild(s);';
-
 const PAGE_SIZE = 50;
 const TOTAL_PAGES = 2;
 
@@ -64,12 +57,11 @@ function stubVerses(page) {
     const browser = await chromium.launch({ executablePath: CHROMIUM_PATH });
     const context = await browser.newContext({ timezoneId: 'America/Los_Angeles' });
 
-    await context.route('https://cdn.tailwindcss.com**', (route) =>
-        route.fulfill({ status: 200, contentType: 'application/javascript', body: TAILWIND_STUB }));
-    await context.route('https://cdnjs.cloudflare.com/**', (route) =>
-        route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    // The page carries its own CSS, so only the webfonts need stubbing.
     await context.route('https://fonts.googleapis.com/**', (route) =>
         route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    await context.route('https://fonts.gstatic.com/**', (route) =>
+        route.fulfill({ status: 200, contentType: 'font/woff2', body: '' }));
 
     let apiCalls = [];
     let apiStatus = 200;
@@ -126,12 +118,12 @@ function stubVerses(page) {
     check('the button flips to Completed',
         (await page.textContent('#btn-label')).trim() === 'Completed');
     check('the reminder card turns positive',
-        (await page.getAttribute('#feedback-card', 'class')).includes('emerald'));
+        (await page.getAttribute('#feedback-card', 'class')).includes('note-done'));
 
     const rows = await page.$$('#history-list [data-date-key]');
     check('history lists 7 days', rows.length === 7, rows.length);
     const historyJuz = await page.$$eval('#history-list [data-date-key]', (els) =>
-        els.map((el) => el.querySelector('p.text-emerald-600').textContent).join(','));
+        els.map((el) => el.querySelector('p.day-juz').textContent).join(','));
     check('history counts the Juz back correctly',
         historyJuz === 'Juz 7,Juz 6,Juz 5,Juz 4,Juz 3,Juz 2,Juz 1', historyJuz);
 
@@ -158,14 +150,14 @@ function stubVerses(page) {
         apiCalls[0] && apiCalls[0].includes('fields=text_uthmani'), apiCalls[0]);
     check('reader pages past the 50-verse cap', apiCalls.length === TOTAL_PAGES,
         apiCalls.length + ' requests');
-    const cards = await page.$$('#reader-content > div.bg-white');
+    const cards = await page.$$('#reader-content .verse');
     check('every verse is rendered', cards.length === PAGE_SIZE * TOTAL_PAGES, cards.length);
     check('Arabic text is rendered',
-        (await page.textContent('#reader-content .arabic-text')).includes('نَصٌّ عَرَبِيٌّ'));
+        (await page.textContent('#reader-content .verse-ar')).includes('نَصٌّ عَرَبِيٌّ'));
     check('subtitle reports the full count',
         (await page.textContent('#reader-subtitle')).includes('100 verses'));
-    const translation = await page.$$eval('#reader-content > div.bg-white', (els) =>
-        els[0].lastElementChild.textContent);
+    const translation = await page.$$eval('#reader-content .verse .verse-tr', (els) =>
+        els[0].textContent);
     check('footnote markup is stripped from translations',
         translation === 'Translation number 1', JSON.stringify(translation));
 
@@ -175,7 +167,7 @@ function stubVerses(page) {
     check('changing the Juz refetches',
         apiCalls.length === TOTAL_PAGES && apiCalls[0].includes('by_juz/12'), apiCalls[0]);
     check('verse cards show the new Juz',
-        (await page.textContent('#reader-content .bg-emerald-50')).includes('Juz 12'));
+        (await page.textContent('#reader-content .verse-juz')).includes('Juz 12'));
 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
@@ -209,13 +201,13 @@ function stubVerses(page) {
     apiCalls = [];
     await page.click('#reader-content button');
     await page.waitForFunction(
-        (n) => document.querySelectorAll('#reader-content > div.bg-white').length === n,
+        (n) => document.querySelectorAll('#reader-content .verse').length === n,
         PAGE_SIZE * TOTAL_PAGES,
         { timeout: 5000 }
     ).catch(() => {});
     check('retry recovers after the API comes back',
-        (await page.$$('#reader-content > div.bg-white')).length === PAGE_SIZE * TOTAL_PAGES,
-        (await page.$$('#reader-content > div.bg-white')).length);
+        (await page.$$('#reader-content .verse')).length === PAGE_SIZE * TOTAL_PAGES,
+        (await page.$$('#reader-content .verse')).length);
     await page.click('#close-reader-btn');
     await page.waitForTimeout(150);
     check('a failed load throws nothing uncaught', errors.length === errorsBeforeFailure,

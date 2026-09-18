@@ -31,7 +31,9 @@ function build() {
     );
 
     // Nothing may reference a sibling file: the whole point is one file.
-    const stray = [...inlined.matchAll(/(?:src|href)="(?!https?:|#|data:)([^"]+)"/g)];
+    const stray = [...inlined.matchAll(
+        /(?:src|href)="(?!https?:|#|data:|mailto:|tel:)([^"]+)"/g
+    )];
     if (stray.length) {
         throw new Error('relative references left in the build: ' +
             stray.map((m) => m[1]).join(', '));

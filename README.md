@@ -25,6 +25,13 @@ derived from the Umm al-Qura calendar via `Intl.DateTimeFormat`. You can change
 it if you started your cycle on a different day — the 30-day rotation just
 follows whatever anchor you set.
 
+The page is styled to match [diinislaam.com](https://diinislaam.com): the same
+parchment/gold/green tokens, the same Amiri / Cormorant Garamond / Marcellus
+fonts, and the site's own header and footer, so it reads as a page of that site
+rather than a separate app. Following the site's convention, all of its CSS is
+inline — there is no Tailwind, no icon font, and the only external requests are
+Google Fonts and the Quran.com API.
+
 ## Running it
 
 No build step. Open `index.html` in a browser, or serve the folder:
@@ -32,10 +39,6 @@ No build step. Open `index.html` in a browser, or serve the folder:
 ```sh
 npm run serve   # http://localhost:8000
 ```
-
-Styling comes from the Tailwind CDN script, so the first load needs a network
-connection. For an offline or production deployment, replace that script tag
-with a pre-built Tailwind stylesheet.
 
 ## Deploying
 
@@ -46,18 +49,35 @@ where a relative `src/core.js` would otherwise resolve to `/src/core.js` and
 break the page. `npm test` fails if the committed build is stale, so `dist/`
 cannot drift from the source.
 
-### Onto a domain you already run
+### diinislaam.com
 
-If you know what serves the domain — a VPS, cPanel, WordPress, any static host
-— copy `dist/quran-tracker/` into its document root. The app is static, has no
-server side, and touches no other path, so nothing else changes.
+The live site is the `fes-reshid/barnoota` repo, served by GitHub Pages from
+`main` with Cloudflare in front. Copy the built file in as a page:
 
-### Onto a domain behind Cloudflare, without knowing the origin
+```sh
+npm run build
+cp dist/quran-tracker/index.html ../barnoota/quran-tracker/index.html
+```
 
-`cloudflare/` deploys the app as a Worker bound to the route
-`diinislaam.com/quran-tracker*`. Only that path is intercepted; every other
-request never reaches the Worker and continues to the existing origin. No DNS
-record changes and the current site is untouched.
+Committing that to `main` publishes it at
+`https://diinislaam.com/quran-tracker/`. The file is generated — edit the
+source here and rebuild, never the copy in the site repo.
+
+Because the page can be served from either repo, its header and footer links
+are absolute `https://diinislaam.com/...` URLs rather than the site's usual
+relative ones, so the navigation works from both.
+
+### Any other host
+
+Copy `dist/quran-tracker/` into the document root. The app is static, has no
+server side, and touches no other path.
+
+### Cloudflare Worker
+
+`cloudflare/` deploys the page as a Worker on the route
+`diinislaam.com/quran-tracker*`, for a domain where the origin cannot be
+changed. Only that path is intercepted; everything else continues to the
+existing origin.
 
 ```sh
 npm run build
@@ -65,21 +85,12 @@ npx wrangler login
 npx wrangler deploy --config cloudflare/wrangler.toml
 ```
 
-Edit the `pattern` and `zone_name` in `cloudflare/wrangler.toml` for a
-different domain. The built page is compiled into the Worker as a text module,
-so there is no origin to keep running — about 11 KB gzipped, inside the free
-tier. Re-run `npm run build` before deploying to pick up source changes.
-
 ### GitHub Pages
 
-`.github/workflows/pages.yml` publishes `dist/` on every push, serving the app
-at `/<repo>/quran-tracker/`. It checks the build is current and runs the unit
-tests before publishing.
-
-Pages has to be turned on once by hand, under **Settings → Pages → Build and
-deployment → Source → GitHub Actions**. The workflow token is not allowed to
-create the Pages site itself, so until that setting is flipped the deploy step
-fails with `Resource not accessible by integration`.
+`.github/workflows/pages.yml` publishes `dist/` on every push. Pages has to be
+turned on once by hand, under **Settings → Pages → Build and deployment →
+Source → GitHub Actions**; the workflow token is not allowed to create the
+Pages site itself.
 
 ## Tests
 
