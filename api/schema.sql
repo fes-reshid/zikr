@@ -1,60 +1,42 @@
--- Schema for the Qur'ān Daily Tracker accounts.
+-- Schema for the Qur'ān Daily Tracker reminders.
 --
--- Deliberately small: an account exists to carry the reading log between
--- devices and to know where to send a reminder. Nothing else is stored.
+-- Accounts live in Firebase, shared with the quest games, so nothing
+-- identifying is stored here: no email, no username, no display name. The only
+-- link to a person is `uid`, the opaque Firebase user id, and it is kept purely
+-- so the nightly job knows who has not read today and where to send a push.
+--
+-- The reading log people actually see is synced through Firestore by the page,
+-- alongside the other apps' progress. What is mirrored here is only what the
+-- scheduled job has to be able to read without a browser present.
 
-CREATE TABLE IF NOT EXISTS users (
-  id            TEXT PRIMARY KEY,
-  email         TEXT NOT NULL UNIQUE,
-  name          TEXT,
-  start_date    TEXT,                       -- cycle start, YYYY-MM-DD
-  timezone      TEXT NOT NULL DEFAULT 'UTC',-- so "today" means their today
-  remind_hour   INTEGER NOT NULL DEFAULT 20,-- local hour to nudge at
-  email_opt_in  INTEGER NOT NULL DEFAULT 1,
-  push_opt_in   INTEGER NOT NULL DEFAULT 1,
-  created_at    INTEGER NOT NULL
+CREATE TABLE IF NOT EXISTS reminder_settings (
+  uid          TEXT PRIMARY KEY,           -- Firebase uid, nothing else
+  start_date   TEXT,                       -- cycle start, YYYY-MM-DD
+  timezone     TEXT NOT NULL DEFAULT 'UTC',-- so "today" means their today
+  remind_hour  INTEGER NOT NULL DEFAULT 20,
+  push_opt_in  INTEGER NOT NULL DEFAULT 1,
+  updated_at   INTEGER NOT NULL
 );
 
--- Sign-in links. Only a hash is kept, so the table is useless if leaked.
-CREATE TABLE IF NOT EXISTS login_tokens (
-  token_hash  TEXT PRIMARY KEY,
-  email       TEXT NOT NULL,
-  expires_at  INTEGER NOT NULL,
-  used_at     INTEGER
-);
-CREATE INDEX IF NOT EXISTS login_tokens_expiry ON login_tokens (expires_at);
-
--- Sessions, likewise stored only as a hash.
-CREATE TABLE IF NOT EXISTS sessions (
-  token_hash  TEXT PRIMARY KEY,
-  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  expires_at  INTEGER NOT NULL,
-  created_at  INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_id);
-
--- One row per day read. Absence means not read.
 CREATE TABLE IF NOT EXISTS readings (
-  user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  day      TEXT NOT NULL,                   -- YYYY-MM-DD in the user's zone
-  juz      INTEGER,
+  uid      TEXT NOT NULL,
+  day      TEXT NOT NULL,                  -- YYYY-MM-DD in the user's zone
   read_at  INTEGER NOT NULL,
-  PRIMARY KEY (user_id, day)
+  PRIMARY KEY (uid, day)
 );
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id          TEXT PRIMARY KEY,             -- hash of the endpoint
-  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id          TEXT PRIMARY KEY,            -- hash of the endpoint
+  uid         TEXT NOT NULL,
   endpoint    TEXT NOT NULL,
   created_at  INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS push_user ON push_subscriptions (user_id);
+CREATE INDEX IF NOT EXISTS push_uid ON push_subscriptions (uid);
 
--- Guarantees at most one nudge per person per day, even if the cron overlaps.
+-- Guarantees at most one nudge per person per day, even if runs overlap.
 CREATE TABLE IF NOT EXISTS reminders_sent (
-  user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  uid      TEXT NOT NULL,
   day      TEXT NOT NULL,
   sent_at  INTEGER NOT NULL,
-  channels TEXT,
-  PRIMARY KEY (user_id, day)
+  PRIMARY KEY (uid, day)
 );

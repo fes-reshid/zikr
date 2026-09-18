@@ -40,7 +40,12 @@ const ICONS = ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-t
 
 // Assets the pages may legitimately reference beside themselves, compared
 // after stripping the "./" or "../" each page's {{ROOT}} puts in front.
-const ALLOWED_REFS = ['reader/', '', 'manifest.webmanifest', 'icons/apple-touch-icon.png'];
+const ALLOWED_REFS = [
+    'reader/', '', 'manifest.webmanifest', 'icons/apple-touch-icon.png',
+    // The site's shared accounts module, which lives beside these pages on
+    // diinislaam.com rather than in this repo.
+    'kids-quest-cloud.js'
+];
 
 function read(relPath) {
     return fs.readFileSync(path.join(ROOT, relPath), 'utf8');

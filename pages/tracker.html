@@ -160,6 +160,10 @@
   }
   .toggle input{ accent-color:var(--green); width:20px; height:20px; flex:none; }
   .hour-row{ display:flex; align-items:center; gap:10px; font-size:16px; }
+  .linkish{
+    background:none; border:0; padding:0; cursor:pointer; font:inherit;
+    color:var(--green); text-decoration:underline;
+  }
   .hour-row select{
     padding:9px 12px; min-height:44px; border-radius:10px; border:1.5px solid var(--gold-soft);
     background:#fffdf6; font-family:'Cormorant Garamond', serif; font-size:16px; font-weight:700;
@@ -288,16 +292,22 @@
       <button type="button" class="icon-btn" id="close-signin-btn" aria-label="Close">&times;</button>
     </div>
     <div class="sheet-pad">
-      <p class="lede">Signing in is optional &mdash; the tracker works without it. An account keeps your reading log on every device you use, and lets it remind you when a day goes unread.</p>
+      <p class="lede" id="signin-lede">Use the same username and password as the quest games &mdash; it is the same account, and no email is asked for. Signing in is optional: the tracker works without it.</p>
       <form id="signin-form">
         <div class="field">
-          <label for="signin-email">Email address</label>
-          <input type="email" id="signin-email" required autocomplete="email" inputmode="email" placeholder="you@example.com">
+          <label for="signin-username">Username</label>
+          <input type="text" id="signin-username" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. amina123">
         </div>
-        <button type="submit" class="btn btn-primary btn-block" id="signin-submit">Email me a sign-in link</button>
+        <div class="field">
+          <label for="signin-password">Password</label>
+          <input type="password" id="signin-password" required autocomplete="current-password" minlength="6">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="signin-submit">Sign in</button>
       </form>
       <p class="sheet-msg" id="signin-message"></p>
-      <p class="fine">No password: we email a link that works once and expires in fifteen minutes. Your address is used for the reminder and nothing else.</p>
+      <p class="fine">
+        <button type="button" class="linkish" id="signin-toggle">I don&rsquo;t have an account yet</button>
+      </p>
     </div>
   </div>
 </div>
@@ -310,29 +320,30 @@
       <button type="button" class="icon-btn" id="close-account-btn" aria-label="Close">&times;</button>
     </div>
     <div class="sheet-pad">
-      <p class="account-email" id="account-email"></p>
-      <p class="lede">Remind me if the day&rsquo;s juz is still unread:</p>
-      <label class="toggle" for="opt-push">
-        <input type="checkbox" id="opt-push">
-        Notify me on this device
-      </label>
-      <label class="toggle" for="opt-email">
-        <input type="checkbox" id="opt-email">
-        Email me
-      </label>
-      <div class="hour-row">
-        <label for="remind-hour">at</label>
-        <select id="remind-hour"></select>
-        <span id="remind-zone" class="fine"></span>
+      <p class="account-email" id="account-name"></p>
+      <div id="reminder-block">
+        <p class="lede">Remind me if the day&rsquo;s juz is still unread:</p>
+        <label class="toggle" for="opt-push">
+          <input type="checkbox" id="opt-push">
+          Notify me on this device
+        </label>
+        <div class="hour-row">
+          <label for="remind-hour">at</label>
+          <select id="remind-hour"></select>
+          <span id="remind-zone" class="fine"></span>
+        </div>
+        <p class="warn is-hidden" id="push-warning"></p>
       </div>
-      <p class="warn is-hidden" id="push-warning"></p>
+      <p class="warn is-hidden" id="api-warning">
+        Reminders are not switched on for this site yet, so nothing will be sent. Your reading log is still kept on this device.
+      </p>
       <button type="button" class="setting" id="signout-btn">
         <strong>Sign out</strong>
         <span>Your reading log stays on this device.</span>
       </button>
-      <button type="button" class="setting setting-danger" id="delete-account-btn">
-        <strong>Delete account</strong>
-        <span>Removes the account and everything stored with it.</span>
+      <button type="button" class="setting setting-danger" id="forget-btn">
+        <strong>Delete my reminder data</strong>
+        <span>Clears the reading log and reminder settings held on the server. Your account and the quest games are untouched.</span>
       </button>
     </div>
   </div>
@@ -346,6 +357,8 @@
 <script>
 <!-- @pwa-js -->
 </script>
+<!-- The site's shared accounts, the same ones the quest games use. -->
+<script type="module" src="{{ROOT}}../kids-quest-cloud.js"></script>
 <script>
 <!-- @account-js -->
 </script>
@@ -427,20 +440,25 @@
     var accountBtn = $('account-btn');
     var signinModal = $('signin-modal');
     var signinForm = $('signin-form');
-    var signinEmail = $('signin-email');
+    var signinUsername = $('signin-username');
+    var signinPassword = $('signin-password');
     var signinSubmit = $('signin-submit');
     var signinMessage = $('signin-message');
+    var signinToggle = $('signin-toggle');
+    var signinTitle = $('signin-title');
+    var signinLede = $('signin-lede');
     var closeSigninBtn = $('close-signin-btn');
     var accountModal = $('account-modal');
     var closeAccountBtn = $('close-account-btn');
-    var accountEmail = $('account-email');
+    var accountName = $('account-name');
+    var reminderBlock = $('reminder-block');
+    var apiWarning = $('api-warning');
     var optPush = $('opt-push');
-    var optEmail = $('opt-email');
     var remindHour = $('remind-hour');
     var remindZone = $('remind-zone');
     var pushWarning = $('push-warning');
     var signoutBtn = $('signout-btn');
-    var deleteAccountBtn = $('delete-account-btn');
+    var forgetBtn = $('forget-btn');
 
     var settingsBtn = $('settings-btn');
     var settingsModal = $('settings-modal');
@@ -597,9 +615,7 @@
 
         // The page never waits on the network: the local log is what it draws.
         var Account = window.QuranAccount;
-        if (Account && Account.state.signedIn && userProfile) {
-            Account.setDay(key, value, Core.juzForDate(userProfile.startDate, key));
-        }
+        if (Account && Account.state.signedIn) Account.setDay(key, value);
     }
 
     function openSettings() {
@@ -676,18 +692,14 @@
 
     // --- Account -------------------------------------------------------
     var Account = window.QuranAccount;
-
-    function firstName(user) {
-        if (user.name) return user.name.split(/\s+/)[0];
-        return user.email.split('@')[0];
-    }
+    var signupMode = false;
 
     function renderAccountButton() {
         if (!accountBtn) return;
-        // Nothing about accounts is shown unless the API answered.
+        // Nothing about accounts is shown unless the shared auth module loaded.
         accountBtn.classList.toggle(HIDDEN, !(Account && Account.state.available));
         if (Account && Account.state.signedIn) {
-            accountBtn.textContent = firstName(Account.state.user);
+            accountBtn.textContent = Account.state.user.displayName || Account.state.user.username;
             accountBtn.classList.add('signed-in');
             accountBtn.setAttribute('aria-label', 'Your account');
         } else {
@@ -706,25 +718,29 @@
 
     function renderAccountSheet() {
         if (!Account || !Account.state.signedIn) return;
-        var user = Account.state.user;
-        accountEmail.textContent = user.email;
-        optEmail.checked = user.emailReminders;
-        // `Notification` is absent entirely in some contexts, so only `typeof`
-        // is safe here — a bare reference would throw a ReferenceError.
+        accountName.textContent = Account.state.user.displayName || Account.state.user.username;
+
+        // Reminders need the API; signing in alone does not give them.
+        var settings = Account.state.settings;
+        reminderBlock.classList.toggle(HIDDEN, !Account.state.apiReady);
+        apiWarning.classList.toggle(HIDDEN, Account.state.apiReady);
+        if (!settings) return;
+
         var canNotify = typeof Notification !== 'undefined';
-        optPush.checked = !!user.pushReminders && canNotify &&
+        optPush.checked = !!settings.pushReminders && canNotify &&
             Notification.permission === 'granted';
-        remindHour.value = String(user.remindHour);
-        remindZone.textContent = user.timezone ? '(' + user.timezone.replace(/_/g, ' ') + ')' : '';
+        remindHour.value = String(settings.remindHour);
+        remindZone.textContent = settings.timezone
+            ? '(' + settings.timezone.replace(/_/g, ' ') + ')' : '';
 
         if (!Account.pushSupported()) {
-            pushWarning.textContent = 'This browser cannot show notifications. ' +
-                'Email reminders still work.';
+            pushWarning.textContent = 'This browser cannot show notifications, so nothing ' +
+                'can be sent to this device.';
             pushWarning.classList.remove(HIDDEN);
             optPush.disabled = true;
         } else if (canNotify && Notification.permission === 'denied') {
-            pushWarning.textContent = 'Notifications are blocked for this site in your browser ' +
-                'settings, so only email can reach you.';
+            pushWarning.textContent = 'Notifications are blocked for this site in your ' +
+                'browser settings.';
             pushWarning.classList.remove(HIDDEN);
             optPush.disabled = true;
         } else {
@@ -733,11 +749,28 @@
         }
     }
 
-    function openSignin() {
+    function setSignupMode(on) {
+        signupMode = on;
+        signinTitle.textContent = on ? 'Create an account' : 'Sign in';
+        signinSubmit.textContent = on ? 'Create account' : 'Sign in';
+        signinPassword.setAttribute('autocomplete', on ? 'new-password' : 'current-password');
+        signinToggle.textContent = on
+            ? 'I already have an account'
+            : 'I don\u2019t have an account yet';
+        signinLede.textContent = on
+            ? 'Pick a username and password. This is the same account the quest games use, ' +
+              'so it will work there too. No email is asked for.'
+            : 'Use the same username and password as the quest games \u2014 it is the same ' +
+              'account, and no email is asked for. Signing in is optional: the tracker ' +
+              'works without it.';
         signinMessage.textContent = '';
         signinMessage.className = 'sheet-msg';
+    }
+
+    function openSignin() {
+        setSignupMode(false);
         signinModal.classList.remove(HIDDEN);
-        signinEmail.focus();
+        signinUsername.focus();
     }
 
     function openAccount() {
@@ -761,26 +794,32 @@
     accountModal.addEventListener('click', function (e) {
         if (e.target === accountModal) accountModal.classList.add(HIDDEN);
     });
+    signinToggle.addEventListener('click', function () { setSignupMode(!signupMode); });
 
     signinForm.addEventListener('submit', async function (event) {
         event.preventDefault();
-        var email = signinEmail.value.trim();
-        if (!email) return;
+        var username = signinUsername.value.trim();
+        var password = signinPassword.value;
+        if (!username || !password) return;
 
         signinSubmit.disabled = true;
-        signinSubmit.textContent = 'Sending…';
-        var result = await Account.requestLink(email);
+        var label = signinSubmit.textContent;
+        signinSubmit.textContent = signupMode ? 'Creating\u2026' : 'Signing in\u2026';
+
+        var result = signupMode
+            ? await Account.signUp(username, password)
+            : await Account.signIn(username, password);
+
         signinSubmit.disabled = false;
-        signinSubmit.textContent = 'Email me a sign-in link';
+        signinSubmit.textContent = label;
 
-        signinMessage.textContent = result.message ||
-            (result.ok ? 'Check your email.' : 'Could not send the link.');
-        signinMessage.className = 'sheet-msg' + (result.ok ? '' : ' bad');
-        if (result.ok) signinForm.reset();
-    });
-
-    optEmail.addEventListener('change', function () {
-        Account.saveProfile({ emailReminders: optEmail.checked });
+        if (result.ok) {
+            signinForm.reset();
+            signinModal.classList.add(HIDDEN);
+        } else {
+            signinMessage.textContent = result.message;
+            signinMessage.className = 'sheet-msg bad';
+        }
     });
 
     optPush.addEventListener('change', async function () {
@@ -798,11 +837,14 @@
         } else {
             await Account.disablePush();
         }
-        Account.saveProfile({ pushReminders: optPush.checked });
+        Account.saveSettings({
+            pushReminders: optPush.checked,
+            timezone: Account.guessTimeZone()
+        });
     });
 
     remindHour.addEventListener('change', function () {
-        Account.saveProfile({
+        Account.saveSettings({
             remindHour: Number(remindHour.value),
             timezone: Account.guessTimeZone()
         });
@@ -814,56 +856,50 @@
         renderAccountButton();
     });
 
-    deleteAccountBtn.addEventListener('click', async function () {
-        if (!confirm('Delete your account and everything stored with it? ' +
-            'Your reading log stays on this device.')) return;
-        await Account.deleteAccount();
+    forgetBtn.addEventListener('click', async function () {
+        if (!confirm('Delete the reading log and reminder settings kept on the server? ' +
+            'Your account and your progress in the other apps are not affected, and ' +
+            'this device keeps its own copy.')) return;
+        await Account.forgetMe();
         accountModal.classList.add(HIDDEN);
-        renderAccountButton();
     });
 
     /*
-     * The account is loaded after the page has already drawn from the local
-     * log, so a slow or missing API never delays anything on screen.
+     * The account is started after the page has already drawn from the local
+     * log, so a slow, missing or signed-out account never delays the screen.
      */
     function startAccount() {
         if (!Account) return;
 
         Account.onChange(function (accountState) {
             renderAccountButton();
-            if (!accountState.signedIn) return;
+            if (!accountState.signedIn || !accountState.apiReady) return;
 
-            // The account is authoritative once signed in.
+            // The account is authoritative once signed in and synced.
             var merged = {};
             accountState.days.forEach(function (day) { merged[day] = true; });
             readingLog = merged;
             writeStore(LOG_KEY, readingLog);
 
-            if (!userProfile && accountState.user.name && accountState.user.startDate) {
+            if (!userProfile && accountState.settings && accountState.settings.startDate) {
                 userProfile = {
-                    name: accountState.user.name,
-                    startDate: accountState.user.startDate
+                    name: accountState.user.displayName || accountState.user.username,
+                    startDate: accountState.settings.startDate
                 };
                 writeStore(PROFILE_KEY, userProfile);
             }
             renderApp();
         });
 
-        Account.load(Object.keys(readingLog), userProfile);
+        Account.start(Object.keys(readingLog), userProfile);
 
         var params = new URLSearchParams(location.search);
-        if (params.get('signedin') === '1' || params.get('signin') === 'expired') {
-            if (params.get('signin') === 'expired') {
-                setTimeout(function () {
-                    openSignin();
-                    signinMessage.textContent = 'That link had already been used or expired. ' +
-                        'Here is a fresh one.';
-                    signinMessage.className = 'sheet-msg bad';
-                }, 300);
-            }
+        if (params.get('account') === '1') {
             history.replaceState(null, '', location.pathname);
+            setTimeout(function () {
+                if (Account.state.signedIn) openAccount(); else openSignin();
+            }, 600);
         }
-        if (params.get('account') === '1') setTimeout(openAccount, 300);
     }
 
     renderAccountButton();

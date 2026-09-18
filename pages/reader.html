@@ -227,6 +227,8 @@
 <script>
 <!-- @pwa-js -->
 </script>
+<!-- The site's shared accounts, the same ones the quest games use. -->
+<script type="module" src="{{ROOT}}../kids-quest-cloud.js"></script>
 <script>
 <!-- @account-js -->
 </script>
@@ -240,8 +242,7 @@
     function render(state) {
         button.classList.toggle('is-hidden', !state.available);
         if (state.signedIn) {
-            var user = state.user;
-            button.textContent = user.name ? user.name.split(/\s+/)[0] : user.email.split('@')[0];
+            button.textContent = state.user.displayName || state.user.username;
             button.classList.add('signed-in');
         } else {
             button.textContent = 'Sign in';
@@ -253,7 +254,7 @@
     button.addEventListener('click', function () {
         location.href = '{{ROOT}}?account=1';
     });
-    window.QuranAccount.load(null, null);
+    window.QuranAccount.start([], null);
 })();
 </script>
 <script>

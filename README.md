@@ -11,10 +11,12 @@ Two pages for reading one juz of the Qur'ān a day, published as part of
 It installs to a phone's home screen as a progressive web app, so it opens
 without browser chrome and the pages you have already opened work offline.
 
-Signing in is optional and adds only two things: the reading log follows you
-between devices, and a missed day is followed by a notification and an email.
-Without an account everything still works, stored on the device alone — and if
-the API is not deployed, the pages show nothing about accounts at all.
+Signing in is optional and uses the site's existing accounts — the same
+username and password as the quest games, with no email anywhere. It adds two
+things: the reading log follows you between devices, and a missed day is
+followed by a notification. Without an account everything still works, stored on
+the device alone, and if either the shared accounts module or the reminder API
+is absent the pages show nothing about accounts at all.
 
 Everything is stored in your browser's `localStorage`. There is no account and
 no server; the only requests leaving the device go to the Quran.com API for
@@ -88,25 +90,41 @@ are committed, so an ordinary build needs neither a browser nor that script.
 
 ## Accounts and reminders
 
-`api/` is a Cloudflare Worker on the route `diinislaam.com/quran-tracker/api/*`
-— the same origin as the pages, so the session cookie needs no CORS and no
-third-party cookie. It holds a D1 database, and an hourly cron trigger sends the
-nudge.
+Accounts are not this project's. `kids-quest-cloud.js` on diinislaam.com already
+signs people in to the quest games with a **username and password** against the
+Firebase project `diinislaam-8fdeb`, and the tracker reuses exactly those: the
+same credentials as Arabic Quest, and no second account to create.
 
-Signing in is by emailed link: there are no passwords to store or leak, and the
-address is needed for the reminder anyway. Tokens and sessions are kept only as
-SHA-256 hashes, the link works once and expires in fifteen minutes, and the
-login endpoint answers identically whether or not an address has an account, so
-it cannot be used to discover who is registered.
+**No email address is involved anywhere.** Those accounts are keyed by username
+— the module maps each one to a synthetic `+tag` address internally, which the
+tracker never sees. Sign-up here passes an empty contact address, and the
+reminder API stores only the Firebase `uid`, an opaque id. No email, no
+username, no display name reaches the server.
+
+`api/` is a Cloudflare Worker at `diinislaam.com/quran-tracker/api/*`. It exists
+for one reason: a notification has to be sent while nobody has the page open,
+and that needs something on a schedule. It never handles a password and issues
+no session of its own — the page sends the Firebase ID token, the Worker
+verifies it against Google's published signing keys, and keeps the `sub` claim.
 
 The cron runs hourly rather than nightly because "20:00" has to mean 20:00 where
-the person is; each run picks out those whose local clock has just reached their
+the person is; each run takes those whose local clock has just reached their
 chosen hour, have not marked the day, and have not already been nudged. A row is
-claimed before anything is sent, so an overlapping run cannot nudge twice.
+claimed before anything is sent, so overlapping runs cannot nudge twice, and a
+subscription the browser has dropped is deleted on 404/410.
 
 Push is sent **without a payload**. Encrypting one per subscription buys nothing
 when the message is always the same, so only the VAPID signature is needed and
 the service worker asks the API which juz is due when it wakes.
+
+### Why there is no email reminder
+
+There is no address to send one to. Every quest account maps to a synthetic
+`fesbackups+quest-<username>@gmail.com`, which delivers to the site admin's own
+inbox — so "emailing the user" would in fact email the admin, once per person
+per day. A notification reaches the actual person; an email would not. Adding
+real email would mean collecting and storing addresses, which is exactly what
+this design avoids.
 
 ### Setting it up
 
@@ -121,18 +139,19 @@ npm run db:remote                        # create the tables
 npm run vapid                            # generates the two push keys
 npx wrangler secret put VAPID_PUBLIC_KEY
 npx wrangler secret put VAPID_PRIVATE_JWK
-npx wrangler secret put RESEND_API_KEY   # from resend.com, after verifying the domain
 
 npx wrangler deploy
 ```
 
-Until the Worker is deployed the pages simply show no sign-in button, so
-publishing them first is harmless.
+Until the Worker is deployed people can still sign in; the account sheet says
+reminders are not switched on and everything else behaves normally.
 
 `npm test` in `api/` runs the suite against a real `wrangler dev` with a local
-D1. Email and push are pointed at a stub rather than mocked out, so the actual
-send paths run: the test reads the sign-in link out of the email it composed,
-and verifies the VAPID signature on the push it sent against the public key.
+D1. It mints its own Firebase-shaped ID tokens and serves the matching public
+key from a stub, so the Worker's real verification path runs — including the
+rejections: another project's token, a wrong issuer, an expired one, a tampered
+payload, an unknown signing key. Push goes to the same stub, so the VAPID
+signature it actually sends is verified against the public key.
 
 ## Deploying
 

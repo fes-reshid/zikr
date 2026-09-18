@@ -3,7 +3,6 @@
 #   npm run db:remote                          (creates the tables)
 #   npx wrangler secret put VAPID_PRIVATE_JWK
 #   npx wrangler secret put VAPID_PUBLIC_KEY
-#   npx wrangler secret put RESEND_API_KEY
 #   npx wrangler deploy
 
 name = "quran-tracker-api"
@@ -18,7 +17,8 @@ zone_name = "diinislaam.com"
 [vars]
 APP_URL = "https://diinislaam.com/quran-tracker/"
 APP_PATH = "/quran-tracker/"
-MAIL_FROM = "Diin Islaam <noreply@diinislaam.com>"
+# The site's existing Firebase project, shared with the quest games.
+FIREBASE_PROJECT_ID = "diinislaam-8fdeb"
 VAPID_SUBJECT = "mailto:fesbackups@gmail.com"
 
 [[d1_databases]]

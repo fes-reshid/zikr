@@ -481,14 +481,24 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     }
 })();
 </script>
+<!-- The site's shared accounts, the same ones the quest games use. -->
+<script type="module" src="../../kids-quest-cloud.js"></script>
 <script>
 /* src/account.js, inlined by build.js — edit the source, not this file. */
 /*
- * Optional accounts.
+ * Optional sign-in, using the site's existing accounts.
  *
- * Signing in is never required: both pages work from localStorage alone, and
- * every call here fails soft. An account only adds carrying the reading log
- * between devices and being reminded when a day is missed.
+ * The quest games already sign people in with a username and password through
+ * kids-quest-cloud.js (Firebase project diinislaam-8fdeb), so the tracker
+ * reuses exactly those accounts: the same username and password as Arabic
+ * Quest, and no second account to create.
+ *
+ * No email is involved anywhere. Those accounts are keyed by username, and the
+ * reminder API is told only the Firebase ID token, from which it keeps just the
+ * opaque user id. Signing in remains entirely optional: both pages work from
+ * localStorage alone, every call here fails soft, and if either the shared
+ * auth module or the reminder API is missing, the pages show nothing about
+ * accounts at all.
  *
  * Exposes window.QuranAccount.
  */
@@ -497,11 +507,19 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     var API = '../api/';
     var SYNCED_KEY = 'quran_synced_with';
+    var CLOUD_WAIT_MS = 8000;
 
-    // `available` stays false when there is no API deployed, or it is
-    // unreachable; the pages then show nothing about accounts at all.
-    var state = { ready: false, available: false, signedIn: false, user: null, days: [] };
+    var state = {
+        ready: false,
+        available: false,   // the shared auth module loaded
+        apiReady: false,    // the reminder API answered
+        signedIn: false,
+        user: null,         // { uid, username, displayName }
+        settings: null,
+        days: []
+    };
     var listeners = [];
+    var pendingLocal = { days: [], profile: null };
 
     function emit() {
         listeners.forEach(function (fn) {
@@ -509,11 +527,36 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         });
     }
 
+    function cloud() { return window.KidsCloud; }
+
+    /** Resolves once the shared auth module is on the page, or null if it never is. */
+    function waitForCloud() {
+        if (cloud()) return Promise.resolve(cloud());
+        return new Promise(function (resolve) {
+            var settled = false;
+            function done(value) {
+                if (settled) return;
+                settled = true;
+                resolve(value);
+            }
+            window.addEventListener('kidscloud-ready', function () { done(cloud()); });
+            setTimeout(function () { done(cloud() || null); }, CLOUD_WAIT_MS);
+        });
+    }
+
     async function api(method, route, body) {
+        var token = null;
+        try {
+            token = cloud() && cloud().getIdToken ? await cloud().getIdToken() : null;
+        } catch (err) { token = null; }
+        if (!token) return { ok: false, status: 401, body: {} };
+
         var response = await fetch(API + route, {
             method: method,
-            credentials: 'same-origin',
-            headers: body ? { 'content-type': 'application/json' } : undefined,
+            headers: Object.assign(
+                { authorization: 'Bearer ' + token },
+                body ? { 'content-type': 'application/json' } : {}
+            ),
             body: body ? JSON.stringify(body) : undefined
         });
         var payload = null;
@@ -521,10 +564,10 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         return { ok: response.ok, status: response.status, body: payload || {} };
     }
 
-    function localStore(key) {
+    function readLocal(key) {
         try { return localStorage.getItem(key); } catch (err) { return null; }
     }
-    function setLocalStore(key, value) {
+    function writeLocal(key, value) {
         try { localStorage.setItem(key, value); } catch (err) { /* private mode */ }
     }
 
@@ -533,92 +576,136 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         catch (err) { return 'UTC'; }
     }
 
-    /**
-     * Loads the session. `localDays` and `localProfile` are what this device
-     * already had: on the first sign-in they are merged up, so a streak built
-     * before signing in is not lost. The merge only ever adds days.
-     */
-    async function load(localDays, localProfile) {
+    /* Pull the account's reading log, merging this device's in on first use. */
+    async function refresh() {
         var result;
         try {
             result = await api('GET', 'me');
         } catch (err) {
-            // Offline, or no API deployed: the pages carry on without it.
-            state.ready = true;
-            state.available = false;
+            state.apiReady = false;
             emit();
-            return state;
+            return;
+        }
+        if (!result.ok) {
+            // Signed in, but the reminder API is not deployed or is unhappy.
+            state.apiReady = false;
+            emit();
+            return;
         }
 
-        state.available = result.ok;
-
-        if (!result.ok || !result.body.signedIn) {
-            state.ready = true;
-            state.signedIn = false;
-            state.user = null;
-            state.days = [];
-            emit();
-            return state;
-        }
-
-        state.signedIn = true;
-        state.user = result.body.user;
+        state.apiReady = true;
+        state.settings = result.body.settings;
         state.days = result.body.days || [];
 
-        if (localStore(SYNCED_KEY) !== state.user.email) {
-            if (localDays && localDays.length) {
-                var merged = await api('POST', 'sync', { days: localDays });
+        var marker = state.user ? state.user.uid : '';
+        if (readLocal(SYNCED_KEY) !== marker) {
+            if (pendingLocal.days.length) {
+                var merged = await api('POST', 'sync', { days: pendingLocal.days });
                 if (merged.ok) state.days = merged.body.days || state.days;
             }
-            setLocalStore(SYNCED_KEY, state.user.email);
+            writeLocal(SYNCED_KEY, marker);
         }
 
-        // A fresh account adopts whatever this device already knew.
+        // A fresh account adopts the cycle this device already knew.
         var fill = {};
-        if (!state.user.name && localProfile && localProfile.name) fill.name = localProfile.name;
-        if (!state.user.startDate && localProfile && localProfile.startDate) {
-            fill.startDate = localProfile.startDate;
+        if (!state.settings.startDate && pendingLocal.profile && pendingLocal.profile.startDate) {
+            fill.startDate = pendingLocal.profile.startDate;
         }
-        if (state.user.timezone === 'UTC') fill.timezone = guessTimeZone();
+        if (state.settings.timezone === 'UTC') fill.timezone = guessTimeZone();
         if (Object.keys(fill).length) {
-            var saved = await api('PUT', 'profile', fill);
-            if (saved.ok) state.user = saved.body.user;
+            var saved = await api('PUT', 'settings', fill);
+            if (saved.ok) state.settings = saved.body.settings;
         }
-
-        state.ready = true;
         emit();
-        return state;
     }
 
-    async function requestLink(email) {
-        var result = await api('POST', 'login', { email: email });
-        return result.ok
-            ? { ok: true, message: result.body.message }
-            : { ok: false, message: (result.body && result.body.error) || 'Could not send the link.' };
+    /**
+     * `localDays` and `localProfile` are what this device already had; they are
+     * merged up the first time an account is used here, so a streak built
+     * before signing in is not lost. The merge only ever adds days.
+     */
+    async function start(localDays, localProfile) {
+        pendingLocal.days = localDays || [];
+        pendingLocal.profile = localProfile || null;
+
+        var kids = await waitForCloud();
+        state.ready = true;
+        if (!kids) {
+            state.available = false;
+            emit();
+            return;
+        }
+        state.available = true;
+
+        kids.onStudentAuth(function (user) {
+            if (!user) {
+                state.signedIn = false;
+                state.user = null;
+                state.settings = null;
+                state.days = [];
+                emit();
+                return;
+            }
+            state.signedIn = true;
+            state.user = { uid: user.uid, username: user.username,
+                           displayName: user.displayName || user.username };
+            emit();
+            refresh();
+        });
+        emit();
+    }
+
+    function friendlyError(err) {
+        var code = (err && err.code) || '';
+        if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' ||
+            code === 'auth/user-not-found' || code === 'auth/invalid-login-credentials') {
+            return 'That username and password do not match.';
+        }
+        if (code === 'auth/email-already-in-use') return 'That username is already taken.';
+        if (code === 'auth/weak-password') return 'Choose a password of at least six characters.';
+        if (code === 'auth/too-many-requests') return 'Too many attempts. Try again in a few minutes.';
+        if (code === 'auth/network-request-failed') return 'No connection. Try again.';
+        return (err && err.message) || 'Could not sign in.';
+    }
+
+    async function signIn(username, password) {
+        try {
+            await cloud().studentLogin(username, password);
+            return { ok: true };
+        } catch (err) {
+            return { ok: false, message: friendlyError(err) };
+        }
+    }
+
+    async function signUp(username, password) {
+        try {
+            // No contact address: these accounts are keyed by username, and
+            // nothing here needs an email.
+            await cloud().studentSignUp(username, '', password);
+            return { ok: true };
+        } catch (err) {
+            return { ok: false, message: friendlyError(err) };
+        }
     }
 
     async function signOut() {
-        await api('POST', 'logout');
-        state.signedIn = false;
-        state.user = null;
-        state.days = [];
+        try { await cloud().studentLogout(); } catch (err) { /* already out */ }
         try { localStorage.removeItem(SYNCED_KEY); } catch (err) { /* ignore */ }
-        emit();
     }
 
-    async function saveProfile(fields) {
-        var result = await api('PUT', 'profile', fields);
+    async function saveSettings(fields) {
+        var result = await api('PUT', 'settings', fields);
         if (result.ok) {
-            state.user = result.body.user;
+            state.settings = result.body.settings;
             emit();
         }
         return result.ok;
     }
 
     /** Fire and forget: the local log stays the thing the page renders. */
-    function setDay(day, read, juz) {
+    function setDay(day, read) {
         if (!state.signedIn) return Promise.resolve(false);
-        return api('POST', 'readings', { day: day, read: read, juz: juz })
+        return api('POST', 'readings', { day: day, read: read })
             .then(function (result) {
                 if (result.ok) state.days = result.body.days || state.days;
                 return result.ok;
@@ -626,9 +713,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
             .catch(function () { return false; });
     }
 
-    async function deleteAccount() {
-        var result = await api('DELETE', 'account');
-        if (result.ok) await signOut();
+    async function forgetMe() {
+        var result = await api('DELETE', 'me');
         return result.ok;
     }
 
@@ -652,20 +738,19 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         if (Notification.permission === 'denied') return { ok: false, reason: 'denied' };
 
         var permission = Notification.permission === 'granted'
-            ? 'granted'
-            : await Notification.requestPermission();
+            ? 'granted' : await Notification.requestPermission();
         if (permission !== 'granted') return { ok: false, reason: 'denied' };
 
-        var keyResult = await api('GET', 'push/key');
-        var key = keyResult.body && keyResult.body.key;
-        if (!key) return { ok: false, reason: 'no-key' };
+        var keyResponse = await fetch(API + 'push/key');
+        var keyBody = keyResponse.ok ? await keyResponse.json() : null;
+        if (!keyBody || !keyBody.key) return { ok: false, reason: 'no-key' };
 
         var registration = await navigator.serviceWorker.ready;
         var subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(key)
+                applicationServerKey: urlBase64ToUint8Array(keyBody.key)
             });
         }
         var saved = await api('POST', 'push/subscribe', { endpoint: subscription.endpoint });
@@ -687,12 +772,13 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     window.QuranAccount = {
         state: state,
         onChange: function (fn) { listeners.push(fn); },
-        load: load,
-        requestLink: requestLink,
+        start: start,
+        signIn: signIn,
+        signUp: signUp,
         signOut: signOut,
-        saveProfile: saveProfile,
+        saveSettings: saveSettings,
         setDay: setDay,
-        deleteAccount: deleteAccount,
+        forgetMe: forgetMe,
         enablePush: enablePush,
         disablePush: disablePush,
         pushSupported: pushSupported,
@@ -710,8 +796,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     function render(state) {
         button.classList.toggle('is-hidden', !state.available);
         if (state.signedIn) {
-            var user = state.user;
-            button.textContent = user.name ? user.name.split(/\s+/)[0] : user.email.split('@')[0];
+            button.textContent = state.user.displayName || state.user.username;
             button.classList.add('signed-in');
         } else {
             button.textContent = 'Sign in';
@@ -723,7 +808,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     button.addEventListener('click', function () {
         location.href = '../?account=1';
     });
-    window.QuranAccount.load(null, null);
+    window.QuranAccount.start([], null);
 })();
 </script>
 <script>
