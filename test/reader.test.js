@@ -175,17 +175,35 @@ function readLog(page) {
     {
         const { context, page, calls, errors } = await openReader(browser, { query: '?juz=7' });
 
-        const options = await page.$$eval('#reciter-selector option', (els) =>
-            els.map((e) => ({ value: e.value, label: e.textContent.trim() })));
-        check('both requested reciters are offered', options.length === 2, JSON.stringify(options));
+        const groups = await page.$$eval('#reciter-selector optgroup', (els) =>
+            els.map((g) => ({
+                label: g.label,
+                options: [...g.querySelectorAll('option')]
+                    .map((o) => ({ value: o.value, label: o.textContent.trim() }))
+            })));
+        const all = groups.flatMap((g) => g.options);
+
+        check('every reciter Quran.com offers is selectable', all.length === RECITATIONS.length,
+            all.length + ' of ' + RECITATIONS.length);
+        check('the two named reciters are grouped first',
+            groups[0] && groups[0].label === 'Suggested' && groups[0].options.length === 2,
+            groups[0] && groups[0].label + ': ' + groups[0].options.length);
         check('Mishari Rashid is matched by name, not by a guessed id',
-            options.some((o) => /Afasy/i.test(o.label) && o.value === '7'),
-            JSON.stringify(options[0]));
-        check('AbdurRashid Sufi is matched by name too',
-            options.some((o) => /Sufi/i.test(o.label) && o.value === '112'),
-            JSON.stringify(options[1]));
-        check('decoy reciters are not offered',
-            !options.some((o) => /Minshawi|Sudais|AbdulBaset/i.test(o.label)));
+            groups[0].options.some((o) => /Afasy/i.test(o.label) && o.value === '7'),
+            JSON.stringify(groups[0].options[0]));
+        check('Abdurrashid Ali Sufi is in the list, matched by name',
+            groups[0].options.some((o) => /Sufi/i.test(o.label) && o.value === '112'),
+            JSON.stringify(groups[0].options[1]));
+        check('the rest are offered under their own heading',
+            groups[1] && groups[1].label === 'All reciters' && groups[1].options.length === 3,
+            groups[1] && groups[1].label + ': ' + groups[1].options.length);
+        check('a suggested reciter is not repeated in the full list',
+            !groups[1].options.some((o) => o.value === '7' || o.value === '112'));
+        check('the full list is alphabetical',
+            groups[1].options.map((o) => o.label).join(' | '),
+            groups[1].options.map((o) => o.label).join(' | '));
+        check('no notice when both named reciters were found',
+            await page.$eval('#notice', (el) => el.classList.contains('is-hidden')));
 
         check('Saheeh International is picked over the other translations',
             calls.api.some((u) => u.includes('translations=20')),
@@ -263,7 +281,7 @@ function readLog(page) {
 
     // --- Manual controls --------------------------------------------------
     {
-        const { context, page } = await openReader(browser, { query: '?juz=7&autoplay=0' });
+        const { context, page, calls } = await openReader(browser, { query: '?juz=7&autoplay=0' });
         check('autoplay=0 leaves it paused',
             await page.evaluate(() => document.getElementById('audio').paused));
         check('previous is disabled on the first verse',
@@ -284,6 +302,18 @@ function readLog(page) {
             await page.textContent('#now-playing'));
         check('and highlights it', await page.$eval('.verse.playing',
             (el) => el.dataset.verseKey) === '7:4');
+
+        // Toggling reciter must refetch the audio from the other reciter.
+        calls.api.length = 0;
+        await page.selectOption('#reciter-selector', '112');
+        await page.waitForFunction(
+            () => document.querySelectorAll('.verse').length > 0, { timeout: 8000 });
+        await page.waitForTimeout(400);
+        check('switching reciter refetches that reciter\'s audio',
+            calls.api.some((u) => u.includes('/recitations/112/by_juz/7')),
+            calls.api.filter((u) => u.includes('/recitations/')).join(' | '));
+        check('and the selector holds the new reciter',
+            (await page.inputValue('#reciter-selector')) === '112');
         await context.close();
     }
 
@@ -293,9 +323,15 @@ function readLog(page) {
             query: '?juz=7',
             recitations: RECITATIONS.filter((r) => !/sufi/i.test(r.reciter_name))
         });
-        const options = await page.$$eval('#reciter-selector option', (els) => els.length);
-        check('a reciter the API does not list is dropped', options === 1, options);
-        check('and the page says which one is missing',
+        const count = await page.$$eval('#reciter-selector option', (els) => els.length);
+        const suggested = await page.$$eval('#reciter-selector optgroup', (els) =>
+            els.filter((g) => g.label === 'Suggested')
+               .flatMap((g) => [...g.querySelectorAll('option')].map((o) => o.textContent.trim())));
+        check('the others stay selectable when a named reciter is absent',
+            count === RECITATIONS.length - 1, count);
+        check('and only the one that was found is suggested',
+            suggested.length === 1 && /Afasy/i.test(suggested[0]), JSON.stringify(suggested));
+        check('and the page says which one Quran.com lacks',
             /Sufi/i.test(await page.textContent('#notice')),
             (await page.textContent('#notice')).trim());
         await context.close();

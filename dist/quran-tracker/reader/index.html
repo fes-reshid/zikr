@@ -587,13 +587,14 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var PLACE_KEY = 'quran_audio_place';
 
     /*
-     * Reciters are matched by name against the API's own list rather than
-     * pinned to numeric ids, so the page cannot break if an id moves and
-     * does not depend on ids being guessed correctly.
+     * Every reciter Quran.com offers is listed, with these two pulled to the
+     * top. Matching is by name against the API's own list rather than pinned
+     * numeric ids, so nothing breaks if an id moves — and because the whole
+     * list is shown, a reciter these patterns miss is still selectable.
      */
-    var WANTED_RECITERS = [
+    var SUGGESTED_RECITERS = [
         { fallbackLabel: 'Mishari Rashid al-ʿAfasy', patterns: [/afas/i, /mishari/i] },
-        { fallbackLabel: 'Abdurrashid Ali Sufi', patterns: [/sufi/i, /abdur?\s*rashid/i] }
+        { fallbackLabel: 'Abdurrashid Ali Sufi', patterns: [/sufi/i, /abdu?r?\s*-?\s*rashid/i] }
     ];
     var TRANSLATION_PATTERNS = [/sahih\s+international/i, /saheeh\s+international/i, /sahih/i];
 
@@ -647,7 +648,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     // --- State ---------------------------------------------------------
     var currentJuz = readJuzFromUrl();
-    var reciters = [];
+    var reciterIndex = { suggested: [], others: [], byId: {}, missing: [] };
     var reciterId = null;
     var translation = null;   // { id, name }
     var playlist = [];        // [{ verseKey, url }]
@@ -737,26 +738,60 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     async function resolveReciters() {
         var data = await getJson(API + '/resources/recitations?language=en');
-        var all = (data && data.recitations) || [];
-        var picked = [];
+        var entries = ((data && data.recitations) || []).map(function (r) {
+            var translated = r.translated_name && r.translated_name.name;
+            var name = r.reciter_name || translated || ('Reciter ' + r.id);
+            return {
+                id: r.id,
+                name: name,
+                label: name + (r.style ? ' (' + r.style + ')' : '')
+            };
+        }).filter(function (r) { return r.id; });
 
-        WANTED_RECITERS.forEach(function (wanted) {
-            for (var i = 0; i < all.length; i++) {
-                var r = all[i];
-                var translated = r.translated_name && r.translated_name.name;
-                if (!matchesAny(r.reciter_name, wanted.patterns) &&
-                    !matchesAny(translated, wanted.patterns)) continue;
-                if (picked.some(function (p) { return p.id === r.id; })) continue;
-
-                var label = r.reciter_name || translated || wanted.fallbackLabel;
-                if (r.style) label += ' (' + r.style + ')';
-                picked.push({ id: r.id, label: label, wanted: wanted.fallbackLabel });
-                return;
+        var suggested = [];
+        var missing = [];
+        SUGGESTED_RECITERS.forEach(function (wanted) {
+            var found = null;
+            for (var i = 0; i < entries.length; i++) {
+                if (matchesAny(entries[i].name, wanted.patterns) &&
+                    !suggested.some(function (s) { return s.id === entries[i].id; })) {
+                    found = entries[i];
+                    break;
+                }
             }
-            picked.push({ id: null, label: wanted.fallbackLabel, wanted: wanted.fallbackLabel });
+            if (found) suggested.push(found);
+            else missing.push(wanted.fallbackLabel);
         });
 
-        return picked;
+        var suggestedIds = suggested.map(function (r) { return r.id; });
+        var others = entries
+            .filter(function (r) { return suggestedIds.indexOf(r.id) === -1; })
+            .sort(function (a, b) { return a.label.localeCompare(b.label); });
+
+        var byId = {};
+        entries.forEach(function (r) { byId[r.id] = r; });
+
+        return { suggested: suggested, others: others, byId: byId, missing: missing };
+    }
+
+    function buildReciterOptions(index) {
+        reciterSelector.innerHTML = '';
+
+        function group(label, items) {
+            if (!items.length) return;
+            var optgroup = document.createElement('optgroup');
+            optgroup.label = label;
+            items.forEach(function (r) {
+                var option = document.createElement('option');
+                option.value = String(r.id);
+                option.textContent = r.label;
+                optgroup.appendChild(option);
+            });
+            reciterSelector.appendChild(optgroup);
+        }
+
+        group('Suggested', index.suggested);
+        group(index.suggested.length ? 'All reciters' : 'Reciters', index.others);
     }
 
     /** verse_key -> absolute mp3 url for one reciter and juz. */
@@ -963,7 +998,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     }
 
     function currentReciterLabel() {
-        var found = reciters.filter(function (r) { return r.id === reciterId; })[0];
+        var found = reciterIndex.byId[reciterId];
         return found ? found.label : '';
     }
 
@@ -1204,38 +1239,34 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     (async function start() {
         try {
-            reciters = await resolveReciters();
+            reciterIndex = await resolveReciters();
         } catch (err) {
             console.error('Could not load the reciter list', err);
-            reciters = [];
+            reciterIndex = { suggested: [], others: [], byId: {}, missing: [] };
         }
 
-        var available = reciters.filter(function (r) { return r.id; });
-        reciterSelector.innerHTML = '';
+        var total = reciterIndex.suggested.length + reciterIndex.others.length;
 
-        if (!available.length) {
+        if (!total) {
+            reciterSelector.innerHTML = '';
             var none = document.createElement('option');
             none.value = '';
             none.textContent = 'No reciters available';
             reciterSelector.appendChild(none);
             reciterSelector.disabled = true;
         } else {
-            available.forEach(function (r) {
-                var option = document.createElement('option');
-                option.value = String(r.id);
-                option.textContent = r.label;
-                reciterSelector.appendChild(option);
-            });
+            buildReciterOptions(reciterIndex);
+
             var remembered = readStore('quran_reciter');
-            var match = available.filter(function (r) { return r.id === remembered; })[0];
-            reciterId = match ? match.id : available[0].id;
+            var first = (reciterIndex.suggested[0] || reciterIndex.others[0]).id;
+            reciterId = reciterIndex.byId[remembered] ? remembered : first;
             reciterSelector.value = String(reciterId);
 
-            var missing = reciters.filter(function (r) { return !r.id; });
-            if (missing.length) {
-                showNotice('Quran.com does not list ' +
-                    missing.map(function (r) { return r.wanted; }).join(' or ') +
-                    ', so only the reciters above are offered.');
+            // Only worth saying when a named reciter is absent from the whole
+            // list; otherwise the list itself is the answer.
+            if (reciterIndex.missing.length) {
+                showNotice('Quran.com does not list ' + reciterIndex.missing.join(' or ') +
+                    '. Every other reciter it offers is in the list above.');
             }
         }
 
