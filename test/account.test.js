@@ -349,31 +349,27 @@ const freshStore = () => ({
     }
 
     // --- Continuing without an account, from the welcome screen -----------
+    // No form to fill in any more: it picks a cycle start on its own, the
+    // same way a signed-in account with none yet gets one, and opens the
+    // reader directly rather than stopping on a name-entry page first.
     {
         store = freshStore(); apiUp = true;
         const { context, page } = await open(browser, { seed: false });
         await page.waitForSelector('#welcome-auth:not(.is-hidden)', { timeout: 5000 });
 
-        await page.click('#welcome-skip');
-        await page.waitForTimeout(200);
-        check('"Continue without an account" reaches the local-only form',
-            (await page.isVisible('#local-setup')) && (await page.isHidden('#welcome-auth')));
-        check('offering a way back, since accounts are available here',
-            (await page.textContent('#local-back')).trim() === 'Back to sign in');
+        await Promise.all([
+            page.waitForURL(/\/reader\//, { timeout: 5000 }),
+            page.click('#welcome-skip')
+        ]);
+        check('"Continue without an account" opens the reader directly',
+            /\/reader\/\?juz=\d+/.test(page.url()), page.url());
 
-        await page.click('#local-back');
-        await page.waitForTimeout(200);
-        check('"Back to sign in" returns to the welcome screen',
-            await page.isVisible('#welcome-auth'));
-
-        await page.click('#welcome-skip');
-        await page.waitForTimeout(200);
-        await page.fill('#user-name', 'Guest Reader');
-        await page.click('#local-setup #setup-form button[type=submit]');
-        await page.waitForTimeout(300);
-        check('the local-only path still works end to end, unsigned in',
-            (await page.isVisible('#dashboard-view')) &&
-            (await page.textContent('#greeting-name')).includes('Guest Reader'));
+        const profile = await page.evaluate(() => {
+            try { return JSON.parse(localStorage.getItem('quran_user_profile') || 'null'); }
+            catch (e) { return null; }
+        });
+        check('a cycle start was picked automatically, with no name asked for',
+            !!(profile && profile.startDate), JSON.stringify(profile));
         await context.close();
     }
 
