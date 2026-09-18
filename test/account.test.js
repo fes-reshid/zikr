@@ -459,10 +459,30 @@ const freshStore = () => ({
 
     // --- Signed in, but the reminder API is not deployed -------------------
     {
-        store = freshStore(); apiUp = false;
-        const { context, page, errors } = await open(browser, { signedInAs: 'amina123' });
+        store = freshStore(); apiUp = false; calls.length = 0;
+        const { context, page, errors } = await open(browser,
+            { seed: false, signedInAs: 'fes', fullName: 'Fes Reshid' });
         check('signing in still works with no reminder API',
-            (await page.textContent('#account-btn')).trim() === 'amina123');
+            (await page.textContent('#account-btn')).trim() === 'Fes Reshid');
+
+        // The bug this covers: signed in, but stuck looking signed out —
+        // the header showed the name while the page underneath stayed on
+        // the sign-in form forever, because syncing the dashboard used to
+        // wait on the reminder API to answer at all, and it never does here.
+        check('signing in still reaches the dashboard, not stuck on sign-in',
+            (await page.isVisible('#dashboard-view')) && (await page.isHidden('#setup-view')));
+        check('with a greeting under their own name',
+            (await page.textContent('#greeting-name')).includes('Fes Reshid'));
+        check('and a juz to read despite the API being down',
+            /^Juz \d+$/.test((await page.textContent('#target-juz-title')).trim()),
+            await page.textContent('#target-juz-title'));
+
+        // Marking a day works locally even though nothing can reach the API.
+        await page.click('#toggle-read-btn');
+        await page.waitForTimeout(200);
+        check('and today can still be marked read, offline from the API',
+            (await page.textContent('#btn-label')).trim() === 'Completed');
+
         await page.click('#account-btn');
         await page.waitForTimeout(400);
         check('the reminder settings are hidden', await page.isHidden('#reminder-block'));

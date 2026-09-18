@@ -1382,29 +1382,48 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
      * dashboard with nothing further to decide. Returns whether it applied.
      */
     function syncFromAccount(accountState) {
-        if (!accountState.signedIn || !accountState.apiReady) return false;
+        if (!accountState.signedIn) return false;
 
-        var merged = {};
-        accountState.days.forEach(function (day) { merged[day] = true; });
-        readingLog = merged;
-        writeStore(LOG_KEY, readingLog);
+        if (accountState.apiReady) {
+            var merged = {};
+            accountState.days.forEach(function (day) { merged[day] = true; });
+            readingLog = merged;
+            writeStore(LOG_KEY, readingLog);
 
-        var startDate = accountState.settings && accountState.settings.startDate;
-        if (!startDate) {
-            startDate = Core.findCycleStart(new Date()) || todayKey();
-            window.QuranAccount.saveSettings({
-                startDate: startDate,
-                timezone: window.QuranAccount.guessTimeZone()
-            });
+            var startDate = accountState.settings && accountState.settings.startDate;
+            if (!startDate) {
+                startDate = Core.findCycleStart(new Date()) || todayKey();
+                window.QuranAccount.saveSettings({
+                    startDate: startDate,
+                    timezone: window.QuranAccount.guessTimeZone()
+                });
+            }
+
+            userProfile = {
+                name: accountState.user.fullName || accountState.user.displayName ||
+                    accountState.user.username,
+                startDate: startDate
+            };
+            writeStore(PROFILE_KEY, userProfile);
+            return true;
         }
 
-        userProfile = {
-            name: accountState.user.fullName || accountState.user.displayName ||
-                accountState.user.username,
-            startDate: startDate
-        };
-        writeStore(PROFILE_KEY, userProfile);
-        return true;
+        // The reminder API hasn't answered yet, or is down. Someone signed
+        // in still deserves a working tracker rather than being stuck on
+        // the sign-in screen forever with nothing to explain why — fall
+        // back to a local-only profile under their account name. If the API
+        // comes back, the branch above takes over and properly syncs,
+        // merging this device's log up rather than losing it.
+        if (!hasValidProfile()) {
+            userProfile = {
+                name: accountState.user.fullName || accountState.user.displayName ||
+                    accountState.user.username,
+                startDate: Core.findCycleStart(new Date()) || todayKey()
+            };
+            writeStore(PROFILE_KEY, userProfile);
+            return true;
+        }
+        return false;
     }
 
     function updateStartDateHint() {
