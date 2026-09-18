@@ -126,6 +126,50 @@ function check(name, ok, detail) {
     check("'Listen & read' links to today's juz", quickHref === 'reader/?juz=7', quickHref);
     check("'Open the reader' links to today's juz", openHref === 'reader/?juz=7', openHref);
 
+    // --- Resuming a paused reading ------------------------------------------
+    // The reader saves { juz, index, verseKey } as it plays; the tracker turns
+    // that into a "continue where you left off" nudge for today's unfinished
+    // juz, and clears it the moment today is actually marked read.
+    // Today is still marked read from the earlier toggle; undo that first so
+    // the resume card has a chance to show at all.
+    await page.click('#toggle-read-btn');
+    await page.waitForTimeout(150);
+    check('no resume card with nothing paused', await page.isHidden('#resume-card'));
+
+    await page.evaluate(() => {
+        localStorage.setItem('quran_audio_place',
+            JSON.stringify({ juz: 7, index: 3, verseKey: '7:12' }));
+    });
+    await page.reload();
+    await page.waitForTimeout(300);
+    check('a mid-juz pause on today\'s due juz shows the resume card',
+        await page.isVisible('#resume-card'));
+    const resumeText = await page.textContent('#resume-desc');
+    check('it names the exact verse that was paused on',
+        resumeText.includes('7:12') && resumeText.includes('Juz 7'), resumeText);
+    check('and encourages continuing', /almost there|continue/i.test(resumeText), resumeText);
+    check('it reminds of the reward for reading the Qur’ān',
+        /reward/i.test(await page.textContent('#resume-reward')));
+    const resumeHref = await page.getAttribute('#resume-btn', 'href');
+    check('the button resumes on the paused juz', resumeHref === 'reader/?juz=7', resumeHref);
+
+    await page.click('#toggle-read-btn');
+    await page.waitForTimeout(150);
+    check('marking today read clears the resume nudge', await page.isHidden('#resume-card'));
+
+    await page.click('#toggle-read-btn');
+    await page.waitForTimeout(150);
+    check('unmarking it brings the nudge back', await page.isVisible('#resume-card'));
+
+    await page.evaluate(() => {
+        localStorage.setItem('quran_audio_place',
+            JSON.stringify({ juz: 12, index: 3, verseKey: '20:5' }));
+    });
+    await page.reload();
+    await page.waitForTimeout(300);
+    check('a paused place on a different juz is not offered as today\'s resume',
+        await page.isHidden('#resume-card'));
+
     // --- Settings ---------------------------------------------------------
     await page.click('#settings-btn');
     await page.waitForTimeout(150);

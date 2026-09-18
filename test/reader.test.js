@@ -140,13 +140,15 @@ async function openReader(browser, opts) {
     if (options.profile !== null) {
         const profile = JSON.stringify(options.profile ||
             { name: 'Ahmad', startDate: CYCLE_START });
-        await context.addInitScript((p) => {
+        const place = options.place ? JSON.stringify(options.place) : null;
+        await context.addInitScript((args) => {
             try {
-                localStorage.setItem('quran_user_profile', p);
+                localStorage.setItem('quran_user_profile', args.profile);
                 localStorage.removeItem('quran_reading_log');
-                localStorage.removeItem('quran_audio_place');
+                if (args.place) localStorage.setItem('quran_audio_place', args.place);
+                else localStorage.removeItem('quran_audio_place');
             } catch (e) { /* ignore */ }
-        }, profile);
+        }, { profile, place });
     }
 
     const page = await context.newPage();
@@ -262,6 +264,35 @@ function readLog(page) {
         check('and says so', /marked as read/i.test(await page.textContent('#notice')),
             (await page.textContent('#notice')).trim());
         check('no uncaught page errors during playback', errors.length === 0, errors.join(' | '));
+        await context.close();
+    }
+
+    // --- Resuming a saved place --------------------------------------------
+    {
+        const { context, page } = await openReader(browser, {
+            query: '?juz=7&autoplay=0',
+            place: { juz: 7, index: 3, verseKey: '7:4' }
+        });
+        check('playback resumes at the saved verse, not the first',
+            /Verse 7:4/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+        check('and it says so',
+            /continuing from where you left off/i.test(await page.textContent('#notice')) &&
+            (await page.textContent('#notice')).includes('7:4'),
+            (await page.textContent('#notice')).trim());
+        await context.close();
+    }
+    {
+        // A saved place for a different juz must not affect this one.
+        const { context, page } = await openReader(browser, {
+            query: '?juz=7&autoplay=0',
+            place: { juz: 12, index: 3, verseKey: '20:5' }
+        });
+        check('a saved place for another juz is ignored',
+            /Verse 7:1\s/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+        check('no resume notice for an unrelated juz',
+            await page.$eval('#notice', (el) => el.classList.contains('is-hidden')));
         await context.close();
     }
 

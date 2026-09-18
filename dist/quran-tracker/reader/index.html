@@ -1484,6 +1484,10 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
             var resumeAt = resumeIndexFor(juz);
             setCurrent(resumeAt, false);
             nowSub.textContent = currentReciterLabel();
+            if (resumeAt > 0) {
+                showNotice('Continuing from where you left off — verse ' +
+                    playlist[resumeAt].verseKey + '.', true);
+            }
             attemptAutoplay();
         } catch (err) {
             if (token !== loadToken) return;
@@ -1544,7 +1548,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         nowSub.textContent = currentReciterLabel();
         prevBtn.disabled = index === 0;
         nextBtn.disabled = index === playlist.length - 1;
-        writeStore(PLACE_KEY, { juz: currentJuz, index: index });
+        writeStore(PLACE_KEY, { juz: currentJuz, index: index, verseKey: item.verseKey });
         updateMediaSession(item);
 
         if (autoplay) play();
@@ -1613,7 +1617,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
      * tick it off so the tracker shows it without the listener going back.
      */
     function onJuzFinished() {
-        writeStore(PLACE_KEY, { juz: currentJuz, index: 0 });
+        writeStore(PLACE_KEY, { juz: currentJuz, index: 0, verseKey: playlist[0] && playlist[0].verseKey });
         setPlayIcon(false);
 
         var dueToday = todayDueJuz();

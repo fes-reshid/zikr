@@ -89,6 +89,14 @@
   .note-install h3{ color:var(--ink-navy); }
   .note-install p{ color:#6b5a49; margin-bottom:12px; }
   .note-install .btn{ margin-top:2px; }
+  .note-resume{ background:#fbf3df; border:2px solid var(--gold); }
+  .note-resume h3{ color:var(--gold); }
+  .note-resume p{ color:#6b5a49; margin-bottom:12px; }
+  .note-resume .reward{
+    margin:0 0 14px; padding-top:12px; border-top:1px dashed var(--gold-soft);
+    font-size:15px; font-style:italic; color:#6b5a49;
+  }
+  .note-resume .btn{ margin-top:2px; }
 
   /* ---------- History ---------- */
   .history{ display:flex; flex-direction:column; gap:10px; margin-top:16px; }
@@ -270,6 +278,13 @@
         <p id="feedback-desc"></p>
       </div>
 
+      <div class="note note-resume is-hidden" id="resume-card">
+        <h3>Continue where you left off</h3>
+        <p id="resume-desc"></p>
+        <p class="reward" id="resume-reward"></p>
+        <a class="btn btn-primary" id="resume-btn" href="reader/">Continue reading</a>
+      </div>
+
       <div class="note note-install is-hidden" id="install-row">
         <h3>Keep it on your home screen</h3>
         <p id="ios-install-hint" class="is-hidden">In Safari, tap the Share button, then &ldquo;Add to Home Screen&rdquo;.</p>
@@ -410,6 +425,9 @@
     var Core = window.QuranCore;
     var PROFILE_KEY = 'quran_user_profile';
     var LOG_KEY = 'quran_reading_log';
+    var PLACE_KEY = 'quran_audio_place';
+    var REWARD_HADITH = '“Whoever reads a letter from the Book of Allah will have a reward, ' +
+        'and that reward will be multiplied by ten.” — Prophet Muhammad ﷺ (Tirmidhi 2910)';
     var HIDDEN = 'is-hidden';
 
     function $(id) { return document.getElementById(id); }
@@ -476,6 +494,10 @@
     var feedbackCard = $('feedback-card');
     var feedbackTitle = $('feedback-title');
     var feedbackDesc = $('feedback-desc');
+    var resumeCard = $('resume-card');
+    var resumeDesc = $('resume-desc');
+    var resumeReward = $('resume-reward');
+    var resumeBtn = $('resume-btn');
     var historyList = $('history-list');
 
     var accountBtn = $('account-btn');
@@ -672,6 +694,26 @@
         }
     }
 
+    /*
+     * A gentle nudge for a reading paused mid-juz: shown only while today's
+     * juz is still unread and the last saved audio position is inside it, so
+     * it never lingers once the day is marked read or the place is stale.
+     */
+    function renderResume(currentJuz, key) {
+        var place = readStore(PLACE_KEY);
+        var isRead = !!readingLog[key];
+        var show = !isRead && place && Number(place.juz) === Number(currentJuz) &&
+            place.index > 0 && place.verseKey;
+
+        resumeCard.classList.toggle(HIDDEN, !show);
+        if (!show) return;
+
+        resumeDesc.textContent = 'You paused in Juz ' + currentJuz + ' at verse ' + place.verseKey +
+            ' (Sūrah:Āyah). You’re almost there — please continue from here.';
+        resumeReward.textContent = REWARD_HADITH;
+        resumeBtn.href = 'reader/?juz=' + currentJuz;
+    }
+
     function renderHistory() {
         historyList.innerHTML = '';
         for (var i = 0; i < 7; i++) {
@@ -729,7 +771,9 @@
 
         var today = new Date();
         var key = Core.formatDateKey(today);
-        renderHero(today, key, Core.juzForDate(userProfile.startDate, key));
+        var currentJuz = Core.juzForDate(userProfile.startDate, key);
+        renderHero(today, key, currentJuz);
+        renderResume(currentJuz, key);
         renderHistory();
     }
 
