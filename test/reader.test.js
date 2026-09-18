@@ -67,10 +67,16 @@ const RECITATIONS = [
     { id: 112, reciter_name: 'AbdurRashid Sufi', style: null, translated_name: { name: 'AbdurRashid Sufi' } }
 ];
 
+// Decoys included on purpose here too: three English translations, so the
+// by-name pick (Saheeh International) has to win over just taking the first
+// English entry, plus one entry each for the other offered languages.
 const TRANSLATIONS = [
-    { id: 131, name: 'Dr. Mustafa Khattab', author_name: 'Dr. Mustafa Khattab' },
-    { id: 20, name: 'Saheeh International', author_name: 'Saheeh International' },
-    { id: 85, name: 'Abdul Haleem', author_name: 'Abdul Haleem' }
+    { id: 131, name: 'Dr. Mustafa Khattab', author_name: 'Dr. Mustafa Khattab', language_name: 'english' },
+    { id: 20, name: 'Saheeh International', author_name: 'Saheeh International', language_name: 'english' },
+    { id: 85, name: 'Abdul Haleem', author_name: 'Abdul Haleem', language_name: 'english' },
+    { id: 140, name: 'Oromo Translation', author_name: 'Ghali Aba Hulgaaʾ', language_name: 'oromo' },
+    { id: 141, name: 'Amharic Translation', author_name: 'Sadiq and Sani', language_name: 'amharic' },
+    { id: 142, name: 'Somali Translation', author_name: 'Mahmud Muhammad Abduh', language_name: 'somali' }
 ];
 
 function stubVerses(juz) {
@@ -209,11 +215,19 @@ function readLog(page) {
         check('no notice when both named reciters were found',
             await page.$eval('#notice', (el) => el.classList.contains('is-hidden')));
 
-        check('Saheeh International is picked over the other translations',
+        check('Saheeh International is picked over the other English translations',
             calls.api.some((u) => u.includes('translations=20')),
             calls.api.filter((u) => u.includes('by_juz')).slice(-1)[0]);
         check('the translation is named on the page',
             (await page.textContent('#page-sub')).includes('Saheeh International'));
+
+        const translationOptions = await page.$$eval('#translation-selector option',
+            (els) => els.map((o) => ({ value: o.value, label: o.textContent.trim() })));
+        check('English, Oromo, Amharic and Somali are all offered',
+            ['English', 'Oromo', 'Amharic', 'Somali'].every((lang) =>
+                translationOptions.some((o) => o.label === lang)),
+            JSON.stringify(translationOptions));
+        check('English is selected by default', await page.inputValue('#translation-selector') === '20');
 
         const cards = await page.$$('.verse');
         check('every verse renders', cards.length === VERSE_COUNT, cards.length);
@@ -347,6 +361,48 @@ function readLog(page) {
             calls.api.filter((u) => u.includes('/recitations/')).join(' | '));
         check('and the selector holds the new reciter',
             (await page.inputValue('#reciter-selector')) === '112');
+        await context.close();
+    }
+
+    // --- Switching translation ---------------------------------------------
+    // Unlike the reciter, the translation has no bearing on the recitation
+    // audio, so switching it must re-fetch only the verse text and must not
+    // touch — let alone restart — whatever is already loaded. Paused on
+    // purpose: with playback running, natural advance-to-the-next-verse
+    // during the test's own waits would add audio calls of its own and mask
+    // the thing actually under test.
+    {
+        const { context, page, calls } = await openReader(browser, { query: '?juz=7&autoplay=0' });
+        await page.waitForFunction(() => {
+            const a = document.getElementById('audio');
+            return a && a.currentSrc;
+        }, { timeout: 8000 });
+
+        const audioCallsBefore = calls.audio.length;
+        const srcBefore = await page.evaluate(() => document.getElementById('audio').currentSrc);
+        calls.api.length = 0;
+        await page.selectOption('#translation-selector', '142'); // Somali
+        await page.waitForFunction(
+            () => document.querySelectorAll('.verse').length > 0, { timeout: 8000 });
+        await page.waitForTimeout(300);
+
+        check('switching translation refetches verses with the new translation id',
+            calls.api.some((u) => u.includes('by_juz/7') && u.includes('translations=142')),
+            calls.api.join(' | '));
+        check('it does not request any new audio',
+            calls.audio.length === audioCallsBefore, calls.audio.length + ' vs ' + audioCallsBefore);
+        check('and does not touch what is already loaded',
+            await page.evaluate(() => document.getElementById('audio').currentSrc) === srcBefore);
+        check('the current verse is still highlighted after the rebuild',
+            (await page.$$('.verse.playing')).length === 1);
+        check('the page names the chosen translator',
+            (await page.textContent('#page-sub')).includes('Mahmud Muhammad Abduh'),
+            await page.textContent('#page-sub'));
+
+        await page.reload();
+        await page.waitForSelector('.verse', { timeout: 10000 });
+        check('the chosen language is remembered across a reload',
+            await page.inputValue('#translation-selector') === '142');
         await context.close();
     }
 

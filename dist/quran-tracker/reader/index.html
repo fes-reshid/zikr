@@ -338,6 +338,12 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         </select>
       </div>
       <div class="control">
+        <label for="translation-selector">Translation</label>
+        <select id="translation-selector">
+          <option value="">Loading translations…</option>
+        </select>
+      </div>
+      <div class="control">
         <label class="follow" for="follow-toggle">
           <input type="checkbox" id="follow-toggle" checked>
           Follow the recitation
@@ -1043,7 +1049,19 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         { fallbackLabel: 'Mishari Rashid al-ʿAfasy', patterns: [/afas/i, /mishari/i] },
         { fallbackLabel: 'Abdurrashid Ali Sufi', patterns: [/sufi/i, /abdu?r?\s*-?\s*rashid/i] }
     ];
-    var TRANSLATION_PATTERNS = [/sahih\s+international/i, /saheeh\s+international/i, /sahih/i];
+    /*
+     * The languages offered in the Translation selector. English picks a
+     * specific, well-known translation out of the many Quran.com lists for
+     * it; the other languages usually have at most one, so the first (if
+     * any) is used as-is. A language Quran.com does not offer is simply
+     * left out of the dropdown rather than shown as broken.
+     */
+    var LANGUAGE_CHOICES = [
+        { code: 'english', label: 'English', patterns: [/sahih\s+international/i, /saheeh\s+international/i] },
+        { code: 'oromo', label: 'Oromo' },
+        { code: 'amharic', label: 'Amharic' },
+        { code: 'somali', label: 'Somali' }
+    ];
 
     function $(id) { return document.getElementById(id); }
 
@@ -1067,6 +1085,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var pageTitle = $('page-title');
     var juzSelector = $('juz-selector');
     var reciterSelector = $('reciter-selector');
+    var translationSelector = $('translation-selector');
     var notice = $('notice');
     var versesEl = $('verses');
     var audio = $('audio');
@@ -1102,7 +1121,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var currentJuz = readJuzFromUrl();
     var reciterIndex = { suggested: [], others: [], byId: {}, missing: [] };
     var reciterId = null;
-    var translation = null;   // { id, name }
+    var translationOptions = [];  // [{ id, code, label, name }]
+    var translationId = null;
     var playlist = [];        // [{ verseKey, url }]
     var verseNodes = {};      // verseKey -> element
     var currentIndex = -1;
@@ -1220,25 +1240,57 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         return patterns.some(function (pattern) { return pattern.test(text); });
     }
 
-    async function resolveTranslation() {
+    /** One entry per LANGUAGE_CHOICES language Quran.com actually offers. */
+    async function resolveTranslations() {
         try {
-            var data = await getJson(API + '/resources/translations?language=en');
+            var data = await getJson(API + '/resources/translations');
             var all = (data && data.translations) || [];
-            for (var p = 0; p < TRANSLATION_PATTERNS.length; p++) {
-                for (var i = 0; i < all.length; i++) {
-                    var t = all[i];
-                    if (matchesAny(t.name, [TRANSLATION_PATTERNS[p]]) ||
-                        matchesAny(t.author_name, [TRANSLATION_PATTERNS[p]])) {
-                        return { id: t.id, name: t.author_name || t.name };
+            var byLanguage = {};
+            all.forEach(function (t) {
+                var lang = (t.language_name || '').toLowerCase();
+                (byLanguage[lang] = byLanguage[lang] || []).push(t);
+            });
+
+            var options = [];
+            LANGUAGE_CHOICES.forEach(function (choice) {
+                var candidates = byLanguage[choice.code] || [];
+                var found = null;
+                if (choice.patterns) {
+                    for (var i = 0; i < candidates.length && !found; i++) {
+                        if (matchesAny(candidates[i].name, choice.patterns) ||
+                            matchesAny(candidates[i].author_name, choice.patterns)) {
+                            found = candidates[i];
+                        }
                     }
                 }
-            }
-            // Nothing matched by name: any English translation beats none.
-            if (all.length) return { id: all[0].id, name: all[0].author_name || all[0].name };
+                if (!found) found = candidates[0];
+                if (found) {
+                    options.push({
+                        id: found.id, code: choice.code, label: choice.label,
+                        name: found.author_name || found.name
+                    });
+                }
+            });
+            return options;
         } catch (err) {
             console.error('Could not load the translation list', err);
+            return [];
         }
-        return null;
+    }
+
+    function buildTranslationOptions(options) {
+        translationSelector.innerHTML = '';
+        options.forEach(function (opt) {
+            var option = document.createElement('option');
+            option.value = String(opt.id);
+            option.textContent = opt.label;
+            translationSelector.appendChild(option);
+        });
+    }
+
+    function currentTranslationName() {
+        var found = translationOptions.filter(function (o) { return o.id === translationId; })[0];
+        return found ? found.name : '';
     }
 
     async function resolveReciters() {
@@ -1401,6 +1453,45 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     }
 
     // --- Loading -------------------------------------------------------
+    function loadVerses(juz, token) {
+        var query = '?words=false&fields=text_uthmani&per_page=' + PAGE_SIZE +
+            (translationId ? '&translations=' + translationId : '');
+        return getAllPages(function (page) {
+            return API + '/verses/by_juz/' + juz + query + '&page=' + page;
+        }, 'verses', token);
+    }
+
+    function renderVerses(verses) {
+        versesEl.innerHTML = '';
+        verseNodes = {};
+        var fragment = document.createDocumentFragment();
+        verses.forEach(function (verse) {
+            var card = verseCard(verse);
+            verseNodes[verse.verse_key] = card;
+            fragment.appendChild(card);
+        });
+        versesEl.appendChild(fragment);
+
+        var withTranslation = verses.some(function (v) {
+            return v.translations && v.translations.length && v.translations[0].text;
+        });
+        var translationName = currentTranslationName();
+        $('page-sub').textContent = verses.length + ' verses' +
+            (withTranslation && translationName ? ' · ' + translationName : '') +
+            ' · playback continues when you switch tabs or lock your phone.';
+
+        // Switching translation rebuilds the cards under a verse that may
+        // already be playing; carry the highlight over rather than losing it.
+        if (currentIndex >= 0 && playlist[currentIndex]) {
+            var node = verseNodes[playlist[currentIndex].verseKey];
+            if (node) {
+                node.classList.add('playing');
+                var flag = node.querySelector('.verse-flag');
+                if (flag) flag.classList.remove(HIDDEN);
+            }
+        }
+    }
+
     async function loadJuz(juz) {
         var token = ++loadToken;
         currentJuz = juz;
@@ -1415,38 +1506,15 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         showLoading('Loading Juz ' + juz + ' from Quran.com…');
 
         try {
-            if (translation === null) translation = await resolveTranslation();
-            if (token !== loadToken) return;
-
-            var query = '?words=false&fields=text_uthmani&per_page=' + PAGE_SIZE +
-                (translation ? '&translations=' + translation.id : '');
-            var verses = await getAllPages(function (page) {
-                return API + '/verses/by_juz/' + juz + query + '&page=' + page;
-            }, 'verses', token);
-            if (verses === null) return;
+            var verses = await loadVerses(juz, token);
+            if (verses === null || token !== loadToken) return;
 
             if (!verses.length) {
                 showMessage('No verses came back for this juz.', true);
                 return;
             }
 
-            versesEl.innerHTML = '';
-            verseNodes = {};
-            var fragment = document.createDocumentFragment();
-            verses.forEach(function (verse) {
-                var card = verseCard(verse);
-                verseNodes[verse.verse_key] = card;
-                fragment.appendChild(card);
-            });
-            versesEl.appendChild(fragment);
-
-            var withTranslation = verses.some(function (v) {
-                return v.translations && v.translations.length && v.translations[0].text;
-            });
-            $('page-sub').textContent = verses.length + ' verses' +
-                (withTranslation && translation ? ' · ' + translation.name : '') +
-                ' · playback continues when you switch tabs or lock your phone.';
-
+            renderVerses(verses);
             await loadPlaylist(juz, token, verses);
         } catch (err) {
             if (token !== loadToken) return;
@@ -1455,6 +1523,21 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
             showMessage(offline
                 ? 'You appear to be offline. Reconnect and try again.'
                 : 'Could not reach the Quran.com API.', true);
+        }
+    }
+
+    /*
+     * Changing only the translation should not restart the recitation — it
+     * re-fetches just the verse text and re-renders, leaving audio alone.
+     */
+    async function reloadTranslation() {
+        var token = ++loadToken;
+        try {
+            var verses = await loadVerses(currentJuz, token);
+            if (verses === null || token !== loadToken) return;
+            renderVerses(verses);
+        } catch (err) {
+            console.error('Could not reload the translation', err);
         }
     }
 
@@ -1718,6 +1801,15 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         });
     });
 
+    translationSelector.addEventListener('change', function (event) {
+        var id = Number(event.target.value);
+        if (!id) return;
+        translationId = id;
+        var chosen = translationOptions.filter(function (o) { return o.id === id; })[0];
+        writeStore('quran_translation_lang', chosen ? chosen.code : '');
+        reloadTranslation();
+    });
+
     document.addEventListener('keydown', function (event) {
         if (event.target.tagName === 'SELECT' || event.target.tagName === 'INPUT') return;
         if (event.key === ' ') { event.preventDefault(); playBtn.click(); }
@@ -1772,13 +1864,15 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     renderReadingStatus();
 
     (async function start() {
-        try {
-            reciterIndex = await resolveReciters();
-        } catch (err) {
+        // Both are independent network calls; kick them off together rather
+        // than waiting on reciters before even asking for translations.
+        var reciterPromise = resolveReciters().catch(function (err) {
             console.error('Could not load the reciter list', err);
-            reciterIndex = { suggested: [], others: [], byId: {}, missing: [] };
-        }
+            return { suggested: [], others: [], byId: {}, missing: [] };
+        });
+        var translationPromise = resolveTranslations();
 
+        reciterIndex = await reciterPromise;
         var total = reciterIndex.suggested.length + reciterIndex.others.length;
 
         if (!total) {
@@ -1802,6 +1896,23 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
                 showNotice('Quran.com does not list ' + reciterIndex.missing.join(' or ') +
                     '. Every other reciter it offers is in the list above.');
             }
+        }
+
+        translationOptions = await translationPromise;
+        if (!translationOptions.length) {
+            translationSelector.innerHTML = '';
+            var noTranslation = document.createElement('option');
+            noTranslation.value = '';
+            noTranslation.textContent = 'No translation available';
+            translationSelector.appendChild(noTranslation);
+            translationSelector.disabled = true;
+        } else {
+            buildTranslationOptions(translationOptions);
+
+            var rememberedLang = readStore('quran_translation_lang');
+            var preferred = translationOptions.filter(function (o) { return o.code === rememberedLang; })[0];
+            translationId = (preferred || translationOptions[0]).id;
+            translationSelector.value = String(translationId);
         }
 
         await loadJuz(currentJuz);
