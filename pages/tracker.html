@@ -392,7 +392,7 @@
       </p>
       <button type="button" class="setting" id="signout-btn">
         <strong>Sign out</strong>
-        <span>Your reading log stays on this device.</span>
+        <span>Clears your name and reading log from this device &mdash; your account keeps everything.</span>
       </button>
       <button type="button" class="setting setting-danger" id="forget-btn">
         <strong>Delete my reminder data</strong>
@@ -843,6 +843,7 @@
         if (!confirm('Clear all reading history? Your streak will reset to zero.')) return;
         readingLog = {};
         removeStore(LOG_KEY);
+        removeStore(PLACE_KEY);
         closeSettings();
         renderApp();
     });
@@ -853,6 +854,7 @@
         readingLog = {};
         removeStore(PROFILE_KEY);
         removeStore(LOG_KEY);
+        removeStore(PLACE_KEY);
         closeSettings();
         localSetupOpen = false;
 
@@ -1099,8 +1101,22 @@
 
     signoutBtn.addEventListener('click', async function () {
         await Account.signOut();
+
+        // The account is what this page has been showing — a name, a
+        // streak, a reading log. Leaving those on the device after signing
+        // out would show them to the next person who opens it here, signed
+        // in or not, which defeats the point of signing out. The account
+        // itself is untouched: everything comes back on the next sign-in.
+        userProfile = null;
+        readingLog = {};
+        removeStore(PROFILE_KEY);
+        removeStore(LOG_KEY);
+        removeStore(PLACE_KEY);
+        localSetupOpen = false;
+
         accountModal.classList.add(HIDDEN);
         renderAccountButton();
+        renderApp();
     });
 
     forgetBtn.addEventListener('click', async function () {

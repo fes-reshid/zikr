@@ -180,6 +180,8 @@ function check(name, ok, detail) {
     check('clearing history resets the streak', (await page.textContent('#streak-count')) === '0');
     check('clearing history keeps the profile',
         (await page.textContent('#greeting-name')).includes('Ahmad'));
+    check('clearing history also drops the stale resume position',
+        await page.evaluate(() => localStorage.getItem('quran_audio_place')) === null);
 
     await page.click('#settings-btn');
     await page.waitForTimeout(150);
@@ -188,10 +190,16 @@ function check(name, ok, detail) {
     await page.waitForTimeout(200);
     check('declining the reset prompt changes nothing', await page.isHidden('#setup-view'));
 
+    await page.evaluate(() => {
+        localStorage.setItem('quran_audio_place',
+            JSON.stringify({ juz: 7, index: 2, verseKey: '7:9' }));
+    });
     page.once('dialog', (d) => d.accept());
     await page.click('#reset-all-btn');
     await page.waitForTimeout(200);
     check('confirming the reset returns to setup', await page.isVisible('#setup-view'));
+    check('and drops the resume position too',
+        await page.evaluate(() => localStorage.getItem('quran_audio_place')) === null);
 
     // --- Midnight rollover ------------------------------------------------
     await page.fill('#user-name', 'Ahmad');

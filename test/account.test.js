@@ -439,6 +439,21 @@ const freshStore = () => ({
         await page.waitForTimeout(400);
         check('signing out returns the header to Sign in',
             (await page.textContent('#account-btn')).trim() === 'Sign in');
+
+        // The bug the user reported: after signing out on a shared device,
+        // the dashboard kept showing the previous person's name and streak,
+        // with only the header's "Sign in" hinting no one was authenticated.
+        check('signing out leaves the dashboard, not showing it to the next person',
+            await page.isHidden('#dashboard-view'));
+        check('and lands back on the sign-in screen',
+            await page.isVisible('#welcome-auth'));
+        const leftoverKeys = await page.evaluate(() => [
+            localStorage.getItem('quran_user_profile'),
+            localStorage.getItem('quran_reading_log'),
+            localStorage.getItem('quran_audio_place')
+        ]);
+        check('no name, reading log or resume position is left on the device',
+            leftoverKeys.every((v) => v === null), JSON.stringify(leftoverKeys));
         await context.close();
     }
 
