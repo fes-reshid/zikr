@@ -124,13 +124,6 @@ npx wrangler login
 npx wrangler deploy --config cloudflare/wrangler.toml
 ```
 
-### GitHub Pages
-
-`.github/workflows/pages.yml` publishes `dist/` on every push. Pages has to be
-turned on once by hand, under **Settings → Pages → Build and deployment →
-Source → GitHub Actions**; the workflow token is not allowed to create the
-Pages site itself.
-
 ## Tests
 
 ```sh
