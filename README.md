@@ -47,11 +47,15 @@ Google Fonts and the Quran.com API.
 
 ## Running it
 
-No build step. Open `index.html` in a browser, or serve the folder:
-
 ```sh
-npm run serve   # http://localhost:8000
+npm run build   # pages/ + src/ -> dist/
+npm run serve   # http://localhost:8000/quran-tracker/
 ```
+
+`dist/` is committed, so serving works without building first; rebuild after
+editing anything under `pages/` or `src/`. Opening
+`dist/quran-tracker/index.html` straight off disk works too, except for the
+service worker, which needs an http origin.
 
 ## Installing it on a phone
 
@@ -111,19 +115,6 @@ relative ones, so the navigation works from both.
 Copy `dist/quran-tracker/` into the document root. The app is static, has no
 server side, and touches no other path.
 
-### Cloudflare Worker
-
-`cloudflare/` deploys the page as a Worker on the route
-`diinislaam.com/quran-tracker*`, for a domain where the origin cannot be
-changed. Only that path is intercepted; everything else continues to the
-existing origin.
-
-```sh
-npm run build
-npx wrangler login
-npx wrangler deploy --config cloudflare/wrangler.toml
-```
-
 ## Tests
 
 ```sh
@@ -136,7 +127,8 @@ serves each verse as a short silent WAV, so playback genuinely runs and `ended`
 really fires — the auto-advance and the auto-tick are exercised, not assumed.
 
 The unit tests run the pure logic in `src/core.js` under several timezones. The
-end-to-end test drives the real `index.html` and needs Chromium:
+end-to-end suites drive the built pages in `dist/` — what actually ships — and
+need Chromium:
 
 ```sh
 npm install && npx playwright install chromium
