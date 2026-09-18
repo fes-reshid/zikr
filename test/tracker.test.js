@@ -54,10 +54,18 @@ function check(name, ok, detail) {
     // Fixed clock: 2026-09-18 is Rabiʿ II 7, 1448 AH.
     await page.clock.install({ time: new Date('2026-09-18T10:00:00-07:00') });
     await page.goto(APP_URL);
-    await page.waitForTimeout(300);
+
+    // This repo does not ship kids-quest-cloud.js (that lives beside it on
+    // the real site), so the accounts script 404s and the page falls back to
+    // the local-only form — quickly, since a failed script fires its own
+    // `error` event rather than waiting out the module's full timeout. Wait
+    // for that fallback explicitly instead of guessing how long it takes.
+    await page.waitForSelector('#local-setup:not(.is-hidden)', { timeout: 5000 });
 
     // --- First run --------------------------------------------------------
     check('setup view is shown on first run', await page.isVisible('#setup-view'));
+    check('the local-only form is reached with no extra click ' +
+        '(no accounts module on this build)', await page.isVisible('#local-setup'));
     check('dashboard is hidden on first run', await page.isHidden('#dashboard-view'));
     const prefill = await page.inputValue('#start-date');
     check('start date pre-fills to Rabiʿ II 1', prefill === '2026-09-12', prefill);

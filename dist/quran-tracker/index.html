@@ -283,8 +283,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     font-size:15px; background:#fbf3df; border:1.5px solid var(--gold-soft);
     color:#6b5a49; border-radius:10px; padding:12px 14px; margin:0;
   }
-  .sheet-pad .lede{ margin:0; font-size:16px; color:#6b5a49; line-height:1.5; }
-  .sheet-pad .fine{ margin:0; font-size:14px; color:#8a7963; line-height:1.45; }
+  .lede{ margin:0; font-size:16px; color:#6b5a49; line-height:1.5; }
+  .fine{ margin:0; font-size:14px; color:#8a7963; line-height:1.45; }
   .sheet-msg{ margin:0; font-size:15px; font-weight:600; color:var(--green-dark); }
   .sheet-msg.bad{ color:#9d2f2f; }
   .account-email{
@@ -341,9 +341,40 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 <main>
   <div class="container">
 
-    <!-- Setup -->
+    <!-- Setup: sign in first, with a local-only fallback for anyone who would
+         rather not create an account. -->
     <div class="stack is-hidden" id="setup-view">
-      <div class="card">
+
+      <!-- Sign in / create account — the default first screen. -->
+      <div class="card" id="welcome-auth">
+        <h2 id="welcome-title">Sign in</h2>
+        <p class="lede" id="welcome-lede" style="margin-bottom:20px;">Use your quest-game username and password — it is the same account, and no email is asked for.</p>
+        <form id="welcome-form">
+          <div class="field is-hidden" id="welcome-fullname-field">
+            <label for="welcome-fullname">Full name</label>
+            <input type="text" id="welcome-fullname" maxlength="60" autocomplete="name" placeholder="e.g. Ahmad Yusuf">
+          </div>
+          <div class="field">
+            <label for="welcome-username">Username</label>
+            <input type="text" id="welcome-username" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. amina123">
+          </div>
+          <div class="field">
+            <label for="welcome-password">Password</label>
+            <input type="password" id="welcome-password" required autocomplete="current-password" minlength="6">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="welcome-submit">Sign in</button>
+        </form>
+        <p class="sheet-msg" id="welcome-message"></p>
+        <p class="fine">
+          <button type="button" class="linkish" id="welcome-toggle">I don&rsquo;t have an account yet</button>
+        </p>
+        <p class="fine" style="margin-top:8px;">
+          <button type="button" class="linkish" id="welcome-skip">Continue without an account</button>
+        </p>
+      </div>
+
+      <!-- Local-only fallback: no account, nothing leaves the device. -->
+      <div class="card is-hidden" id="local-setup">
         <h2>Begin your cycle</h2>
         <p style="margin:0 0 20px; font-size:17px; color:#6b5a49;">Your progress is saved on this device only — no account, nothing sent anywhere.</p>
         <form id="setup-form">
@@ -359,7 +390,11 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
           </div>
           <button type="submit" class="btn btn-primary btn-block">Start</button>
         </form>
+        <p class="fine is-hidden" id="local-back-wrap" style="margin-top:14px;">
+          <button type="button" class="linkish" id="local-back">Back to sign in</button>
+        </p>
       </div>
+
     </div>
 
     <!-- Dashboard -->
@@ -451,6 +486,10 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     <div class="sheet-pad">
       <p class="lede" id="signin-lede">Use the same username and password as the quest games &mdash; it is the same account, and no email is asked for. Signing in is optional: the tracker works without it.</p>
       <form id="signin-form">
+        <div class="field is-hidden" id="signin-fullname-field">
+          <label for="signin-fullname">Full name</label>
+          <input type="text" id="signin-fullname" maxlength="60" autocomplete="name" placeholder="e.g. Ahmad Yusuf">
+        </div>
         <div class="field">
           <label for="signin-username">Username</label>
           <input type="text" id="signin-username" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. amina123">
@@ -637,14 +676,14 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     var API = './api/';
     var SYNCED_KEY = 'quran_synced_with';
-    var CLOUD_WAIT_MS = 8000;
+    var CLOUD_WAIT_MS = 8000; // ultimate fallback only; the error listener below is what actually fires fast
 
     var state = {
         ready: false,
         available: false,   // the shared auth module loaded
         apiReady: false,    // the reminder API answered
         signedIn: false,
-        user: null,         // { uid, username, displayName }
+        user: null,         // { uid, username, displayName, fullName }
         settings: null,
         days: []
     };
@@ -659,19 +698,44 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     function cloud() { return window.KidsCloud; }
 
-    /** Resolves once the shared auth module is on the page, or null if it never is. */
+    /**
+     * Resolves once the shared auth module is on the page, or null if it never
+     * is. Memoized: every caller shares one wait rather than racing separate
+     * listeners, and `signIn`/`signUp` can call this even before `start()` has
+     * — a click on the very first screen should not have to wait for `start()`
+     * to get there first.
+     *
+     * A missing script fires the element's own `error` event almost at once,
+     * so that is what settles this on a 404 — the timeout below only guards
+     * against the module loading but never calling back, which `error` cannot
+     * catch.
+     */
+    var cloudPromise = null;
     function waitForCloud() {
-        if (cloud()) return Promise.resolve(cloud());
-        return new Promise(function (resolve) {
+        if (cloudPromise) return cloudPromise;
+        if (cloud()) return (cloudPromise = Promise.resolve(cloud()));
+
+        cloudPromise = new Promise(function (resolve) {
             var settled = false;
             function done(value) {
                 if (settled) return;
                 settled = true;
                 resolve(value);
             }
+            function onScriptError(event) {
+                var target = event && event.target;
+                if (target && target.tagName === 'SCRIPT' &&
+                    /kids-quest-cloud\.js/.test(target.src || '')) {
+                    window.removeEventListener('error', onScriptError, true);
+                    done(null);
+                }
+            }
             window.addEventListener('kidscloud-ready', function () { done(cloud()); });
+            // capture: a resource load failure does not bubble.
+            window.addEventListener('error', onScriptError, true);
             setTimeout(function () { done(cloud() || null); }, CLOUD_WAIT_MS);
         });
+        return cloudPromise;
     }
 
     async function api(method, route, body) {
@@ -778,7 +842,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
             }
             state.signedIn = true;
             state.user = { uid: user.uid, username: user.username,
-                           displayName: user.displayName || user.username };
+                           displayName: user.displayName || user.username,
+                           fullName: user.fullName || '' };
             emit();
             refresh();
         });
@@ -799,19 +864,24 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     }
 
     async function signIn(username, password) {
+        var kids = await waitForCloud();
+        if (!kids) return { ok: false, message: 'Accounts are not available on this page right now.' };
         try {
-            await cloud().studentLogin(username, password);
+            await kids.studentLogin(username, password);
             return { ok: true };
         } catch (err) {
             return { ok: false, message: friendlyError(err) };
         }
     }
 
-    async function signUp(username, password) {
+    async function signUp(username, password, fullName) {
+        var kids = await waitForCloud();
+        if (!kids) return { ok: false, message: 'Accounts are not available on this page right now.' };
         try {
             // No contact address: these accounts are keyed by username, and
-            // nothing here needs an email.
-            await cloud().studentSignUp(username, '', password);
+            // nothing here needs an email. fullName is optional and becomes
+            // the account's display name in place of the username.
+            await kids.studentSignUp(username, '', password, fullName || '');
             return { ok: true };
         } catch (err) {
             return { ok: false, message: friendlyError(err) };
@@ -1143,6 +1213,9 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     var userProfile = readStore(PROFILE_KEY);
     var readingLog = readStore(LOG_KEY) || {};
+    // True once someone has explicitly chosen to skip signing in; only
+    // matters while no valid profile exists yet — see renderWelcome().
+    var localSetupOpen = false;
 
     // --- Elements ------------------------------------------------------
     var setupView = $('setup-view');
@@ -1171,6 +1244,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var accountBtn = $('account-btn');
     var signinModal = $('signin-modal');
     var signinForm = $('signin-form');
+    var signinFullnameField = $('signin-fullname-field');
+    var signinFullname = $('signin-fullname');
     var signinUsername = $('signin-username');
     var signinPassword = $('signin-password');
     var signinSubmit = $('signin-submit');
@@ -1179,6 +1254,22 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var signinTitle = $('signin-title');
     var signinLede = $('signin-lede');
     var closeSigninBtn = $('close-signin-btn');
+
+    var welcomeAuth = $('welcome-auth');
+    var welcomeTitle = $('welcome-title');
+    var welcomeLede = $('welcome-lede');
+    var welcomeForm = $('welcome-form');
+    var welcomeFullnameField = $('welcome-fullname-field');
+    var welcomeFullname = $('welcome-fullname');
+    var welcomeUsername = $('welcome-username');
+    var welcomePassword = $('welcome-password');
+    var welcomeSubmit = $('welcome-submit');
+    var welcomeMessage = $('welcome-message');
+    var welcomeToggle = $('welcome-toggle');
+    var welcomeSkip = $('welcome-skip');
+    var localSetup = $('local-setup');
+    var localBackWrap = $('local-back-wrap');
+    var localBack = $('local-back');
     var accountModal = $('account-modal');
     var closeAccountBtn = $('close-account-btn');
     var accountName = $('account-name');
@@ -1215,15 +1306,85 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         return parts ? ' (' + parts.monthName + ' ' + parts.day + ')' : '';
     }
 
-    function renderSetup() {
+    function hasValidProfile() {
+        return !!(userProfile && userProfile.name && Core.parseDateKey(userProfile.startDate));
+    }
+
+    /** Whether there is an account screen worth going back to. */
+    function accountsAvailable() {
+        return !!(window.QuranAccount && window.QuranAccount.state.available);
+    }
+
+    function showLocalSetup() {
         setupView.classList.remove(HIDDEN);
         dashboardView.classList.add(HIDDEN);
+        welcomeAuth.classList.add(HIDDEN);
+        localSetup.classList.remove(HIDDEN);
 
         userNameInput.value = userProfile ? userProfile.name : '';
         startDateInput.value = (userProfile && userProfile.startDate) ||
             Core.findCycleStart(new Date()) ||
             todayKey();
         updateStartDateHint();
+
+        // Editing an existing profile can always be cancelled; a first-run
+        // visitor can only go "back" if there is somewhere to go back to.
+        localBack.textContent = hasValidProfile() ? 'Cancel' : 'Back to sign in';
+        localBackWrap.classList.toggle(HIDDEN, !(hasValidProfile() || accountsAvailable()));
+    }
+
+    function showWelcomeAuth() {
+        setupView.classList.remove(HIDDEN);
+        dashboardView.classList.add(HIDDEN);
+        localSetup.classList.add(HIDDEN);
+        welcomeAuth.classList.remove(HIDDEN);
+    }
+
+    /**
+     * The first-run screen. Signing in is the default; a visitor who would
+     * rather not create an account can always reach the local-only form via
+     * "Continue without an account" — and gets it automatically, with no
+     * extra click, wherever the shared accounts module is not on the page.
+     */
+    function renderWelcome() {
+        var forcedLocal = !window.QuranAccount ||
+            (window.QuranAccount.state.ready && !window.QuranAccount.state.available);
+        if (localSetupOpen || forcedLocal) showLocalSetup();
+        else showWelcomeAuth();
+    }
+
+    /**
+     * Pulls the signed-in account's reading log and cycle into the page's own
+     * state. A brand-new account has no start date yet; rather than ask
+     * (that would just be the same old first page under a different name),
+     * one is picked the same way the local-only form's default is — from the
+     * Hijri calendar itself — and saved, so sign-in goes straight to the
+     * dashboard with nothing further to decide. Returns whether it applied.
+     */
+    function syncFromAccount(accountState) {
+        if (!accountState.signedIn || !accountState.apiReady) return false;
+
+        var merged = {};
+        accountState.days.forEach(function (day) { merged[day] = true; });
+        readingLog = merged;
+        writeStore(LOG_KEY, readingLog);
+
+        var startDate = accountState.settings && accountState.settings.startDate;
+        if (!startDate) {
+            startDate = Core.findCycleStart(new Date()) || todayKey();
+            window.QuranAccount.saveSettings({
+                startDate: startDate,
+                timezone: window.QuranAccount.guessTimeZone()
+            });
+        }
+
+        userProfile = {
+            name: accountState.user.fullName || accountState.user.displayName ||
+                accountState.user.username,
+            startDate: startDate
+        };
+        writeStore(PROFILE_KEY, userProfile);
+        return true;
     }
 
     function updateStartDateHint() {
@@ -1321,8 +1482,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     function renderApp() {
         storageWarning.classList.toggle(HIDDEN, storageAvailable);
 
-        if (!userProfile || !userProfile.name || !Core.parseDateKey(userProfile.startDate)) {
-            renderSetup();
+        if (!hasValidProfile()) {
+            renderWelcome();
             return;
         }
 
@@ -1393,7 +1554,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     editProfileBtn.addEventListener('click', function () {
         closeSettings();
-        renderSetup();
+        localSetupOpen = true;
+        showLocalSetup();
     });
 
     clearHistoryBtn.addEventListener('click', function () {
@@ -1411,6 +1573,14 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         removeStore(PROFILE_KEY);
         removeStore(LOG_KEY);
         closeSettings();
+        localSetupOpen = false;
+
+        // Signed in, this cannot actually erase anything — the account is
+        // still signed in and still holds the log — so put it straight back
+        // rather than bounce someone who is already signed in to a sign-in
+        // screen. "Delete my reminder data" in the account panel is what
+        // actually erases the server-side copy.
+        if (window.QuranAccount) syncFromAccount(window.QuranAccount.state);
         renderApp();
     });
 
@@ -1482,6 +1652,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     function setSignupMode(on) {
         signupMode = on;
+        signinFullnameField.classList.toggle(HIDDEN, !on);
         signinTitle.textContent = on ? 'Create an account' : 'Sign in';
         signinSubmit.textContent = on ? 'Create account' : 'Sign in';
         signinPassword.setAttribute('autocomplete', on ? 'new-password' : 'current-password');
@@ -1489,8 +1660,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
             ? 'I already have an account'
             : 'I don\u2019t have an account yet';
         signinLede.textContent = on
-            ? 'Pick a username and password. This is the same account the quest games use, ' +
-              'so it will work there too. No email is asked for.'
+            ? 'Pick a username and password, and tell us who you are. This is the same ' +
+              'account the quest games use, so it will work there too. No email is asked for.'
             : 'Use the same username and password as the quest games \u2014 it is the same ' +
               'account, and no email is asked for. Signing in is optional: the tracker ' +
               'works without it.';
@@ -1531,6 +1702,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         event.preventDefault();
         var username = signinUsername.value.trim();
         var password = signinPassword.value;
+        var fullName = signinFullname.value.trim();
         if (!username || !password) return;
 
         signinSubmit.disabled = true;
@@ -1538,7 +1710,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
         signinSubmit.textContent = signupMode ? 'Creating\u2026' : 'Signing in\u2026';
 
         var result = signupMode
-            ? await Account.signUp(username, password)
+            ? await Account.signUp(username, password, fullName)
             : await Account.signIn(username, password);
 
         signinSubmit.disabled = false;
@@ -1551,6 +1723,69 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
             signinMessage.textContent = result.message;
             signinMessage.className = 'sheet-msg bad';
         }
+    });
+
+    // --- The welcome screen: the default first page --------------------
+    var welcomeSignupMode = false;
+
+    function setWelcomeMode(on) {
+        welcomeSignupMode = on;
+        welcomeFullnameField.classList.toggle(HIDDEN, !on);
+        welcomeTitle.textContent = on ? 'Create an account' : 'Sign in';
+        welcomeSubmit.textContent = on ? 'Create account' : 'Sign in';
+        welcomePassword.setAttribute('autocomplete', on ? 'new-password' : 'current-password');
+        welcomeToggle.textContent = on
+            ? 'I already have an account'
+            : 'I don’t have an account yet';
+        welcomeLede.textContent = on
+            ? 'Pick a username and password, and tell us who you are. This is the same ' +
+              'account the quest games use, so it will work there too. No email is asked for.'
+            : 'Use your quest-game username and password — it is the same account, and ' +
+              'no email is asked for.';
+        welcomeMessage.textContent = '';
+        welcomeMessage.className = 'sheet-msg';
+    }
+
+    welcomeToggle.addEventListener('click', function () { setWelcomeMode(!welcomeSignupMode); });
+
+    welcomeForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var username = welcomeUsername.value.trim();
+        var password = welcomePassword.value;
+        var fullName = welcomeFullname.value.trim();
+        if (!username || !password) return;
+
+        welcomeSubmit.disabled = true;
+        var label = welcomeSubmit.textContent;
+        welcomeSubmit.textContent = welcomeSignupMode ? 'Creating…' : 'Signing in…';
+
+        var result = welcomeSignupMode
+            ? await Account.signUp(username, password, fullName)
+            : await Account.signIn(username, password);
+
+        welcomeSubmit.disabled = false;
+        welcomeSubmit.textContent = label;
+
+        if (result.ok) {
+            // Nothing further to do: onStudentAuth's callback fires the
+            // moment Firebase confirms the session, Account.onChange picks
+            // it up, and renderApp() swaps straight to the dashboard — no
+            // modal to dismiss, no second step.
+            welcomeForm.reset();
+        } else {
+            welcomeMessage.textContent = result.message;
+            welcomeMessage.className = 'sheet-msg bad';
+        }
+    });
+
+    welcomeSkip.addEventListener('click', function () {
+        localSetupOpen = true;
+        renderApp();
+    });
+
+    localBack.addEventListener('click', function () {
+        localSetupOpen = false;
+        renderApp();
     });
 
     optPush.addEventListener('change', async function () {
@@ -1604,21 +1839,12 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
         Account.onChange(function (accountState) {
             renderAccountButton();
-            if (!accountState.signedIn || !accountState.apiReady) return;
-
-            // The account is authoritative once signed in and synced.
-            var merged = {};
-            accountState.days.forEach(function (day) { merged[day] = true; });
-            readingLog = merged;
-            writeStore(LOG_KEY, readingLog);
-
-            if (!userProfile && accountState.settings && accountState.settings.startDate) {
-                userProfile = {
-                    name: accountState.user.displayName || accountState.user.username,
-                    startDate: accountState.settings.startDate
-                };
-                writeStore(PROFILE_KEY, userProfile);
-            }
+            // The account is authoritative once signed in and synced — this
+            // also covers the moment sign-in itself completes, and a fresh
+            // account that has never set a cycle start, so signing in always
+            // lands straight on the dashboard rather than back on a setup
+            // screen that has nothing left to ask.
+            syncFromAccount(accountState);
             renderApp();
         });
 

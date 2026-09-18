@@ -507,14 +507,14 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     var API = '../api/';
     var SYNCED_KEY = 'quran_synced_with';
-    var CLOUD_WAIT_MS = 8000;
+    var CLOUD_WAIT_MS = 8000; // ultimate fallback only; the error listener below is what actually fires fast
 
     var state = {
         ready: false,
         available: false,   // the shared auth module loaded
         apiReady: false,    // the reminder API answered
         signedIn: false,
-        user: null,         // { uid, username, displayName }
+        user: null,         // { uid, username, displayName, fullName }
         settings: null,
         days: []
     };
@@ -529,19 +529,44 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     function cloud() { return window.KidsCloud; }
 
-    /** Resolves once the shared auth module is on the page, or null if it never is. */
+    /**
+     * Resolves once the shared auth module is on the page, or null if it never
+     * is. Memoized: every caller shares one wait rather than racing separate
+     * listeners, and `signIn`/`signUp` can call this even before `start()` has
+     * — a click on the very first screen should not have to wait for `start()`
+     * to get there first.
+     *
+     * A missing script fires the element's own `error` event almost at once,
+     * so that is what settles this on a 404 — the timeout below only guards
+     * against the module loading but never calling back, which `error` cannot
+     * catch.
+     */
+    var cloudPromise = null;
     function waitForCloud() {
-        if (cloud()) return Promise.resolve(cloud());
-        return new Promise(function (resolve) {
+        if (cloudPromise) return cloudPromise;
+        if (cloud()) return (cloudPromise = Promise.resolve(cloud()));
+
+        cloudPromise = new Promise(function (resolve) {
             var settled = false;
             function done(value) {
                 if (settled) return;
                 settled = true;
                 resolve(value);
             }
+            function onScriptError(event) {
+                var target = event && event.target;
+                if (target && target.tagName === 'SCRIPT' &&
+                    /kids-quest-cloud\.js/.test(target.src || '')) {
+                    window.removeEventListener('error', onScriptError, true);
+                    done(null);
+                }
+            }
             window.addEventListener('kidscloud-ready', function () { done(cloud()); });
+            // capture: a resource load failure does not bubble.
+            window.addEventListener('error', onScriptError, true);
             setTimeout(function () { done(cloud() || null); }, CLOUD_WAIT_MS);
         });
+        return cloudPromise;
     }
 
     async function api(method, route, body) {
@@ -648,7 +673,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
             }
             state.signedIn = true;
             state.user = { uid: user.uid, username: user.username,
-                           displayName: user.displayName || user.username };
+                           displayName: user.displayName || user.username,
+                           fullName: user.fullName || '' };
             emit();
             refresh();
         });
@@ -669,19 +695,24 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     }
 
     async function signIn(username, password) {
+        var kids = await waitForCloud();
+        if (!kids) return { ok: false, message: 'Accounts are not available on this page right now.' };
         try {
-            await cloud().studentLogin(username, password);
+            await kids.studentLogin(username, password);
             return { ok: true };
         } catch (err) {
             return { ok: false, message: friendlyError(err) };
         }
     }
 
-    async function signUp(username, password) {
+    async function signUp(username, password, fullName) {
+        var kids = await waitForCloud();
+        if (!kids) return { ok: false, message: 'Accounts are not available on this page right now.' };
         try {
             // No contact address: these accounts are keyed by username, and
-            // nothing here needs an email.
-            await cloud().studentSignUp(username, '', password);
+            // nothing here needs an email. fullName is optional and becomes
+            // the account's display name in place of the username.
+            await kids.studentSignUp(username, '', password, fullName || '');
             return { ok: true };
         } catch (err) {
             return { ok: false, message: friendlyError(err) };

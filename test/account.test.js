@@ -107,11 +107,20 @@ function startServer() {
     });
 }
 
-/* A stand-in for kids-quest-cloud.js with the same public shape. */
-const FAKE_CLOUD = (signedInUsername) => {
+/*
+ * A stand-in for kids-quest-cloud.js with the same public shape, including
+ * the fullName-as-displayName behavior studentSignUp gained: a full name, if
+ * given, becomes the display name; otherwise it stays the username, matching
+ * the real module exactly.
+ */
+const FAKE_CLOUD = (opts) => {
+    opts = opts || {};
+    var signedInUsername = opts.signedInAs || null;
+    var signedInFullName = opts.fullName || '';
     const user = signedInUsername
         ? { uid: 'uid-' + signedInUsername, username: signedInUsername,
-            displayName: signedInUsername, fullName: '', progress: {} }
+            displayName: signedInFullName || signedInUsername,
+            fullName: signedInFullName, progress: {} }
         : null;
     window.KidsCloud = {
         _user: user,
@@ -121,18 +130,21 @@ const FAKE_CLOUD = (signedInUsername) => {
                 var err = new Error('bad'); err.code = 'auth/invalid-credential';
                 return Promise.reject(err);
             }
-            this._user = { uid: 'uid-' + username, username: username, displayName: username };
+            this._user = { uid: 'uid-' + username, username: username, displayName: username,
+                           fullName: '' };
             if (this._cb) this._cb(this._user);
             return Promise.resolve(this._user);
         },
-        studentSignUp: function (username, contactEmail, password) {
+        studentSignUp: function (username, contactEmail, password, fullName) {
+            var cleanFullName = String(fullName || '').trim();
             window.__signUpArgs = { username: username, contactEmail: contactEmail,
-                                    password: password };
+                                    password: password, fullName: cleanFullName };
             if (username === 'taken') {
                 var err = new Error('taken'); err.code = 'auth/email-already-in-use';
                 return Promise.reject(err);
             }
-            this._user = { uid: 'uid-' + username, username: username, displayName: username };
+            this._user = { uid: 'uid-' + username, username: username,
+                           displayName: cleanFullName || username, fullName: cleanFullName };
             if (this._cb) this._cb(this._user);
             return Promise.resolve(this._user);
         },
@@ -166,8 +178,10 @@ async function open(browser, opts = {}) {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
-    await page.addInitScript(SEED);
-    if (opts.cloud !== false) await page.addInitScript(FAKE_CLOUD, opts.signedInAs || null);
+    if (opts.seed !== false) await page.addInitScript(SEED);
+    if (opts.cloud !== false) {
+        await page.addInitScript(FAKE_CLOUD, { signedInAs: opts.signedInAs, fullName: opts.fullName });
+    }
     await page.clock.install({ time: new Date('2026-09-18T10:00:00+03:00') });
     await page.goto(APP + (opts.query || ''));
     await page.waitForTimeout(900);
@@ -242,20 +256,26 @@ const freshStore = () => ({
         await context.close();
     }
 
-    // --- Creating an account ---------------------------------------------
+    // --- Creating an account, from the header (an already-set-up local
+    //     user adding an account later) ------------------------------------
     {
         store = freshStore(); apiUp = true;
         const { context, page } = await open(browser);
         await page.click('#account-btn');
         await page.waitForTimeout(200);
+        check('creating an account does not ask for a full name until asked to',
+            await page.isHidden('#signin-fullname-field'));
         await page.click('#signin-toggle');
         await page.waitForTimeout(200);
         check('there is a way to create an account',
             (await page.textContent('#signin-title')).trim() === 'Create an account');
-        check('which also asks for no email',
+        check('which asks for a full name',
+            await page.isVisible('#signin-fullname-field'));
+        check('and no email at all',
             /No email is asked for/i.test(await page.textContent('#signin-lede')) &&
             (await page.$('#signin-email')) === null);
 
+        await page.fill('#signin-fullname', 'Khadija Nur');
         await page.fill('#signin-username', 'newkid');
         await page.fill('#signin-password', 'correct-horse');
         await page.click('#signin-submit');
@@ -264,8 +284,127 @@ const freshStore = () => ({
         check('sign-up passes an empty contact address',
             args && args.username === 'newkid' && args.contactEmail === '',
             JSON.stringify(args));
-        check('and the account is used straight away',
-            (await page.textContent('#account-btn')).trim() === 'newkid');
+        check('and the full name that was entered',
+            args && args.fullName === 'Khadija Nur', JSON.stringify(args));
+        check('the account is used straight away, with no extra step',
+            (await page.isHidden('#signin-modal')) &&
+            (await page.isHidden('#setup-view')) &&
+            (await page.isVisible('#dashboard-view')));
+        check('and the full name is what the header shows',
+            (await page.textContent('#account-btn')).trim() === 'Khadija Nur',
+            await page.textContent('#account-btn'));
+        await context.close();
+    }
+
+    // --- The first page a brand-new visitor sees ---------------------------
+    // No seed this time: nothing on the device yet, nobody signed in.
+    {
+        store = freshStore(); apiUp = true;
+        const { context, page, errors } = await open(browser, { seed: false });
+
+        check('the welcome screen — not a name-only form — is the first thing shown',
+            (await page.isVisible('#welcome-auth')) && (await page.isHidden('#local-setup')));
+        check('asking for a username and password, not a name',
+            (await page.isVisible('#welcome-username')) &&
+            (await page.isVisible('#welcome-password')) &&
+            (await page.isHidden('#welcome-fullname-field')));
+
+        // Wrong password: reported, not swallowed, and the screen stays put.
+        await page.fill('#welcome-username', 'amina123');
+        await page.fill('#welcome-password', 'wrong-password');
+        await page.click('#welcome-submit');
+        await page.waitForTimeout(400);
+        check('a wrong password on the welcome screen says so',
+            /do not match/i.test(await page.textContent('#welcome-message')),
+            (await page.textContent('#welcome-message')).trim());
+        check('and stays on the welcome screen', await page.isVisible('#welcome-auth'));
+
+        // Switch to create an account.
+        await page.click('#welcome-toggle');
+        await page.waitForTimeout(200);
+        check('clicking through offers full name, username and password',
+            (await page.isVisible('#welcome-fullname-field')) &&
+            (await page.textContent('#welcome-title')).trim() === 'Create an account');
+
+        await page.fill('#welcome-fullname', 'Ahmad Yusuf');
+        await page.fill('#welcome-username', 'ahmad99');
+        await page.fill('#welcome-password', 'correct-horse');
+        await page.click('#welcome-submit');
+        await page.waitForTimeout(700);
+
+        const args = await page.evaluate(() => window.__signUpArgs);
+        check('the full name reaches sign-up', args && args.fullName === 'Ahmad Yusuf',
+            JSON.stringify(args));
+        check('signing up saves the session and logs in immediately — ' +
+            'no modal, no second click', await page.isHidden('#setup-view') &&
+            await page.isVisible('#dashboard-view'));
+        check('the full name is what the greeting shows',
+            (await page.textContent('#greeting-name')).includes('Ahmad Yusuf'),
+            await page.textContent('#greeting-name'));
+        check('and what the header shows',
+            (await page.textContent('#account-btn')).trim() === 'Ahmad Yusuf');
+        check('no uncaught errors on the welcome screen', errors.length === 0,
+            errors.join(' | '));
+        await context.close();
+    }
+
+    // --- Continuing without an account, from the welcome screen -----------
+    {
+        store = freshStore(); apiUp = true;
+        const { context, page } = await open(browser, { seed: false });
+        await page.waitForSelector('#welcome-auth:not(.is-hidden)', { timeout: 5000 });
+
+        await page.click('#welcome-skip');
+        await page.waitForTimeout(200);
+        check('"Continue without an account" reaches the local-only form',
+            (await page.isVisible('#local-setup')) && (await page.isHidden('#welcome-auth')));
+        check('offering a way back, since accounts are available here',
+            (await page.textContent('#local-back')).trim() === 'Back to sign in');
+
+        await page.click('#local-back');
+        await page.waitForTimeout(200);
+        check('"Back to sign in" returns to the welcome screen',
+            await page.isVisible('#welcome-auth'));
+
+        await page.click('#welcome-skip');
+        await page.waitForTimeout(200);
+        await page.fill('#user-name', 'Guest Reader');
+        await page.click('#local-setup #setup-form button[type=submit]');
+        await page.waitForTimeout(300);
+        check('the local-only path still works end to end, unsigned in',
+            (await page.isVisible('#dashboard-view')) &&
+            (await page.textContent('#greeting-name')).includes('Guest Reader'));
+        await context.close();
+    }
+
+    // --- The bug the screenshots showed: signed in, but stuck on setup ----
+    // A visitor already signed in, on an account that has never set a cycle
+    // start (a brand-new account, or one only ever used on another device).
+    // The old page kept such a person on the local name-only form forever,
+    // even though the header already showed them signed in.
+    {
+        store = { settings: { startDate: null, timezone: 'UTC', remindHour: 20, pushReminders: true },
+                  days: [] };
+        apiUp = true;
+        calls.length = 0;
+        const { context, page, errors } = await open(browser,
+            { seed: false, signedInAs: 'fes', fullName: 'Fes Reshid' });
+
+        check('an already-signed-in visitor lands straight on the dashboard',
+            (await page.isVisible('#dashboard-view')) && (await page.isHidden('#setup-view')));
+        check('the header shows them signed in immediately',
+            (await page.textContent('#account-btn')).trim() === 'Fes Reshid');
+        check('a juz is shown despite the account never having set one',
+            /^Juz \d+$/.test((await page.textContent('#target-juz-title')).trim()),
+            await page.textContent('#target-juz-title'));
+
+        const saved = calls.filter((c) => c.route === 'settings')
+            .map((c) => c.body).filter((b) => b && b.startDate);
+        check('a cycle start was picked and saved on their behalf',
+            saved.length >= 1 && /^\d{4}-\d{2}-\d{2}$/.test(saved[0].startDate),
+            JSON.stringify(saved));
+        check('no uncaught errors resolving the stuck-setup bug', errors.length === 0,
+            errors.join(' | '));
         await context.close();
     }
 
