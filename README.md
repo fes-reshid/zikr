@@ -43,14 +43,43 @@ with a pre-built Tailwind stylesheet.
 `dist/quran-tracker/index.html`. One file, no relative references, so it works
 at any URL depth — including `/quran-tracker` served without a trailing slash,
 where a relative `src/core.js` would otherwise resolve to `/src/core.js` and
-break the page.
+break the page. `npm test` fails if the committed build is stale, so `dist/`
+cannot drift from the source.
 
-To publish it at `example.com/quran-tracker`, copy `dist/quran-tracker/` into
-the document root of whatever already serves that domain. Nothing else needs to
-change: the app is static, has no server side, and touches no other path.
+### Onto a domain you already run
 
-`npm test` fails if the committed build is stale, so `dist/` cannot drift from
-the source.
+If you know what serves the domain — a VPS, cPanel, WordPress, any static host
+— copy `dist/quran-tracker/` into its document root. The app is static, has no
+server side, and touches no other path, so nothing else changes.
+
+### Onto a domain behind Cloudflare, without knowing the origin
+
+`cloudflare/` deploys the app as a Worker bound to the route
+`diinislaam.com/quran-tracker*`. Only that path is intercepted; every other
+request never reaches the Worker and continues to the existing origin. No DNS
+record changes and the current site is untouched.
+
+```sh
+npm run build
+npx wrangler login
+npx wrangler deploy --config cloudflare/wrangler.toml
+```
+
+Edit the `pattern` and `zone_name` in `cloudflare/wrangler.toml` for a
+different domain. The built page is compiled into the Worker as a text module,
+so there is no origin to keep running — about 11 KB gzipped, inside the free
+tier. Re-run `npm run build` before deploying to pick up source changes.
+
+### GitHub Pages
+
+`.github/workflows/pages.yml` publishes `dist/` on every push, serving the app
+at `/<repo>/quran-tracker/`. It checks the build is current and runs the unit
+tests before publishing.
+
+Pages has to be turned on once by hand, under **Settings → Pages → Build and
+deployment → Source → GitHub Actions**. The workflow token is not allowed to
+create the Pages site itself, so until that setting is flipped the deploy step
+fails with `Resource not accessible by integration`.
 
 ## Tests
 

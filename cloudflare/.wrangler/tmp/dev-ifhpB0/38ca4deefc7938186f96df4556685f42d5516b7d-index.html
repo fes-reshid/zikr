@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Track one Juz of the Quran a day on a 30-day cycle anchored to Rabiʿ II 1, and read the day's Juz inline.">
+    <meta name="theme-color" content="#047857">
+    <title>Quran Daily Tracker &amp; Reader</title>
+
+    <!-- Tailwind CSS for modern mobile-friendly styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Amiri:wght@400;700&display=swap">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .arabic-text { font-family: 'Amiri', serif; direction: rtl; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .fade-in { animation: none; }
+        }
+    </style>
+</head>
+<body class="h-full bg-slate-50 text-slate-800 antialiased flex flex-col">
+
+    <div id="app" class="flex-1 flex flex-col max-w-md mx-auto w-full p-4 justify-between">
+
+        <!-- Setup / Profile View -->
+        <div id="setup-view" class="my-auto bg-white rounded-3xl p-6 shadow-xl border border-slate-100 hidden">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+                    <i class="fa-solid fa-moon"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900">Quran Daily Tracker</h1>
+                <p class="text-slate-500 text-sm mt-1">One Juz a day on a 30-day cycle, anchored so that Juz 1 falls on Rabiʿ II 1.</p>
+            </div>
+            <form id="setup-form" class="space-y-4">
+                <div>
+                    <label for="user-name" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Your Name</label>
+                    <input type="text" id="user-name" required maxlength="40" placeholder="e.g. Ahmad" autocomplete="given-name" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 bg-slate-50">
+                </div>
+                <div>
+                    <label for="start-date" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Cycle Start (Juz 1)</label>
+                    <p class="text-xs text-slate-400 mb-2">Pre-filled with Rabiʿ II 1 from the Umm al-Qura calendar. Change it if you started on a different day.</p>
+                    <input type="date" id="start-date" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 bg-slate-50">
+                    <p id="start-date-hint" class="text-xs text-emerald-600 font-medium mt-2 min-h-[1rem]"></p>
+                </div>
+                <button type="submit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition-all">
+                    Start Journey
+                </button>
+            </form>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="flex-1 flex flex-col hidden pb-6">
+            <header class="flex items-center justify-between py-4 mb-2 gap-3">
+                <div class="min-w-0">
+                    <span id="hijri-badge-top" class="text-xs uppercase tracking-wider text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 inline-block mb-1"></span>
+                    <h1 id="greeting-name" class="text-xl font-bold text-slate-900 truncate">Assalamu Alaikum!</h1>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button id="open-reader-btn" class="px-3 py-2 rounded-xl bg-emerald-600 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm hover:bg-emerald-700 transition-all">
+                        <i class="fa-solid fa-book-quran"></i> Read Juz
+                    </button>
+                    <button id="settings-btn" class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 shadow-sm" title="Settings" aria-label="Settings">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-6 text-white shadow-xl shadow-emerald-900/10 mb-6 relative overflow-hidden">
+                <div class="absolute right-[-20px] bottom-[-20px] opacity-10 text-9xl" aria-hidden="true">
+                    <i class="fa-solid fa-book-quran"></i>
+                </div>
+                <div class="flex justify-between items-start mb-4 gap-3">
+                    <div>
+                        <p class="text-emerald-100 text-xs font-medium tracking-wide uppercase">Today's Target</p>
+                        <h2 class="text-3xl font-bold mt-1" id="target-juz-title">Juz &mdash;</h2>
+                        <p class="text-emerald-100 text-xs mt-1" id="cycle-progress-label"></p>
+                    </div>
+                    <span id="streak-badge" class="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 shrink-0">
+                        <i class="fa-solid fa-fire text-amber-300"></i> <span id="streak-count">0</span> Day Streak
+                    </span>
+                </div>
+
+                <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-4">
+                    <div>
+                        <p class="text-xs text-emerald-100" id="current-date-label">Today</p>
+                        <p class="text-sm font-semibold mt-0.5" id="status-text">Not read yet</p>
+                    </div>
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <button id="quick-read-btn" class="flex-1 sm:flex-none px-4 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold rounded-xl shadow-md transition-all text-sm flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-book-open"></i> Read Now
+                        </button>
+                        <button id="toggle-read-btn" class="flex-1 sm:flex-none px-4 py-2.5 bg-white text-emerald-700 font-bold rounded-xl shadow-md hover:bg-emerald-50 transition-all text-sm flex items-center justify-center gap-1.5">
+                            <i class="fa-regular fa-circle" id="check-icon"></i> <span id="btn-label">Mark as Read</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="feedback-card" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
+                <div id="feedback-icon" class="text-amber-600 text-lg mt-0.5">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+                <div>
+                    <h3 id="feedback-title" class="text-sm font-bold text-amber-900">Daily Reminder Status</h3>
+                    <p id="feedback-desc" class="text-xs text-amber-700 mt-0.5"></p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex-1 flex flex-col">
+                <h3 class="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-days text-emerald-600"></i> Recent Progress (Last 7 Days)
+                </h3>
+                <p class="text-xs text-slate-400 mb-3">Tap any day to correct its status.</p>
+                <div id="history-list" class="space-y-2.5 overflow-y-auto pr-1">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Reader -->
+        <div id="reader-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="reader-title">
+            <div id="reader-panel" class="bg-white w-full sm:max-w-xl h-[85vh] sm:h-[80vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden fade-in">
+                <div class="bg-emerald-700 text-white p-4 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <h3 id="reader-title" class="font-bold text-lg">Juz Reader</h3>
+                        <p id="reader-subtitle" class="text-xs text-emerald-200 truncate">Loaded via Quran.com API</p>
+                    </div>
+                    <button id="close-reader-btn" class="w-9 h-9 rounded-full bg-emerald-800 hover:bg-emerald-900 text-white flex items-center justify-center transition-all shrink-0" aria-label="Close reader">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="bg-slate-100 p-3 border-b border-slate-200 flex items-center justify-between gap-2">
+                    <label for="juz-selector" class="text-xs font-semibold text-slate-600 uppercase">Select Juz:</label>
+                    <select id="juz-selector" class="px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <!-- Options generated 1-30 -->
+                    </select>
+                </div>
+                <div id="reader-content" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50">
+                    <!-- Verses rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings -->
+        <div id="settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <div class="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl fade-in space-y-3">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 id="settings-title" class="font-bold text-lg text-slate-900">Settings</h3>
+                    <button id="close-settings-btn" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center" aria-label="Close settings">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <button id="edit-profile-btn" class="w-full text-left px-4 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all">
+                    <span class="font-semibold text-sm text-slate-800 flex items-center gap-2"><i class="fa-solid fa-user-pen text-emerald-600"></i> Edit name &amp; start date</span>
+                    <span class="text-xs text-slate-500">Keeps your reading history.</span>
+                </button>
+                <button id="clear-history-btn" class="w-full text-left px-4 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all">
+                    <span class="font-semibold text-sm text-slate-800 flex items-center gap-2"><i class="fa-solid fa-eraser text-amber-600"></i> Clear reading history</span>
+                    <span class="text-xs text-slate-500">Resets your streak, keeps your profile.</span>
+                </button>
+                <button id="reset-all-btn" class="w-full text-left px-4 py-3 rounded-xl border border-red-200 hover:bg-red-50 transition-all">
+                    <span class="font-semibold text-sm text-red-700 flex items-center gap-2"><i class="fa-solid fa-trash"></i> Reset everything</span>
+                    <span class="text-xs text-red-500">Deletes profile and history.</span>
+                </button>
+                <p id="storage-warning" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 hidden">
+                    Storage is unavailable in this browser, so your progress will be lost when you close the tab.
+                </p>
+            </div>
+        </div>
+
+        <footer class="text-center text-xs text-slate-400 py-2">
+            Quran Reading Tracker &bull; Powered by Quran.com API
+        </footer>
+
+    </div>
+
+    <script>
+/* src/core.js, inlined by build.js — edit the source, not this file. */
+/*
+ * Pure date / tracking logic for the Quran daily tracker.
+ *
+ * Kept free of DOM access so it can be loaded as a classic script in the
+ * browser (window.QuranCore) and required directly from the Node tests.
+ */
+(function (root, factory) {
+    if (typeof module === 'object' && module.exports) {
+        module.exports = factory();
+    } else {
+        root.QuranCore = factory();
+    }
+})(typeof self !== 'undefined' ? self : this, function () {
+    'use strict';
+
+    var JUZ_IN_CYCLE = 30;
+    var RABI_AL_THANI = 4; // 4th month of the Hijri year
+    var HIJRI_LOCALE = 'en-US-u-ca-islamic-umalqura';
+
+    /** Local-midnight copy of a date, so day maths never straddles a DST shift. */
+    function startOfDay(date) {
+        var d = new Date(date.getTime());
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }
+
+    /** YYYY-MM-DD in the *local* timezone (never the UTC date). */
+    function formatDateKey(date) {
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    }
+
+    /**
+     * Parse YYYY-MM-DD as local midnight. `new Date('2026-09-18')` is parsed as
+     * UTC, which lands on the previous day for anyone west of Greenwich.
+     */
+    function parseDateKey(key) {
+        var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || '').trim());
+        if (!parts) return null;
+        var date = new Date(
+            Number(parts[1]),
+            Number(parts[2]) - 1,
+            Number(parts[3])
+        );
+        return isNaN(date.getTime()) ? null : startOfDay(date);
+    }
+
+    function toDate(value) {
+        if (value instanceof Date) return startOfDay(value);
+        return parseDateKey(value);
+    }
+
+    /** Whole days from `start` to `target`. Negative when target precedes start. */
+    function daysBetween(start, target) {
+        var a = toDate(start);
+        var b = toDate(target);
+        if (!a || !b) return null;
+        return Math.round((b.getTime() - a.getTime()) / 86400000);
+    }
+
+    /**
+     * Position in the 30-day cycle (1..30). Dates before the start date wrap
+     * backwards rather than clamping, so recent history stays truthful.
+     */
+    function cycleDay(startDate, targetDate) {
+        var diff = daysBetween(startDate, targetDate);
+        if (diff === null) return null;
+        return ((diff % JUZ_IN_CYCLE) + JUZ_IN_CYCLE) % JUZ_IN_CYCLE + 1;
+    }
+
+    /** Juz due on a given date. Juz 1 falls on the cycle start (Rabiʿ II 1). */
+    function juzForDate(startDate, targetDate) {
+        return cycleDay(startDate, targetDate);
+    }
+
+    /**
+     * Consecutive days read, counting back from today. Today being unread does
+     * not break the streak until the day is over.
+     */
+    function calculateStreak(log, today) {
+        var readingLog = log || {};
+        var cursor = toDate(today || new Date());
+        if (!cursor) return 0;
+
+        var todayKey = formatDateKey(cursor);
+        if (!readingLog[todayKey]) {
+            cursor.setDate(cursor.getDate() - 1);
+        }
+
+        var streak = 0;
+        // Bounded so a corrupt log can never spin forever.
+        for (var i = 0; i < 366 * 10; i++) {
+            if (!readingLog[formatDateKey(cursor)]) break;
+            streak++;
+            cursor.setDate(cursor.getDate() - 1);
+        }
+        return streak;
+    }
+
+    /** Hijri (Umm al-Qura) breakdown of a Gregorian date, or null if unsupported. */
+    function hijriParts(date) {
+        try {
+            var formatter = new Intl.DateTimeFormat(HIJRI_LOCALE, {
+                day: 'numeric',
+                month: 'numeric',
+                year: 'numeric'
+            });
+            var nameFormatter = new Intl.DateTimeFormat(HIJRI_LOCALE, {
+                month: 'long'
+            });
+            var result = { day: null, month: null, year: null, monthName: null };
+            formatter.formatToParts(date).forEach(function (part) {
+                if (part.type === 'day') result.day = parseInt(part.value, 10);
+                if (part.type === 'month') result.month = parseInt(part.value, 10);
+                if (part.type === 'year') result.year = parseInt(part.value, 10);
+            });
+            nameFormatter.formatToParts(date).forEach(function (part) {
+                if (part.type === 'month') result.monthName = part.value;
+            });
+            if (!result.day || !result.month || !result.year) return null;
+            return result;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    /** e.g. "Rabiʻ II 7, 1448 AH" — empty string when Intl lacks the calendar. */
+    function formatHijri(date) {
+        var parts = hijriParts(date);
+        if (!parts) return '';
+        return parts.monthName + ' ' + parts.day + ', ' + parts.year + ' AH';
+    }
+
+    /**
+     * Gregorian date key for the most recent Rabiʿ II 1 on or before `from`,
+     * which is the anchor the tracker counts Juz 1 from. Returns null when the
+     * runtime has no Islamic calendar to search.
+     */
+    function findCycleStart(from) {
+        var cursor = startOfDay(from ? new Date(from) : new Date());
+        var parts = hijriParts(cursor);
+        if (!parts) return null;
+
+        // Inside Rabiʿ II already: step straight back to day 1.
+        if (parts.month === RABI_AL_THANI) {
+            cursor.setDate(cursor.getDate() - (parts.day - 1));
+            return formatDateKey(cursor);
+        }
+
+        // Otherwise walk back to the last day-1 of Rabiʿ II (< 1 Hijri year).
+        for (var i = 0; i < 400; i++) {
+            cursor.setDate(cursor.getDate() - 1);
+            var step = hijriParts(cursor);
+            if (!step) return null;
+            if (step.month === RABI_AL_THANI && step.day === 1) {
+                return formatDateKey(cursor);
+            }
+        }
+        return null;
+    }
+
+    return {
+        JUZ_IN_CYCLE: JUZ_IN_CYCLE,
+        startOfDay: startOfDay,
+        formatDateKey: formatDateKey,
+        parseDateKey: parseDateKey,
+        daysBetween: daysBetween,
+        cycleDay: cycleDay,
+        juzForDate: juzForDate,
+        calculateStreak: calculateStreak,
+        hijriParts: hijriParts,
+        formatHijri: formatHijri,
+        findCycleStart: findCycleStart
+    };
+});
+    </script>
+    <script>
+    (function () {
+        'use strict';
+
+        var Core = window.QuranCore;
+        var PROFILE_KEY = 'quran_user_profile';
+        var LOG_KEY = 'quran_reading_log';
+        var TRANSLATION_ID = 131; // Saheeh International
+        var PAGE_SIZE = 50;       // Quran.com caps per_page at 50
+
+        // --- Storage -------------------------------------------------------
+        // localStorage throws in some privacy modes; fall back to memory so the
+        // app still works for the session instead of dying on load.
+        var storageAvailable = true;
+        var memoryStore = {};
+
+        function readStore(key) {
+            try {
+                var raw = localStorage.getItem(key);
+                return raw ? JSON.parse(raw) : null;
+            } catch (err) {
+                storageAvailable = false;
+                return memoryStore[key] || null;
+            }
+        }
+
+        function writeStore(key, value) {
+            memoryStore[key] = value;
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch (err) {
+                storageAvailable = false;
+            }
+        }
+
+        function removeStore(key) {
+            delete memoryStore[key];
+            try {
+                localStorage.removeItem(key);
+            } catch (err) {
+                storageAvailable = false;
+            }
+        }
+
+        var userProfile = readStore(PROFILE_KEY);
+        var readingLog = readStore(LOG_KEY) || {};
+
+        // --- Elements ------------------------------------------------------
+        function $(id) { return document.getElementById(id); }
+
+        var setupView = $('setup-view');
+        var dashboardView = $('dashboard-view');
+        var setupForm = $('setup-form');
+        var userNameInput = $('user-name');
+        var startDateInput = $('start-date');
+        var startDateHint = $('start-date-hint');
+
+        var greetingName = $('greeting-name');
+        var hijriBadgeTop = $('hijri-badge-top');
+        var targetJuzTitle = $('target-juz-title');
+        var cycleProgressLabel = $('cycle-progress-label');
+        var streakCount = $('streak-count');
+        var currentDateLabel = $('current-date-label');
+        var statusText = $('status-text');
+        var toggleReadBtn = $('toggle-read-btn');
+        var quickReadBtn = $('quick-read-btn');
+        var checkIcon = $('check-icon');
+        var btnLabel = $('btn-label');
+        var feedbackCard = $('feedback-card');
+        var feedbackIcon = $('feedback-icon');
+        var feedbackTitle = $('feedback-title');
+        var feedbackDesc = $('feedback-desc');
+        var historyList = $('history-list');
+
+        var openReaderBtn = $('open-reader-btn');
+        var readerModal = $('reader-modal');
+        var closeReaderBtn = $('close-reader-btn');
+        var readerTitle = $('reader-title');
+        var readerSubtitle = $('reader-subtitle');
+        var juzSelector = $('juz-selector');
+        var readerContent = $('reader-content');
+
+        var settingsBtn = $('settings-btn');
+        var settingsModal = $('settings-modal');
+        var closeSettingsBtn = $('close-settings-btn');
+        var editProfileBtn = $('edit-profile-btn');
+        var clearHistoryBtn = $('clear-history-btn');
+        var resetAllBtn = $('reset-all-btn');
+        var storageWarning = $('storage-warning');
+
+        for (var j = 1; j <= Core.JUZ_IN_CYCLE; j++) {
+            var opt = document.createElement('option');
+            opt.value = String(j);
+            opt.textContent = 'Juz ' + j;
+            juzSelector.appendChild(opt);
+        }
+
+        // --- Rendering -----------------------------------------------------
+        function todayKey() {
+            return Core.formatDateKey(new Date());
+        }
+
+        function hijriSuffix(date) {
+            var formatted = Core.formatHijri(date);
+            return formatted ? ' (' + formatted + ')' : '';
+        }
+
+        function renderSetup() {
+            setupView.classList.remove('hidden');
+            dashboardView.classList.add('hidden');
+
+            userNameInput.value = userProfile ? userProfile.name : '';
+            startDateInput.value = (userProfile && userProfile.startDate) ||
+                Core.findCycleStart(new Date()) ||
+                todayKey();
+            updateStartDateHint();
+        }
+
+        function updateStartDateHint() {
+            var parsed = Core.parseDateKey(startDateInput.value);
+            if (!parsed) {
+                startDateHint.textContent = '';
+                return;
+            }
+            var formatted = Core.formatHijri(parsed);
+            startDateHint.textContent = formatted
+                ? 'Juz 1 on ' + formatted
+                : 'Juz 1 on ' + startDateInput.value;
+        }
+
+        function renderHero(today, key, currentJuz) {
+            var day = Core.cycleDay(userProfile.startDate, key);
+            var isRead = !!readingLog[key];
+
+            hijriBadgeTop.textContent = Core.formatHijri(today) || 'Daily Juz';
+            greetingName.textContent = 'Assalamu Alaikum, ' + userProfile.name + '!';
+            targetJuzTitle.textContent = 'Juz ' + currentJuz;
+            cycleProgressLabel.textContent = 'Day ' + day + ' of ' + Core.JUZ_IN_CYCLE + ' in this cycle';
+            streakCount.textContent = String(Core.calculateStreak(readingLog, today));
+
+            var gregorian = today.toLocaleDateString(undefined, {
+                weekday: 'short', month: 'short', day: 'numeric'
+            });
+            currentDateLabel.textContent = gregorian + hijriSuffix(today);
+
+            if (isRead) {
+                statusText.textContent = 'Completed Juz ' + currentJuz + ' today. Jazakallah Khair!';
+                toggleReadBtn.className = 'flex-1 sm:flex-none px-4 py-2.5 bg-emerald-800 text-white font-bold rounded-xl shadow-md hover:bg-emerald-900 transition-all text-sm flex items-center justify-center gap-1.5';
+                checkIcon.className = 'fa-solid fa-circle-check text-emerald-300';
+                btnLabel.textContent = 'Completed';
+
+                feedbackCard.className = 'bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-6 flex items-start gap-3';
+                feedbackIcon.className = 'text-emerald-600 text-lg mt-0.5';
+                feedbackIcon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+                feedbackTitle.className = 'text-sm font-bold text-emerald-900';
+                feedbackTitle.textContent = "Today's Goal Complete";
+                feedbackDesc.className = 'text-xs text-emerald-700 mt-0.5';
+                feedbackDesc.textContent = 'Alhamdulillah, you have fulfilled your reading goal for Juz ' + currentJuz + ' today.';
+            } else {
+                statusText.textContent = 'Pending reading for today';
+                toggleReadBtn.className = 'flex-1 sm:flex-none px-4 py-2.5 bg-white text-emerald-700 font-bold rounded-xl shadow-md hover:bg-emerald-50 transition-all text-sm flex items-center justify-center gap-1.5';
+                checkIcon.className = 'fa-regular fa-circle';
+                btnLabel.textContent = 'Mark as Read';
+
+                feedbackCard.className = 'bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-3';
+                feedbackIcon.className = 'text-amber-600 text-lg mt-0.5';
+                feedbackIcon.innerHTML = '<i class="fa-solid fa-bell"></i>';
+                feedbackTitle.className = 'text-sm font-bold text-amber-900';
+                feedbackTitle.textContent = 'Daily Reminder Status';
+                feedbackDesc.className = 'text-xs text-amber-700 mt-0.5';
+                feedbackDesc.textContent = "Don't forget to complete Juz " + currentJuz + ' today to keep your streak alive!';
+            }
+        }
+
+        function renderHistory() {
+            historyList.innerHTML = '';
+            for (var i = 0; i < 7; i++) {
+                var date = new Date();
+                date.setDate(date.getDate() - i);
+                var key = Core.formatDateKey(date);
+                var juz = Core.juzForDate(userProfile.startDate, key);
+                var isRead = !!readingLog[key];
+                var isToday = i === 0;
+
+                var row = document.createElement('button');
+                row.type = 'button';
+                row.dataset.dateKey = key;
+                row.setAttribute('aria-pressed', String(isRead));
+                row.className = 'w-full text-left flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 text-sm hover:border-emerald-200 hover:bg-emerald-50/40 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500';
+
+                var label = isToday
+                    ? 'Today'
+                    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+                var left = document.createElement('div');
+                left.className = 'flex items-center gap-3';
+
+                var icon = document.createElement('div');
+                icon.className = 'w-9 h-9 rounded-xl ' +
+                    (isRead ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-400') +
+                    ' flex items-center justify-center font-bold text-xs shrink-0';
+                icon.innerHTML = '<i class="fa-solid ' + (isRead ? 'fa-check' : 'fa-book') + '"></i>';
+
+                var text = document.createElement('div');
+                var dayLine = document.createElement('p');
+                dayLine.className = 'font-semibold text-slate-700';
+                dayLine.textContent = label;
+
+                var hijriSpan = document.createElement('span');
+                hijriSpan.className = 'text-xs text-slate-400 font-normal';
+                hijriSpan.textContent = hijriSuffix(date);
+                dayLine.appendChild(hijriSpan);
+
+                var juzLine = document.createElement('p');
+                juzLine.className = 'text-xs text-emerald-600 font-medium';
+                juzLine.textContent = 'Juz ' + juz;
+
+                text.appendChild(dayLine);
+                text.appendChild(juzLine);
+                left.appendChild(icon);
+                left.appendChild(text);
+
+                var badge = document.createElement('span');
+                badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ' +
+                    (isRead ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-600');
+                badge.textContent = isRead ? 'Completed' : 'Pending';
+
+                row.appendChild(left);
+                row.appendChild(badge);
+                historyList.appendChild(row);
+            }
+        }
+
+        function renderApp() {
+            storageWarning.classList.toggle('hidden', storageAvailable);
+
+            if (!userProfile || !userProfile.name || !Core.parseDateKey(userProfile.startDate)) {
+                renderSetup();
+                return;
+            }
+
+            setupView.classList.add('hidden');
+            dashboardView.classList.remove('hidden');
+
+            var today = new Date();
+            var key = Core.formatDateKey(today);
+            var currentJuz = Core.juzForDate(userProfile.startDate, key);
+
+            renderHero(today, key, currentJuz);
+            renderHistory();
+        }
+
+        function setRead(key, value) {
+            if (value) {
+                readingLog[key] = true;
+            } else {
+                delete readingLog[key];
+            }
+            writeStore(LOG_KEY, readingLog);
+            renderApp();
+        }
+
+        // --- Reader --------------------------------------------------------
+        // Every fetch carries a token; a stale response from a Juz the reader
+        // has already moved on from is discarded instead of being rendered.
+        var readerRequestId = 0;
+        var lastFocusedElement = null;
+
+        function showReaderMessage(html) {
+            readerContent.innerHTML = '';
+            var box = document.createElement('div');
+            box.className = 'text-center py-12 text-slate-500 space-y-3';
+            box.innerHTML = html;
+            readerContent.appendChild(box);
+            return box;
+        }
+
+        function showReaderLoading() {
+            return showReaderMessage(
+                '<i class="fa-solid fa-spinner fa-spin text-3xl text-emerald-600"></i>' +
+                '<p class="text-sm">Fetching Quranic verses from Quran.com&hellip;</p>'
+            );
+        }
+
+        /**
+         * Quran.com translations embed footnote markup. Render them as text
+         * with the footnote markers dropped, so nothing from the network is
+         * ever injected as live HTML.
+         */
+        function translationText(html) {
+            var doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+            doc.querySelectorAll('sup').forEach(function (node) { node.remove(); });
+            return doc.body.textContent.replace(/\s+/g, ' ').trim();
+        }
+
+        function verseCard(verse, juzNumber) {
+            var card = document.createElement('div');
+            card.className = 'bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-3';
+
+            var bar = document.createElement('div');
+            bar.className = 'flex justify-between items-center text-xs text-slate-400 border-b border-slate-100 pb-2';
+            var verseLabel = document.createElement('span');
+            verseLabel.className = 'font-bold text-emerald-600';
+            verseLabel.textContent = 'Verse ' + verse.verse_key;
+            var juzLabel = document.createElement('span');
+            juzLabel.className = 'bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-semibold';
+            juzLabel.textContent = 'Juz ' + juzNumber;
+            bar.appendChild(verseLabel);
+            bar.appendChild(juzLabel);
+            card.appendChild(bar);
+
+            // Field availability varies with the `fields` query, so fall back.
+            var arabic = verse.text_uthmani || verse.text_imlaei ||
+                verse.text_uthmani_simple || verse.text_indopak || '';
+            if (arabic) {
+                var arabicDiv = document.createElement('div');
+                arabicDiv.className = 'arabic-text text-2xl text-slate-900 leading-loose text-right py-2';
+                arabicDiv.lang = 'ar';
+                arabicDiv.textContent = arabic;
+                card.appendChild(arabicDiv);
+            }
+
+            if (verse.translations && verse.translations.length) {
+                var translation = translationText(verse.translations[0].text);
+                if (translation) {
+                    var transDiv = document.createElement('div');
+                    transDiv.className = 'text-sm text-slate-600 pt-2 border-t border-slate-100';
+                    transDiv.textContent = translation;
+                    card.appendChild(transDiv);
+                }
+            }
+            return card;
+        }
+
+        function versesUrl(juzNumber, page) {
+            return 'https://api.quran.com/api/v4/verses/by_juz/' + juzNumber +
+                '?words=false&fields=text_uthmani' +
+                '&translations=' + TRANSLATION_ID +
+                '&per_page=' + PAGE_SIZE +
+                '&page=' + page;
+        }
+
+        /**
+         * A Juz runs to a few hundred verses but the API caps a page at 50, so
+         * walk the pages and append each one as it arrives.
+         */
+        async function fetchJuzVerses(juzNumber) {
+            var requestId = ++readerRequestId;
+            readerTitle.textContent = 'Juz ' + juzNumber + ' Reader';
+            readerSubtitle.textContent = 'Loading from Quran.com…';
+            showReaderLoading();
+
+            var page = 1;
+            var loaded = 0;
+
+            try {
+                while (page) {
+                    var response = await fetch(versesUrl(juzNumber, page));
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    var data = await response.json();
+                    if (requestId !== readerRequestId) return; // superseded
+
+                    var verses = (data && data.verses) || [];
+                    if (page === 1) {
+                        readerContent.innerHTML = '';
+                        if (!verses.length) {
+                            showReaderMessage('<p class="text-sm">No verses were returned for this Juz.</p>');
+                            readerSubtitle.textContent = 'Nothing to display';
+                            return;
+                        }
+                    }
+
+                    var fragment = document.createDocumentFragment();
+                    verses.forEach(function (verse) {
+                        fragment.appendChild(verseCard(verse, juzNumber));
+                    });
+                    readerContent.appendChild(fragment);
+
+                    loaded += verses.length;
+                    readerSubtitle.textContent = loaded + ' verses loaded (Saheeh International)';
+
+                    var pagination = (data && data.pagination) || {};
+                    page = pagination.next_page || 0;
+                }
+            } catch (err) {
+                if (requestId !== readerRequestId) return;
+                console.error('Failed to load Juz ' + juzNumber, err);
+                var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+                var box = showReaderMessage(
+                    '<i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i>' +
+                    '<p class="text-sm">' +
+                    (offline
+                        ? 'You appear to be offline. Reconnect and try again.'
+                        : 'Could not reach the Quran.com API.') +
+                    '</p>'
+                );
+                var retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700';
+                retry.textContent = 'Try again';
+                retry.addEventListener('click', function () { fetchJuzVerses(juzNumber); });
+                box.appendChild(retry);
+                readerSubtitle.textContent = loaded ? loaded + ' verses loaded before the error' : 'Load failed';
+            }
+        }
+
+        function openReader(juzNumber) {
+            lastFocusedElement = document.activeElement;
+            juzSelector.value = String(juzNumber);
+            readerModal.classList.remove('hidden');
+            readerContent.scrollTop = 0;
+            closeReaderBtn.focus();
+            fetchJuzVerses(juzNumber);
+        }
+
+        function closeReader() {
+            readerRequestId++; // abandon any in-flight page
+            readerModal.classList.add('hidden');
+            if (lastFocusedElement && lastFocusedElement.focus) lastFocusedElement.focus();
+        }
+
+        function openTodaysJuz() {
+            if (!userProfile) return;
+            openReader(Core.juzForDate(userProfile.startDate, todayKey()));
+        }
+
+        // --- Settings ------------------------------------------------------
+        function openSettings() {
+            storageWarning.classList.toggle('hidden', storageAvailable);
+            settingsModal.classList.remove('hidden');
+            closeSettingsBtn.focus();
+        }
+
+        function closeSettings() {
+            settingsModal.classList.add('hidden');
+        }
+
+        // --- Events --------------------------------------------------------
+        setupForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var name = userNameInput.value.trim();
+            var startDate = startDateInput.value;
+            if (!name || !Core.parseDateKey(startDate)) return;
+
+            userProfile = { name: name, startDate: startDate };
+            writeStore(PROFILE_KEY, userProfile);
+            renderApp();
+        });
+
+        startDateInput.addEventListener('change', updateStartDateHint);
+        startDateInput.addEventListener('input', updateStartDateHint);
+
+        toggleReadBtn.addEventListener('click', function () {
+            var key = todayKey();
+            setRead(key, !readingLog[key]);
+        });
+
+        historyList.addEventListener('click', function (event) {
+            var row = event.target.closest('[data-date-key]');
+            if (!row) return;
+            var key = row.dataset.dateKey;
+            setRead(key, !readingLog[key]);
+        });
+
+        quickReadBtn.addEventListener('click', openTodaysJuz);
+        openReaderBtn.addEventListener('click', openTodaysJuz);
+        closeReaderBtn.addEventListener('click', closeReader);
+
+        // Only a click that lands on the overlay itself dismisses the reader.
+        // Testing `panel.contains(target)` would misfire, because a control
+        // that re-renders the verse list (the retry button) is detached from
+        // the DOM before its click finishes bubbling up to here.
+        readerModal.addEventListener('click', function (event) {
+            if (event.target === readerModal) closeReader();
+        });
+
+        juzSelector.addEventListener('change', function (event) {
+            fetchJuzVerses(Number(event.target.value));
+        });
+
+        settingsBtn.addEventListener('click', openSettings);
+        closeSettingsBtn.addEventListener('click', closeSettings);
+        settingsModal.addEventListener('click', function (event) {
+            if (event.target === settingsModal) closeSettings();
+        });
+
+        editProfileBtn.addEventListener('click', function () {
+            closeSettings();
+            renderSetup();
+        });
+
+        clearHistoryBtn.addEventListener('click', function () {
+            if (!confirm('Clear all reading history? Your streak will reset to zero.')) return;
+            readingLog = {};
+            removeStore(LOG_KEY);
+            closeSettings();
+            renderApp();
+        });
+
+        resetAllBtn.addEventListener('click', function () {
+            if (!confirm('Delete your profile and all reading history? This cannot be undone.')) return;
+            userProfile = null;
+            readingLog = {};
+            removeStore(PROFILE_KEY);
+            removeStore(LOG_KEY);
+            closeSettings();
+            renderApp();
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Escape') return;
+            if (!readerModal.classList.contains('hidden')) closeReader();
+            else if (!settingsModal.classList.contains('hidden')) closeSettings();
+        });
+
+        // A tab left open past midnight should roll over to the new day's Juz.
+        var renderedDay = todayKey();
+        setInterval(function () {
+            var current = todayKey();
+            if (current !== renderedDay) {
+                renderedDay = current;
+                renderApp();
+            }
+        }, 60000);
+
+        renderApp();
+    })();
+    </script>
+</body>
+</html>

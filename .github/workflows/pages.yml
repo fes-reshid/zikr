@@ -32,10 +32,11 @@ jobs:
       - name: Unit tests
         run: node --test test/core.test.js
 
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
+      # Note: actions/configure-pages with `enablement` is deliberately not
+      # used here. The workflow token cannot create a Pages site ("Resource
+      # not accessible by integration"), so Pages has to be switched on once
+      # by hand: Settings -> Pages -> Build and deployment -> Source ->
+      # "GitHub Actions". After that this workflow deploys on every push.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
