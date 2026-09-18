@@ -40,19 +40,55 @@ function build() {
     return inlined;
 }
 
-const output = build();
-const target = path.join(OUT_DIR, 'index.html');
+/*
+ * The app lives at /quran-tracker, so the directory above it would otherwise
+ * 404. Send it on instead of showing nothing.
+ */
+function redirectPage() {
+    return [
+        '<!DOCTYPE html>',
+        '<html lang="en">',
+        '<head>',
+        '<meta charset="UTF-8">',
+        '<meta http-equiv="refresh" content="0; url=quran-tracker/">',
+        '<link rel="canonical" href="quran-tracker/">',
+        '<title>Quran Daily Tracker</title>',
+        '</head>',
+        '<body>',
+        '<p><a href="quran-tracker/">Continue to the Quran Daily Tracker</a></p>',
+        '</body>',
+        '</html>',
+        ''
+    ].join('\n');
+}
 
-if (process.argv.includes('--check')) {
-    const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
-    if (current !== output) {
-        console.error('dist/quran-tracker/index.html is out of date. Run: npm run build');
+const outputs = {
+    'dist/quran-tracker/index.html': build(),
+    'dist/index.html': redirectPage()
+};
+
+const checking = process.argv.includes('--check');
+let stale = [];
+
+Object.keys(outputs).forEach(function (relPath) {
+    const target = path.join(ROOT, relPath);
+    const content = outputs[relPath];
+
+    if (checking) {
+        const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
+        if (current !== content) stale.push(relPath);
+        return;
+    }
+
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+    console.log('built ' + relPath + ' (' + Math.round(content.length / 1024) + ' KB)');
+});
+
+if (checking) {
+    if (stale.length) {
+        console.error('Out of date: ' + stale.join(', ') + '\nRun: npm run build');
         process.exit(1);
     }
-    console.log('dist/quran-tracker/index.html is up to date.');
-} else {
-    fs.mkdirSync(OUT_DIR, { recursive: true });
-    fs.writeFileSync(target, output);
-    console.log('built ' + path.relative(ROOT, target) +
-        ' (' + Math.round(output.length / 1024) + ' KB, self-contained)');
+    console.log('dist/ is up to date with the source.');
 }
