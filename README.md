@@ -8,6 +8,9 @@ Two pages for reading one juz of the Qur'ān a day, published as part of
 | `/quran-tracker/` | The day's juz, your streak, and the last week of progress |
 | `/quran-tracker/reader/` | Reads and recites any juz, verse by verse |
 
+It installs to a phone's home screen as a progressive web app, so it opens
+without browser chrome and the pages you have already opened work offline.
+
 Everything is stored in your browser's `localStorage`. There is no account and
 no server; the only requests leaving the device go to the Quran.com API for
 verse text and recitation audio.
@@ -50,6 +53,30 @@ No build step. Open `index.html` in a browser, or serve the folder:
 npm run serve   # http://localhost:8000
 ```
 
+## Installing it on a phone
+
+The pages ship a web app manifest, icons and a service worker, so both Android
+and iOS can install them to the home screen. Once installed the app opens
+standalone — no address bar — and moving between the tracker and the reader is
+served from cache, so the header does not blink between pages.
+
+- **Android / Chrome** fires `beforeinstallprompt`, so the tracker shows an
+  Install button.
+- **iOS / Safari** has no such event and installs only through *Share → Add to
+  Home Screen*, so the tracker shows those steps instead of a button that could
+  not work.
+
+The service worker is registered under `/quran-tracker/` and its scope is that
+directory, so no other page of the site can be intercepted by it — there is a
+test for exactly that. It caches the two pages, the manifest and the icons, and
+deliberately leaves the Quran.com API and the recitation audio alone: the audio
+is far too large to cache and both pages already handle it failing. Its cache
+name carries a hash of the build, so a deploy replaces the old cache instead of
+serving a stale page.
+
+`npm run icons` regenerates the PNGs from one HTML source with Playwright. They
+are committed, so an ordinary build needs neither a browser nor that script.
+
 ## Deploying
 
 `npm run build` inlines `src/core.js` into a single self-contained
@@ -66,8 +93,10 @@ The live site is the `fes-reshid/barnoota` repo, served by GitHub Pages from
 
 ```sh
 npm run build
-cp dist/quran-tracker/index.html ../barnoota/quran-tracker/index.html
+cp -r dist/quran-tracker/. ../barnoota/quran-tracker/
 ```
+
+That copies both pages plus the manifest, service worker and icons.
 
 Committing that to `main` publishes it at
 `https://diinislaam.com/quran-tracker/`. The file is generated — edit the
@@ -105,9 +134,13 @@ Pages site itself.
 ## Tests
 
 ```sh
-npm test        # date, cycle and streak logic (Node, no dependencies)
-npm run test:e2e   # full UI in headless Chromium, Quran.com API stubbed
+npm test           # date, cycle and streak logic (Node, no dependencies)
+npm run test:e2e   # both pages plus the installable behaviour, in Chromium
 ```
+
+The end-to-end suites stub Quran.com, so they run offline. The reader's suite
+serves each verse as a short silent WAV, so playback genuinely runs and `ended`
+really fires — the auto-advance and the auto-tick are exercised, not assumed.
 
 The unit tests run the pure logic in `src/core.js` under several timezones. The
 end-to-end test drives the real `index.html` and needs Chromium:
@@ -123,10 +156,15 @@ It skips itself with a message if `playwright-core` is not installed. Set
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | Markup plus the UI code that drives it |
+| `pages/` | The page sources, with build placeholders |
 | `src/core.js` | Pure date/cycle/streak logic, no DOM — shared with the tests |
-| `test/core.test.js` | Unit tests for that logic |
-| `test/browser.test.js` | End-to-end test of the page |
+| `src/site.css`, `src/chrome-*.html` | Chrome shared by both pages |
+| `src/sw.js`, `src/manifest.webmanifest`, `src/icons/` | The installable app |
+| `build.js` | Inlines the shared parts and writes `dist/` |
+| `tools/make-icons.js` | Regenerates the app icons |
+| `test/core.test.js` | Unit tests for the date logic |
+| `test/tracker.test.js`, `test/reader.test.js` | End-to-end tests of each page |
+| `test/pwa.test.js` | Manifest, offline behaviour and worker scope |
 
 `src/core.js` loads as a plain script in the browser (`window.QuranCore`) and as
 a CommonJS module in Node, so the same code is tested and shipped. It is not an

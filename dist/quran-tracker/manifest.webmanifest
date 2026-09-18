@@ -1,0 +1,29 @@
+{
+  "name": "Qur'ān Daily Tracker",
+  "short_name": "Daily Juz",
+  "description": "One juz of the Qur'ān a day, with recitation, on a thirty-day cycle anchored to Rabīʿ II 1.",
+  "id": "/quran-tracker/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#e9e2cd",
+  "theme_color": "#faf3e0",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["books", "education", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Listen to today's juz",
+      "short_name": "Listen",
+      "url": "./reader/",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

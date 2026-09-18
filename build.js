@@ -13,6 +13,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT = __dirname;
 
@@ -21,19 +22,30 @@ const PARTIALS = {
     '<!-- @header -->': { file: 'src/chrome-header.html' },
     '<!-- @footer -->': { file: 'src/chrome-footer.html' },
     '<!-- @chrome-js -->': { file: 'src/chrome.js', note: 'src/chrome.js' },
+    '<!-- @pwa-js -->': { file: 'src/pwa.js', note: 'src/pwa.js' },
     '<!-- @core-js -->': { file: 'src/core.js', note: 'src/core.js' }
 };
 
+/*
+ * `root` is what {{ROOT}} becomes: how each page reaches /quran-tracker/, so
+ * the manifest, icons and service worker resolve from either depth.
+ */
 const PAGES = [
-    { source: 'pages/tracker.html', out: 'dist/quran-tracker/index.html' },
-    { source: 'pages/reader.html', out: 'dist/quran-tracker/reader/index.html' }
+    { source: 'pages/tracker.html', out: 'dist/quran-tracker/index.html', root: './' },
+    { source: 'pages/reader.html', out: 'dist/quran-tracker/reader/index.html', root: '../' }
 ];
+
+const ICONS = ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'];
+
+// Assets the pages may legitimately reference beside themselves, compared
+// after stripping the "./" or "../" each page's {{ROOT}} puts in front.
+const ALLOWED_REFS = ['reader/', '', 'manifest.webmanifest', 'icons/apple-touch-icon.png'];
 
 function read(relPath) {
     return fs.readFileSync(path.join(ROOT, relPath), 'utf8');
 }
 
-function buildPage(source) {
+function buildPage(source, root) {
     let html = read(source);
 
     Object.keys(PARTIALS).forEach(function (marker) {
@@ -51,9 +63,11 @@ function buildPage(source) {
         throw new Error(source + ' has unknown placeholders: ' + unresolved.join(', '));
     }
 
-    // Nothing may reference a sibling file: the point is one file per page.
+    html = html.split('{{ROOT}}').join(root);
+
+    // The page's own code stays inline; only the listed assets may sit beside it.
     const stray = [...html.matchAll(/(?:src|href)="(?!https?:|#|data:|mailto:|tel:|\?)([^"]+)"/g)]
-        .filter((m) => !m[1].startsWith('reader/') && m[1] !== '../');
+        .filter((m) => ALLOWED_REFS.indexOf(m[1].replace(/^(\.\.?\/)+/, '')) === -1);
     if (stray.length) {
         throw new Error(source + ' has unexpected relative references: ' +
             stray.map((m) => m[1]).join(', '));
@@ -85,9 +99,28 @@ function redirectPage() {
 
 const outputs = {};
 PAGES.forEach(function (page) {
-    outputs[page.out] = buildPage(page.source);
+    outputs[page.out] = buildPage(page.source, page.root);
 });
 outputs['dist/index.html'] = redirectPage();
+outputs['dist/quran-tracker/manifest.webmanifest'] = read('src/manifest.webmanifest');
+
+/*
+ * The service worker's cache name carries a hash of everything it caches, so a
+ * deploy makes a new cache and the previous one is dropped instead of serving
+ * a stale page.
+ */
+const buildId = crypto.createHash('sha1')
+    .update(Object.keys(outputs).sort().map((k) => outputs[k]).join('\0'))
+    .digest('hex')
+    .slice(0, 12);
+outputs['dist/quran-tracker/sw.js'] =
+    read('src/sw.js').split('__BUILD_ID__').join(buildId);
+
+const binaryOutputs = {};
+ICONS.forEach(function (icon) {
+    binaryOutputs['dist/quran-tracker/icons/' + icon] =
+        fs.readFileSync(path.join(ROOT, 'src', 'icons', icon));
+});
 
 const checking = process.argv.includes('--check');
 const stale = [];
@@ -99,6 +132,21 @@ Object.keys(outputs).forEach(function (relPath) {
     if (checking) {
         const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
         if (current !== content) stale.push(relPath);
+        return;
+    }
+
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+    console.log('built ' + relPath + ' (' + Math.round(content.length / 1024) + ' KB)');
+});
+
+Object.keys(binaryOutputs).forEach(function (relPath) {
+    const target = path.join(ROOT, relPath);
+    const content = binaryOutputs[relPath];
+
+    if (checking) {
+        const current = fs.existsSync(target) ? fs.readFileSync(target) : null;
+        if (!current || !current.equals(content)) stale.push(relPath);
         return;
     }
 

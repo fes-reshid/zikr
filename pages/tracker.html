@@ -8,6 +8,13 @@
 <meta property="og:title" content="Qur'ān Daily Tracker — Diin Islaam">
 <meta property="og:description" content="One juz a day, anchored to the Hijri month. Track your streak and read or listen to the day's juz.">
 <meta property="og:type" content="website">
+<meta name="theme-color" content="#faf3e0">
+<link rel="manifest" href="{{ROOT}}manifest.webmanifest">
+<link rel="apple-touch-icon" href="{{ROOT}}icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Daily Juz">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,500&family=Marcellus&display=swap" rel="stylesheet">
@@ -78,6 +85,10 @@
   .note-done{ background:var(--green-bg); border-color:#a9c9b9; }
   .note-done h3{ color:var(--green-dark); }
   .note-done p{ color:#3f6355; }
+  .note-install{ background:#fffdf6; border-color:var(--gold-soft); }
+  .note-install h3{ color:var(--ink-navy); }
+  .note-install p{ color:#6b5a49; margin-bottom:12px; }
+  .note-install .btn{ margin-top:2px; }
 
   /* ---------- History ---------- */
   .history{ display:flex; flex-direction:column; gap:10px; margin-top:16px; }
@@ -202,6 +213,13 @@
         <p id="feedback-desc"></p>
       </div>
 
+      <div class="note note-install is-hidden" id="install-row">
+        <h3>Keep it on your home screen</h3>
+        <p id="ios-install-hint" class="is-hidden">In Safari, tap the Share button, then &ldquo;Add to Home Screen&rdquo;.</p>
+        <p class="install-why">It opens like an app, with its own icon and no browser bar, and pages you have already opened still work without a signal.</p>
+        <button type="button" class="btn btn-primary is-hidden" id="install-btn">Install</button>
+      </div>
+
       <div class="card">
         <h2>Recent progress</h2>
         <p style="margin:0; font-size:16px; color:#8a7963;">The last seven days. Tap any day to correct it.</p>
@@ -247,6 +265,9 @@
 
 <script>
 <!-- @chrome-js -->
+</script>
+<script>
+<!-- @pwa-js -->
 </script>
 <script>
 <!-- @core-js -->
