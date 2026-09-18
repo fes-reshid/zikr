@@ -21,36 +21,13 @@ try {
 // Defaults to the source page on disk; point APP_URL at a served build to
 // exercise the deployed artifact instead.
 const APP_URL = process.env.APP_URL ||
-    'file://' + path.resolve(__dirname, '..', 'index.html');
+    'file://' + path.resolve(__dirname, '..', 'dist', 'quran-tracker', 'index.html');
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH || undefined;
 
 const results = [];
 function check(name, ok, detail) {
     results.push({ name, ok: !!ok });
     console.log((ok ? 'ok   ' : 'FAIL ') + name + (detail !== undefined ? '  -> ' + detail : ''));
-}
-
-const PAGE_SIZE = 50;
-const TOTAL_PAGES = 2;
-
-function stubVerses(page) {
-    const verses = [];
-    for (let i = 0; i < PAGE_SIZE; i++) {
-        const n = (page - 1) * PAGE_SIZE + i + 1;
-        verses.push({
-            verse_key: '7:' + n,
-            text_uthmani: 'نَصٌّ عَرَبِيٌّ ' + n,
-            translations: [{ text: 'Translation number ' + n + '<sup foot_note="9">1</sup>' }]
-        });
-    }
-    return {
-        verses,
-        pagination: {
-            current_page: page,
-            next_page: page < TOTAL_PAGES ? page + 1 : null,
-            total_pages: TOTAL_PAGES
-        }
-    };
 }
 
 (async () => {
@@ -63,19 +40,12 @@ function stubVerses(page) {
     await context.route('https://fonts.gstatic.com/**', (route) =>
         route.fulfill({ status: 200, contentType: 'font/woff2', body: '' }));
 
-    let apiCalls = [];
-    let apiStatus = 200;
+    // The tracker itself never calls the API; fail loudly if that changes.
     await context.route('https://api.quran.com/**', (route) => {
-        const url = route.request().url();
-        apiCalls.push(url);
-        if (apiStatus !== 200) return route.fulfill({ status: apiStatus, body: 'error' });
-        const page = Number(new URL(url).searchParams.get('page') || 1);
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(stubVerses(page))
-        });
+        unexpectedApiCalls.push(route.request().url());
+        route.fulfill({ status: 500, body: 'the tracker should not call the API' });
     });
+    const unexpectedApiCalls = [];
 
     const page = await context.newPage();
     const errors = [];
@@ -140,78 +110,13 @@ function stubVerses(page) {
     check('profile survives a reload', await page.isVisible('#dashboard-view'));
     check('reading log survives a reload', (await page.textContent('#streak-count')) === '1');
 
-    // --- Reader -----------------------------------------------------------
-    apiCalls = [];
-    await page.click('#open-reader-btn');
-    await page.waitForTimeout(600);
-    check('reader opens', await page.isVisible('#reader-modal'));
-    check("reader defaults to today's Juz", (await page.inputValue('#juz-selector')) === '7');
-    check('request asks for the Uthmani script',
-        apiCalls[0] && apiCalls[0].includes('fields=text_uthmani'), apiCalls[0]);
-    check('reader pages past the 50-verse cap', apiCalls.length === TOTAL_PAGES,
-        apiCalls.length + ' requests');
-    const cards = await page.$$('#reader-content .verse');
-    check('every verse is rendered', cards.length === PAGE_SIZE * TOTAL_PAGES, cards.length);
-    check('Arabic text is rendered',
-        (await page.textContent('#reader-content .verse-ar')).includes('نَصٌّ عَرَبِيٌّ'));
-    check('subtitle reports the full count',
-        (await page.textContent('#reader-subtitle')).includes('100 verses'));
-    const translation = await page.$$eval('#reader-content .verse .verse-tr', (els) =>
-        els[0].textContent);
-    check('footnote markup is stripped from translations',
-        translation === 'Translation number 1', JSON.stringify(translation));
-
-    apiCalls = [];
-    await page.selectOption('#juz-selector', '12');
-    await page.waitForTimeout(600);
-    check('changing the Juz refetches',
-        apiCalls.length === TOTAL_PAGES && apiCalls[0].includes('by_juz/12'), apiCalls[0]);
-    check('verse cards show the new Juz',
-        (await page.textContent('#reader-content .verse-juz')).includes('Juz 12'));
-
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(150);
-    check('Escape closes the reader', await page.isHidden('#reader-modal'));
-
-    await page.click('#quick-read-btn');
-    await page.waitForTimeout(600);
-    // Dispatch on the overlay itself: the stub has no Tailwind layout, so a
-    // coordinate click cannot reliably land outside the panel.
-    await page.$eval('#reader-modal', (el) => el.click());
-    await page.waitForTimeout(150);
-    check('clicking the backdrop closes the reader', await page.isHidden('#reader-modal'));
-    await page.click('#quick-read-btn');
-    await page.waitForTimeout(600);
-    await page.$eval('#reader-panel', (el) => el.click());
-    await page.waitForTimeout(150);
-    check('clicking inside the panel keeps the reader open',
-        await page.isVisible('#reader-modal'));
-    await page.click('#close-reader-btn');
-    await page.waitForTimeout(150);
-
-    // --- Reader failure path ---------------------------------------------
-    const errorsBeforeFailure = errors.length;
-    apiStatus = 500;
-    await page.click('#quick-read-btn');
-    await page.waitForTimeout(500);
-    const errorText = await page.textContent('#reader-content');
-    check('an API failure offers a retry',
-        /Could not reach|offline/.test(errorText) && errorText.includes('Try again'));
-    apiStatus = 200;
-    apiCalls = [];
-    await page.click('#reader-content button');
-    await page.waitForFunction(
-        (n) => document.querySelectorAll('#reader-content .verse').length === n,
-        PAGE_SIZE * TOTAL_PAGES,
-        { timeout: 5000 }
-    ).catch(() => {});
-    check('retry recovers after the API comes back',
-        (await page.$$('#reader-content .verse')).length === PAGE_SIZE * TOTAL_PAGES,
-        (await page.$$('#reader-content .verse')).length);
-    await page.click('#close-reader-btn');
-    await page.waitForTimeout(150);
-    check('a failed load throws nothing uncaught', errors.length === errorsBeforeFailure,
-        errors.slice(errorsBeforeFailure).join(' | '));
+    // --- Reader link ------------------------------------------------------
+    // The reader is a separate page now; the tracker only has to point at it
+    // with the juz that is due today.
+    const quickHref = await page.getAttribute('#quick-read-btn', 'href');
+    const openHref = await page.getAttribute('#open-reader-btn', 'href');
+    check("'Listen & read' links to today's juz", quickHref === 'reader/?juz=7', quickHref);
+    check("'Open the reader' links to today's juz", openHref === 'reader/?juz=7', openHref);
 
     // --- Settings ---------------------------------------------------------
     await page.click('#settings-btn');
@@ -248,6 +153,8 @@ function stubVerses(page) {
         (await page.textContent('#target-juz-title')).trim() === 'Juz 8',
         (await page.textContent('#target-juz-title')).trim());
 
+    check('the tracker makes no API calls', unexpectedApiCalls.length === 0,
+        unexpectedApiCalls.join(' | '));
     check('no uncaught page errors', errors.length === 0, errors.join(' | '));
 
     await browser.close();

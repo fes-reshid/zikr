@@ -1,50 +1,69 @@
 #!/usr/bin/env node
 /*
- * Builds the deployable copy of the app.
+ * Builds the deployable pages.
  *
- * `index.html` loads `src/core.js` as a separate file, which is convenient for
- * development but fragile to deploy: served at `/quran-tracker` without a
- * trailing slash, a relative `src/core.js` resolves to `/src/core.js` and the
- * page breaks. The build inlines it so the result is one self-contained file
- * that works at any path on any host.
+ * diinislaam.com serves self-contained HTML — every page carries its own CSS
+ * and script, with no shared stylesheet. These pages follow that, but keep the
+ * shared parts in src/ and inline them here, so the chrome cannot drift
+ * between pages and the logic stays in one tested file.
+ *
+ * Inlining also makes each page safe to serve at any URL depth: with a
+ * separate src/core.js, `/quran-tracker` requested without a trailing slash
+ * would resolve it to `/src/core.js` and the page would break.
  */
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = __dirname;
-const OUT_DIR = path.join(ROOT, 'dist', 'quran-tracker');
-const SCRIPT_TAG = '<script src="src/core.js"></script>';
 
-function build() {
-    const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-    const core = fs.readFileSync(path.join(ROOT, 'src', 'core.js'), 'utf8');
+const PARTIALS = {
+    '<!-- @site-css -->': { file: 'src/site.css' },
+    '<!-- @header -->': { file: 'src/chrome-header.html' },
+    '<!-- @footer -->': { file: 'src/chrome-footer.html' },
+    '<!-- @chrome-js -->': { file: 'src/chrome.js', note: 'src/chrome.js' },
+    '<!-- @core-js -->': { file: 'src/core.js', note: 'src/core.js' }
+};
 
-    if (!html.includes(SCRIPT_TAG)) {
-        throw new Error('index.html no longer contains ' + SCRIPT_TAG + '; update build.js');
+const PAGES = [
+    { source: 'pages/tracker.html', out: 'dist/quran-tracker/index.html' },
+    { source: 'pages/reader.html', out: 'dist/quran-tracker/reader/index.html' }
+];
+
+function read(relPath) {
+    return fs.readFileSync(path.join(ROOT, relPath), 'utf8');
+}
+
+function buildPage(source) {
+    let html = read(source);
+
+    Object.keys(PARTIALS).forEach(function (marker) {
+        const partial = PARTIALS[marker];
+        if (!html.includes(marker)) return;
+        let body = read(partial.file).trimEnd();
+        if (partial.note) {
+            body = '/* ' + partial.note + ', inlined by build.js — edit the source, not this file. */\n' + body;
+        }
+        html = html.split(marker).join(body);
+    });
+
+    const unresolved = html.match(/<!--\s*@[a-z-]+\s*-->/g);
+    if (unresolved) {
+        throw new Error(source + ' has unknown placeholders: ' + unresolved.join(', '));
     }
 
-    const inlined = html.replace(
-        SCRIPT_TAG,
-        '<script>\n/* src/core.js, inlined by build.js — edit the source, not this file. */\n' +
-            core.trimEnd() +
-            '\n    </script>'
-    );
-
-    // Nothing may reference a sibling file: the whole point is one file.
-    const stray = [...inlined.matchAll(
-        /(?:src|href)="(?!https?:|#|data:|mailto:|tel:)([^"]+)"/g
-    )];
+    // Nothing may reference a sibling file: the point is one file per page.
+    const stray = [...html.matchAll(/(?:src|href)="(?!https?:|#|data:|mailto:|tel:|\?)([^"]+)"/g)]
+        .filter((m) => !m[1].startsWith('reader/') && m[1] !== '../');
     if (stray.length) {
-        throw new Error('relative references left in the build: ' +
+        throw new Error(source + ' has unexpected relative references: ' +
             stray.map((m) => m[1]).join(', '));
     }
-
-    return inlined;
+    return html;
 }
 
 /*
- * The app lives at /quran-tracker, so the directory above it would otherwise
- * 404. Send it on instead of showing nothing.
+ * The pages live under /quran-tracker, so the directory above them would
+ * otherwise 404. Send it on instead of showing nothing.
  */
 function redirectPage() {
     return [
@@ -54,23 +73,24 @@ function redirectPage() {
         '<meta charset="UTF-8">',
         '<meta http-equiv="refresh" content="0; url=quran-tracker/">',
         '<link rel="canonical" href="quran-tracker/">',
-        '<title>Quran Daily Tracker</title>',
+        "<title>Qur'ān Daily Tracker</title>",
         '</head>',
         '<body>',
-        '<p><a href="quran-tracker/">Continue to the Quran Daily Tracker</a></p>',
+        '<p><a href="quran-tracker/">Continue to the Qur\'ān Daily Tracker</a></p>',
         '</body>',
         '</html>',
         ''
     ].join('\n');
 }
 
-const outputs = {
-    'dist/quran-tracker/index.html': build(),
-    'dist/index.html': redirectPage()
-};
+const outputs = {};
+PAGES.forEach(function (page) {
+    outputs[page.out] = buildPage(page.source);
+});
+outputs['dist/index.html'] = redirectPage();
 
 const checking = process.argv.includes('--check');
-let stale = [];
+const stale = [];
 
 Object.keys(outputs).forEach(function (relPath) {
     const target = path.join(ROOT, relPath);

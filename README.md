@@ -1,11 +1,21 @@
-# Zikr — Quran Daily Tracker & Reader
+# Zikr — Qur'ān Daily Tracker & Reader
 
-A single-page web app for reading one Juz of the Quran a day. It tracks your
-streak, shows the last week of progress, and reads the day's Juz inline using
-the [Quran.com API](https://api-docs.quran.com/).
+Two pages for reading one juz of the Qur'ān a day, published as part of
+[diinislaam.com](https://diinislaam.com):
 
-Everything is stored in your browser's `localStorage`. There is no account, no
-server, and nothing leaves your device except the verse requests to Quran.com.
+| Page | What it does |
+| --- | --- |
+| `/quran-tracker/` | The day's juz, your streak, and the last week of progress |
+| `/quran-tracker/reader/` | Reads and recites any juz, verse by verse |
+
+Everything is stored in your browser's `localStorage`. There is no account and
+no server; the only requests leaving the device go to the Quran.com API for
+verse text and recitation audio.
+
+The pages are styled to match diinislaam.com — the same parchment/gold/green
+tokens, the same Amiri / Cormorant Garamond / Marcellus fonts, and the site's
+own header and footer. Following the site's convention each page is
+self-contained with inline CSS: there is no Tailwind and no icon font.
 
 ## The cycle
 
@@ -124,23 +134,50 @@ ES module on purpose: `file://` pages cannot load those.
 
 ## Notes on the implementation
 
-A few things that are easy to get wrong and are covered by tests:
+Things that are easy to get wrong here, each covered by a test:
 
 - **Dates are local, never UTC.** `new Date('2026-09-12')` parses as UTC
-  midnight, which is the *previous* day for anyone west of Greenwich — enough to
-  show the wrong Juz all day. Date keys are built and parsed from local calendar
-  fields instead.
-- **Day counts survive DST.** Day arithmetic normalises to local midnight first,
-  so a week spanning a clock change is still seven days.
+  midnight, which is the *previous* day west of Greenwich — enough to show the
+  wrong juz all day. Date keys are built and parsed from local calendar fields.
+- **Day counts survive DST.** Day arithmetic normalises to local midnight, so a
+  week spanning a clock change is still seven days.
 - **The Hijri date is computed, not hardcoded**, including the year.
-- **The reader pages through the whole Juz.** Quran.com caps `per_page` at 50
-  while a Juz runs to a few hundred verses, so the reader follows
-  `pagination.next_page` and appends each page as it arrives.
+- **Nothing is identified by a hardcoded API id.** Reciters and the translation
+  are resolved by matching names against Quran.com's own `/resources` lists at
+  runtime. The first version pinned `translations=131` and labelled it "Saheeh
+  International"; that id is something else, and the result was verses with no
+  translation at all. Matching by name cannot drift like that, and the page
+  shows whichever name the API gives back.
+- **Whole juz, not the first page of one.** Quran.com caps `per_page` at 50
+  while a juz runs to a few hundred verses, so both verses and audio follow
+  `pagination.next_page`.
 - **Arabic text is requested explicitly.** `text_uthmani` is only returned when
-  asked for via `fields`; without it the verses come back with no script.
+  asked for via `fields`; without it the verses arrive with no script.
 - **Translations are rendered as text.** Quran.com returns HTML with footnote
-  markup; the footnotes are stripped and the rest is inserted as text, so no
+  markup; the footnotes are stripped and the rest inserted as text, so no
   network content is ever executed as markup.
-- **Stale responses are discarded.** Each load carries a token, so switching Juz
-  mid-request cannot render the previous one's verses.
-- **A tab left open past midnight rolls over** to the new day's Juz on its own.
+- **Audio URLs may be relative.** `audio_files[].url` comes back as a path, so
+  it is resolved against `verses.quran.com` — and passed through untouched if
+  it is already absolute.
+- **One `<audio>` element for the session.** Reusing the element the listener
+  first unlocked with a tap is what lets later verses start by themselves,
+  iOS included; a fresh element per verse would need a new gesture. Playback
+  uses a plain media element rather than the Web Audio API, which browsers
+  suspend in the background.
+- **A bad verse file does not end the session.** An audio error advances to the
+  next verse instead of stopping.
+- **Stale responses are discarded.** Each load carries a token, so switching
+  juz or reciter mid-request cannot render the previous one's verses.
+- **Finishing only ticks off the juz that was due.** If you listen to a
+  different juz the page says so and changes nothing.
+- **A tab left open past midnight rolls over** to the new day's juz, and the
+  tracker re-reads the log on focus so a juz finished in the reader shows up.
+
+## Known limits
+
+- **Autoplay is best-effort.** Browsers refuse to start audio until a listener
+  has interacted with the page, so the first play may need one tap; after that
+  verses advance on their own. Passing `?autoplay=0` opens the reader paused.
+- **Background playback depends on the browser.** Audio keeps going while the
+  tab is backgrounded or the phone is locked, with lock-screen controls via the
+  Media Session API, but a browser that discards the tab stops it.
