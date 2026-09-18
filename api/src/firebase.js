@@ -45,10 +45,11 @@ export function resetKeyCache() {
 }
 
 /**
- * Returns the user id, or null for anything that does not verify. Deliberately
- * silent about which check failed: the page has nothing useful to do with it.
+ * Returns the token's claims, or null for anything that does not verify.
+ * Deliberately silent about which check failed: the caller has nothing useful
+ * to do with the distinction.
  */
-export async function verifyIdToken(token, projectId, options = {}) {
+export async function verifyClaims(token, projectId, options = {}) {
     if (!projectId) return null;
     if (typeof token !== 'string' || token.split('.').length !== 3) return null;
 
@@ -93,10 +94,16 @@ export async function verifyIdToken(token, projectId, options = {}) {
             b64urlToBytes(signaturePart),
             new TextEncoder().encode(headerPart + '.' + payloadPart)
         );
-        return valid ? claims.sub : null;
+        return valid ? claims : null;
     } catch (err) {
         return null;
     }
+}
+
+/** Just the user id, which is all most routes need. */
+export async function verifyIdToken(token, projectId, options = {}) {
+    const claims = await verifyClaims(token, projectId, options);
+    return claims ? claims.sub : null;
 }
 
 export function bearerToken(request) {

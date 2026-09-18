@@ -24,7 +24,8 @@ const PARTIALS = {
     '<!-- @chrome-js -->': { file: 'src/chrome.js', note: 'src/chrome.js' },
     '<!-- @pwa-js -->': { file: 'src/pwa.js', note: 'src/pwa.js' },
     '<!-- @account-js -->': { file: 'src/account.js', note: 'src/account.js' },
-    '<!-- @core-js -->': { file: 'src/core.js', note: 'src/core.js' }
+    '<!-- @core-js -->': { file: 'src/core.js', note: 'src/core.js' },
+    '<!-- @xlsx-js -->': { file: 'src/xlsx.js', note: 'src/xlsx.js' }
 };
 
 /*
@@ -37,6 +38,14 @@ const PAGES = [
 ];
 
 const ICONS = ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'];
+
+/*
+ * Standalone scripts, built the same way as the pages so they can share
+ * partials. admin-report.js is loaded by kids-admin.html at the site root.
+ */
+const SCRIPTS = [
+    { source: 'src/admin-report.js', out: 'dist/quran-tracker/admin-report.js' }
+];
 
 // Assets the pages may legitimately reference beside themselves, compared
 // after stripping the "./" or "../" each page's {{ROOT}} puts in front.
@@ -108,6 +117,24 @@ PAGES.forEach(function (page) {
     outputs[page.out] = buildPage(page.source, page.root);
 });
 outputs['dist/index.html'] = redirectPage();
+
+SCRIPTS.forEach(function (script) {
+    let code = read(script.source);
+    Object.keys(PARTIALS).forEach(function (marker) {
+        if (!code.includes(marker)) return;
+        const partial = PARTIALS[marker];
+        let body = read(partial.file).trimEnd();
+        if (partial.note) {
+            body = '/* ' + partial.note + ', inlined by build.js — edit the source, not this file. */\n' + body;
+        }
+        code = code.split(marker).join(body);
+    });
+    const unresolved = code.match(/<!--\s*@[a-z-]+\s*-->/g);
+    if (unresolved) {
+        throw new Error(script.source + ' has unknown placeholders: ' + unresolved.join(', '));
+    }
+    outputs[script.out] = code;
+});
 outputs['dist/quran-tracker/manifest.webmanifest'] = read('src/manifest.webmanifest');
 
 /*

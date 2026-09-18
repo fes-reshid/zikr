@@ -153,6 +153,34 @@ rejections: another project's token, a wrong issuer, an expired one, a tampered
 payload, an unknown signing key. Push goes to the same stub, so the VAPID
 signature it actually sends is verified against the public key.
 
+## The admin report
+
+`kids-admin.html` gains a card listing every registered student against each
+day in a range: ✅ where they marked that day's juz complete, ❌ where they did
+not, with a running total and a **Download Excel** button. Everyone who has an
+account is listed, whether or not they have ever opened the tracker.
+
+The join happens in the admin's browser. Names come from Firestore, where the
+site already keeps them; the ticks come from `GET /admin/report`, which returns
+only user ids and dates. No name or address is ever stored on the reminder
+server, and the report endpoint carries none.
+
+Two independent checks decide who may read it. The panel shows itself only to
+someone `onAdminAuth` reports as an admin, and the Worker checks again, by
+reading `kids_quest_admins/{email}` with the *caller's own* ID token — so the
+project's Firestore rules still apply and no service-account key is needed. If
+those rules do not let an admin read that collection, set `ADMIN_EMAILS` on the
+Worker as a comma-separated fallback.
+
+`src/xlsx.js` writes the workbook: a small .xlsx writer, no library, entries
+stored uncompressed and cells as inline strings. Its test builds a file and
+parses it back with a real spreadsheet reader, so "Excel will open this" is
+checked rather than assumed.
+
+The panel is built to `dist/quran-tracker/admin-report.js` and mounted by one
+`<div id="quran-tracker-report">` plus a script tag in `kids-admin.html`; it
+does nothing at all if that element is absent or the viewer is not an admin.
+
 ## Deploying
 
 `npm run build` inlines `src/core.js` into a single self-contained
@@ -223,6 +251,8 @@ It skips itself with a message if `playwright-core` is not installed. Set
 | `test/tracker.test.js`, `test/reader.test.js` | End-to-end tests of each page |
 | `test/pwa.test.js` | Manifest, offline behaviour and worker scope |
 | `test/account.test.js` | The sign-in UI, against a stubbed API |
+| `test/admin-report.test.js` | The admin table and its Excel download |
+| `src/xlsx.js` | A minimal .xlsx writer |
 | `api/` | The Cloudflare Worker: accounts, sync and reminders |
 
 `src/core.js` loads as a plain script in the browser (`window.QuranCore`) and as

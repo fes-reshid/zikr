@@ -16,7 +16,8 @@
  */
 import { json, isDayKey, isTimeZone, localParts } from './util.js';
 import * as db from './db.js';
-import { verifyIdToken, bearerToken } from './firebase.js';
+import { verifyClaims, bearerToken } from './firebase.js';
+import { isAdmin } from './admins.js';
 import { juzForDay } from './juz.js';
 import { runReminders } from './reminders.js';
 
@@ -102,6 +103,44 @@ const routes = {
         return json({ ok: true });
     },
 
+    /*
+     * Every day read across everyone, for the admin report. Only user ids are
+     * returned: the names belong to Firestore, and the admin page joins them
+     * there, so no name ever needs to be stored on this side.
+     */
+    'GET /admin/report': async (request, env, uid, claims, token) => {
+        if (!await isAdmin(env, claims, token)) {
+            return json({ error: 'not an admin' }, { status: 403 });
+        }
+
+        const params = new URL(request.url).searchParams;
+        const to = isDayKey(params.get('to')) ? params.get('to')
+            : localParts(new Date(), 'UTC').day;
+        let from = isDayKey(params.get('from')) ? params.get('from') : to;
+        if (from > to) from = to;
+
+        // Bounded, so one request cannot ask for the entire history.
+        const days = [];
+        const cursor = new Date(from + 'T00:00:00Z');
+        const end = new Date(to + 'T00:00:00Z');
+        while (cursor <= end && days.length < 92) {
+            days.push(cursor.toISOString().slice(0, 10));
+            cursor.setUTCDate(cursor.getUTCDate() + 1);
+        }
+        const last = days[days.length - 1] || to;
+
+        const { results } = await env.DB.prepare(
+            'SELECT uid, day FROM readings WHERE day >= ? AND day <= ?'
+        ).bind(from, last).all();
+
+        const readings = {};
+        (results || []).forEach((row) => {
+            (readings[row.uid] = readings[row.uid] || []).push(row.day);
+        });
+
+        return json({ from: days[0] || to, to: last, days, readings });
+    },
+
     /* Everything this Worker holds about them, gone. */
     'DELETE /me': async (request, env, uid) => {
         await db.forgetUser(env.DB, uid);
@@ -137,12 +176,13 @@ export default {
 
         // FIREBASE_JWKS_URL is unset in production, so Google's own endpoint
         // is used; the test suite points it at a stub to mint its own tokens.
-        const uid = await verifyIdToken(bearerToken(request), env.FIREBASE_PROJECT_ID,
+        const token = bearerToken(request);
+        const claims = await verifyClaims(token, env.FIREBASE_PROJECT_ID,
             { jwksUrl: env.FIREBASE_JWKS_URL });
-        if (!uid) return json({ error: 'not signed in' }, { status: 401 });
+        if (!claims) return json({ error: 'not signed in' }, { status: 401 });
 
         try {
-            return await handler(request, env, uid);
+            return await handler(request, env, claims.sub, claims, token);
         } catch (err) {
             console.error(key, err);
             return json({ error: 'server error' }, { status: 500 });

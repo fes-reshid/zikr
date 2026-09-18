@@ -36,6 +36,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // --- A stand-in for Google's signing keys, and for the push service --------
 let jwks = { keys: [] };
 const pushes = [];
+const admins = new Set(['teacher@diinislaam.com']);
 
 function startStub() {
     return new Promise((resolve) => {
@@ -52,6 +53,18 @@ function startStub() {
                 if (req.url.startsWith('/push')) {
                     pushes.push({ url: req.url, headers: req.headers });
                     res.writeHead(201); return res.end();
+                }
+                if (req.url.startsWith('/firestore/')) {
+                    // Only the roster's own documents exist.
+                    const email = decodeURIComponent(req.url.split('/').pop());
+                    if (!/^Bearer .+/.test(req.headers.authorization || '')) {
+                        res.writeHead(401); return res.end();
+                    }
+                    if (admins.has(email)) {
+                        res.writeHead(200, { 'content-type': 'application/json' });
+                        return res.end(JSON.stringify({ fields: { role: { stringValue: 'admin' } } }));
+                    }
+                    res.writeHead(404); return res.end();
                 }
                 res.writeHead(404); res.end();
             });
@@ -278,7 +291,47 @@ async function call(method, route, body, opts = {}) {
     await sleep(1200);
     check('the same day is never nudged twice', pushes.length === 0, pushes.length);
 
+    // --- The admin report -------------------------------------------------
+    // Put two people's readings in, from two different accounts.
+    token = await mintToken({ sub: 'uid-amina' });
+    await call('PUT', '/settings', { startDate: '2026-09-12', timezone: 'UTC' });
+    await call('POST', '/sync', { days: ['2026-09-17', '2026-09-18'] });
+    token = await mintToken({ sub: 'uid-omar' });
+    await call('PUT', '/settings', { startDate: '2026-09-12', timezone: 'UTC' });
+    await call('POST', '/sync', { days: ['2026-09-18'] });
+
+    token = await mintToken({ sub: 'uid-amina', email: 'amina@example.com' });
+    res = await call('GET', '/admin/report?from=2026-09-17&to=2026-09-18');
+    check('an ordinary account cannot read the report', res.status === 403, res.status);
+
+    token = await mintToken({ sub: 'uid-nobody' });
+    res = await call('GET', '/admin/report?from=2026-09-17&to=2026-09-18');
+    check('nor can one with no email claim', res.status === 403, res.status);
+
+    token = await mintToken({ sub: 'uid-teacher', email: 'teacher@diinislaam.com' });
+    res = await call('GET', '/admin/report?from=2026-09-17&to=2026-09-18');
+    check('an admin on the Firestore roster can', res.status === 200, res.status);
+    check('the report covers each day in the range',
+        JSON.stringify(res.body.days) === JSON.stringify(['2026-09-17', '2026-09-18']),
+        JSON.stringify(res.body.days));
+    check('and says who read on which day',
+        res.body.readings['uid-amina'].length === 2 &&
+        res.body.readings['uid-omar'].length === 1 &&
+        res.body.readings['uid-omar'][0] === '2026-09-18',
+        JSON.stringify(res.body.readings));
+    check('but carries no names or addresses, only ids',
+        !/@|username|displayName/.test(JSON.stringify(res.body)),
+        Object.keys(res.body.readings).join(','));
+
+    res = await call('GET', '/admin/report?from=2020-01-01&to=2026-12-31');
+    check('a huge range is capped rather than served whole',
+        res.body.days.length === 92, res.body.days.length);
+
+    res = await call('GET', '/admin/report');
+    check('with no range it reports today', res.body.days.length === 1, res.body.days.length);
+
     // --- Forgetting -------------------------------------------------------
+    token = await mintToken({ sub: 'uid-amina' });
     res = await call('DELETE', '/me');
     check('an account can erase what is held here', res.body.ok === true);
     res = await call('GET', '/me');

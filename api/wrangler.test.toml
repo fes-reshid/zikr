@@ -13,6 +13,7 @@ VAPID_SUBJECT = "mailto:fesbackups@gmail.com"
 # Test-only: lets the suite point push at a local stub. Never set in production.
 ALLOW_INSECURE_PUSH = "1"
 FIREBASE_JWKS_URL = "http://localhost:8791/jwks"
+FIRESTORE_BASE = "http://localhost:8791/firestore/"
 
 [[d1_databases]]
 binding = "DB"
