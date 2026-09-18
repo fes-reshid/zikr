@@ -2,7 +2,7 @@
 <html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Qur'ān Daily Tracker — Diin Islaam</title>
 <meta name="description" content="Track one juz of the Qur'ān a day on a 30-day cycle anchored to Rabīʿ II 1, and listen to the day's juz with recitation.">
 <meta property="og:title" content="Qur'ān Daily Tracker — Diin Islaam">
@@ -24,8 +24,9 @@
   }
   .field .help{ font-size:15px; color:#6b5a49; margin:0 0 8px; }
   .field input{
-    width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid var(--gold-soft);
-    background:#fffdf6; font-family:'Cormorant Garamond', serif; font-size:18px; color:var(--ink-brown);
+    width:100%; padding:12px 14px; min-height:46px; border-radius:10px;
+    border:1.5px solid var(--gold-soft); background:#fffdf6;
+    font-family:'Cormorant Garamond', serif; font-size:18px; color:var(--ink-brown);
   }
   .field input:focus{ outline:2px solid var(--green); outline-offset:1px; }
   .hint{ font-size:15px; color:var(--green-dark); font-weight:600; margin:8px 0 0; min-height:1.2em; }
@@ -59,6 +60,13 @@
   .today-foot .when{ font-size:14px; color:rgba(250,243,224,.72); margin:0; }
   .today-foot .state{ font-size:18px; font-weight:600; margin:3px 0 0; }
   .today-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  @media (max-width:430px){
+    .today{ padding:24px 20px; }
+    .today h2{ font-size:33px; }
+    .today-actions{ width:100%; }
+    .today-actions .btn{ flex:1 1 100%; }
+    .card{ padding:22px 18px; }
+  }
 
   /* ---------- Reminder ---------- */
   .note{ border-radius:14px; padding:16px 20px; border:1.5px solid; }
@@ -76,7 +84,8 @@
   .day{
     display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%;
     background:#fffdf6; border:1.5px solid rgba(169,124,37,.28); border-radius:12px;
-    padding:12px 16px; cursor:pointer; text-align:left;
+    padding:12px 16px; min-height:56px; cursor:pointer; text-align:left;
+    -webkit-tap-highlight-color:rgba(46,107,88,.15);
     font-family:'Cormorant Garamond', serif; color:var(--ink-brown);
     transition:border-color .15s, background .15s;
   }

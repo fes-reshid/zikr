@@ -2,7 +2,7 @@
 <html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Juz Reader &amp; Recitation — Diin Islaam</title>
 <meta name="description" content="Read and listen to any juz of the Qur'ān with recitation, verse by verse, and have the day's reading ticked off when it finishes.">
 <meta property="og:title" content="Juz Reader &amp; Recitation — Diin Islaam">
@@ -15,8 +15,9 @@
 <style>
 <!-- @site-css -->
 
-  /* Room for the fixed player bar. */
-  main{ padding:24px 0 150px; }
+  /* Fallback room for the fixed player; the real value is measured in JS,
+     because the bar changes height as it wraps on narrow screens. */
+  main{ padding:24px 0 210px; }
   .page-head{ padding:34px 20px 22px; }
 
   /* ---------- Controls ---------- */
@@ -30,11 +31,18 @@
     color:var(--gold); font-weight:700;
   }
   .control select{
-    padding:9px 13px; border-radius:10px; border:1.5px solid var(--gold-soft); background:#fffdf6;
-    font-family:'Cormorant Garamond', serif; font-size:16px; font-weight:700; color:var(--ink-brown);
-    min-width:190px;
+    padding:11px 13px; min-height:46px; border-radius:10px; border:1.5px solid var(--gold-soft);
+    background:#fffdf6; font-family:'Cormorant Garamond', serif; font-size:16px; font-weight:700;
+    color:var(--ink-brown); min-width:190px; max-width:100%;
   }
   .control select:focus{ outline:2px solid var(--green); outline-offset:1px; }
+  /* Moved out of the player bar: it was making the bar a third of a phone screen. */
+  .control label.follow{
+    display:flex; align-items:center; gap:9px; min-height:46px; margin:0;
+    font-size:16px; font-weight:600; color:var(--ink-brown); cursor:pointer;
+    text-transform:none; letter-spacing:normal; white-space:nowrap;
+  }
+  .follow input{ accent-color:var(--green); width:20px; height:20px; }
 
   .notice{
     max-width:860px; margin:0 auto 20px; border-radius:12px; padding:13px 18px;
@@ -46,8 +54,9 @@
   .verses{ max-width:860px; margin:0 auto; }
   .verse{
     background:var(--parchment); border:1.5px solid rgba(169,124,37,.3); border-radius:14px;
-    padding:20px; margin-bottom:14px; cursor:pointer; scroll-margin-top:100px;
+    padding:20px; margin-bottom:14px; cursor:pointer; scroll-margin-top:90px;
     transition:border-color .15s, box-shadow .15s;
+    -webkit-tap-highlight-color:rgba(46,107,88,.15);
   }
   .verse:hover{ border-color:var(--gold); }
   .verse.playing{
@@ -65,7 +74,7 @@
   }
   .verse-ar{
     font-family:'Amiri', serif; direction:rtl; text-align:right;
-    font-size:27px; line-height:2.1; color:var(--ink-navy); margin:0 0 12px;
+    font-size:clamp(22px, 6vw, 27px); line-height:2.05; color:var(--ink-navy); margin:0 0 12px;
   }
   .verse-tr{ font-size:17px; color:#5d4c3d; border-top:1px solid rgba(169,124,37,.2); padding-top:12px; margin:0; }
 
@@ -77,14 +86,14 @@
     position:fixed; left:0; right:0; bottom:0; z-index:60;
     background:var(--green-dark); color:var(--parchment);
     border-top:1px solid var(--gold); box-shadow:0 -8px 24px rgba(28,43,70,.28);
-    padding:12px 20px 14px;
+    /* env() keeps the bar above the iOS home indicator. */
+    padding:9px 20px calc(11px + env(safe-area-inset-bottom, 0px));
   }
-  .player-inner{
-    max-width:860px; margin:0 auto; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
-  }
-  .player-buttons{ display:flex; align-items:center; gap:10px; }
+  .player-inner{ max-width:860px; margin:0 auto; }
+  .player-row{ display:flex; align-items:center; gap:14px; margin-top:5px; }
+  .player-buttons{ display:flex; align-items:center; gap:8px; flex:none; }
   .pbtn{
-    width:42px; height:42px; border-radius:50%; border:1.5px solid rgba(250,243,224,.4);
+    width:44px; height:44px; border-radius:50%; border:1.5px solid rgba(250,243,224,.4);
     background:transparent; color:var(--parchment); cursor:pointer; flex:none;
     display:flex; align-items:center; justify-content:center; padding:0;
   }
@@ -92,13 +101,13 @@
   .pbtn:disabled{ opacity:.4; cursor:not-allowed; }
   .pbtn svg{ width:18px; height:18px; fill:currentColor; }
   .pbtn-main{
-    width:54px; height:54px; background:var(--gold); border-color:var(--gold);
+    width:52px; height:52px; background:var(--gold); border-color:var(--gold);
     color:#fffdf6;
   }
   .pbtn-main:hover:not(:disabled){ background:#8d6619; }
   .pbtn-main svg{ width:22px; height:22px; }
 
-  .player-meta{ flex:1 1 200px; min-width:0; }
+  .player-meta{ flex:1; min-width:0; }
   .player-meta .now{
     font-family:'Marcellus'; font-size:19px; margin:0; color:var(--parchment);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -107,17 +116,22 @@
     margin:2px 0 0; font-size:14px; color:rgba(250,243,224,.72);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  .player-seek{ flex:1 1 100%; display:flex; align-items:center; gap:10px; font-size:13px; color:rgba(250,243,224,.72); }
-  .player-seek input{ flex:1; accent-color:var(--gold-soft); }
-  .player-seek span{ font-variant-numeric:tabular-nums; min-width:34px; }
-  .follow{
-    display:flex; align-items:center; gap:7px; font-size:15px;
-    color:rgba(250,243,224,.85); cursor:pointer; white-space:nowrap;
-  }
-  .follow input{ accent-color:var(--gold); width:16px; height:16px; }
-  @media (max-width:560px){
-    .player-meta .now{ font-size:17px; }
-    .pbtn-main{ width:48px; height:48px; }
+  .player-seek{ display:flex; align-items:center; gap:10px; font-size:12px; color:rgba(250,243,224,.7); }
+  .player-seek input{ flex:1; min-width:0; accent-color:var(--gold-soft); height:22px; }
+  .player-seek span{ font-variant-numeric:tabular-nums; min-width:32px; }
+  @media (max-width:430px){
+    .controls{ gap:10px; }
+    .control select{ min-width:0; width:100%; }
+    .control{ flex:1 1 100%; }
+    .verse{ padding:16px 15px; }
+    .player{ padding:8px 15px calc(9px + env(safe-area-inset-bottom, 0px)); }
+    .player-row{ flex-direction:column-reverse; align-items:stretch; gap:6px; }
+    .player-buttons{ justify-content:center; }
+    .player-meta{ text-align:center; }
+    .player-meta .now{ font-size:16px; }
+    /* The reciter is already named in the selector above; on a phone that
+       line is just height taken from the verses. */
+    .player-meta .sub{ display:none; }
   }
 </style>
 </head>
@@ -145,6 +159,12 @@
           <option value="">Loading reciters…</option>
         </select>
       </div>
+      <div class="control">
+        <label class="follow" for="follow-toggle">
+          <input type="checkbox" id="follow-toggle" checked>
+          Follow the recitation
+        </label>
+      </div>
     </div>
 
     <div class="notice is-hidden" id="notice"></div>
@@ -160,29 +180,27 @@
 
 <div class="player" id="player">
   <div class="player-inner">
-    <div class="player-buttons">
-      <button type="button" class="pbtn" id="prev-btn" aria-label="Previous verse" disabled>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h2v12H7zm3.5 6L19 6v12z"/></svg>
-      </button>
-      <button type="button" class="pbtn pbtn-main" id="play-btn" aria-label="Play recitation" disabled>
-        <svg id="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-      </button>
-      <button type="button" class="pbtn" id="next-btn" aria-label="Next verse" disabled>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6h2v12h-2zM5 18V6l8.5 6z"/></svg>
-      </button>
-    </div>
-    <div class="player-meta">
-      <p class="now" id="now-playing">Preparing the recitation…</p>
-      <p class="sub" id="now-sub"></p>
-    </div>
-    <label class="follow" for="follow-toggle">
-      <input type="checkbox" id="follow-toggle" checked>
-      Follow along
-    </label>
     <div class="player-seek">
       <span id="time-now">0:00</span>
       <input type="range" id="seek" min="0" max="0" step="0.25" value="0" aria-label="Seek within the verse" disabled>
       <span id="time-total">0:00</span>
+    </div>
+    <div class="player-row">
+      <div class="player-buttons">
+        <button type="button" class="pbtn" id="prev-btn" aria-label="Previous verse" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h2v12H7zm3.5 6L19 6v12z"/></svg>
+        </button>
+        <button type="button" class="pbtn pbtn-main" id="play-btn" aria-label="Play recitation" disabled>
+          <svg id="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button type="button" class="pbtn" id="next-btn" aria-label="Next verse" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6h2v12h-2zM5 18V6l8.5 6z"/></svg>
+        </button>
+      </div>
+      <div class="player-meta">
+        <p class="now" id="now-playing">Preparing the recitation…</p>
+        <p class="sub" id="now-sub"></p>
+      </div>
     </div>
   </div>
 </div>
@@ -260,6 +278,8 @@
     var nowPlaying = $('now-playing');
     var nowSub = $('now-sub');
     var followToggle = $('follow-toggle');
+    var player = $('player');
+    var mainEl = document.querySelector('main');
     var seek = $('seek');
     var timeNow = $('time-now');
     var timeTotal = $('time-total');
@@ -629,6 +649,7 @@
 
         nowPlaying.textContent = 'Verse ' + item.verseKey +
             '  ·  ' + (index + 1) + ' of ' + playlist.length;
+        nowPlaying.title = nowPlaying.textContent;
         nowSub.textContent = currentReciterLabel();
         prevBtn.disabled = index === 0;
         nextBtn.disabled = index === playlist.length - 1;
@@ -809,6 +830,22 @@
         if (event.key === 'ArrowRight' && !nextBtn.disabled) nextBtn.click();
         if (event.key === 'ArrowLeft' && !prevBtn.disabled) prevBtn.click();
     });
+
+    /*
+     * The bar wraps to a different height on narrow screens, so a hardcoded
+     * padding either wasted space or hid the last verses behind it. Measure it.
+     */
+    function syncPlayerSpace() {
+        if (!player || !mainEl) return;
+        mainEl.style.paddingBottom = (player.offsetHeight + 26) + 'px';
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(syncPlayerSpace).observe(player);
+    }
+    window.addEventListener('resize', syncPlayerSpace);
+    window.addEventListener('orientationchange', syncPlayerSpace);
+    syncPlayerSpace();
 
     // --- Start ---------------------------------------------------------
     setupMediaSession();

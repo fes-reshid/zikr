@@ -2,7 +2,7 @@
 <html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Qur'ān Daily Tracker — Diin Islaam</title>
 <meta name="description" content="Track one juz of the Qur'ān a day on a 30-day cycle anchored to Rabīʿ II 1, and listen to the day's juz with recitation.">
 <meta property="og:title" content="Qur'ān Daily Tracker — Diin Islaam">
@@ -26,6 +26,8 @@
 }
 *{box-sizing:border-box;}
 html,body{ overflow-x:hidden; }
+/* Stop iOS inflating text when the phone is turned sideways. */
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
 body{
   margin:0; padding:0; background:#e9e2cd; font-family:'Cormorant Garamond', serif;
   color:var(--ink-brown); -webkit-font-smoothing:antialiased;
@@ -71,7 +73,7 @@ nav.main-links a.active{ color:var(--green); border-color:var(--gold); }
   nav.main-links a{ padding:10px 4px; border-bottom:1px solid rgba(169,124,37,.15); }
   .menu-btn{
     display:flex; align-items:center; justify-content:center;
-    width:40px; height:40px; border-radius:8px; border:1px solid var(--gold-soft);
+    width:44px; height:44px; border-radius:8px; border:1px solid var(--gold-soft);
     background:#fff; cursor:pointer; flex-direction:column; gap:4px; padding:0;
   }
   .menu-btn span{ width:20px; height:2px; background:var(--ink-brown); display:block; }
@@ -105,9 +107,10 @@ main{ padding:30px 0 60px; }
 /* ---------- Buttons ---------- */
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
-  padding:11px 24px; border-radius:30px; border:1.5px solid transparent;
+  padding:11px 24px; min-height:44px; border-radius:30px; border:1.5px solid transparent;
   font-family:'Cormorant Garamond', serif; font-size:17px; font-weight:700;
   text-decoration:none; cursor:pointer; transition:background .15s, color .15s, border-color .15s;
+  -webkit-tap-highlight-color:rgba(46,107,88,.15);
 }
 .btn:disabled{ opacity:.5; cursor:not-allowed; }
 .btn-primary{ background:var(--green); color:#faf3e0; }
@@ -124,8 +127,8 @@ main{ padding:30px 0 60px; }
 /* ---------- Footer ---------- */
 footer{ background:var(--ink-navy); color:#c9d2e0; padding:40px 20px 26px; text-align:center; }
 footer .arabic{ color:var(--gold-soft); font-size:20px; margin:0 0 14px; }
-footer .flinks{ display:flex; justify-content:center; gap:22px; flex-wrap:wrap; margin:0 0 18px; font-size:15px; }
-footer .flinks a{ text-decoration:none; color:#c9d2e0; }
+footer .flinks{ display:flex; justify-content:center; gap:10px 22px; flex-wrap:wrap; margin:0 0 14px; font-size:15px; }
+footer .flinks a{ text-decoration:none; color:#c9d2e0; display:inline-block; padding:6px 0; }
 footer .flinks a:hover{ color:#faf3e0; }
 footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
@@ -147,8 +150,9 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
   }
   .field .help{ font-size:15px; color:#6b5a49; margin:0 0 8px; }
   .field input{
-    width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid var(--gold-soft);
-    background:#fffdf6; font-family:'Cormorant Garamond', serif; font-size:18px; color:var(--ink-brown);
+    width:100%; padding:12px 14px; min-height:46px; border-radius:10px;
+    border:1.5px solid var(--gold-soft); background:#fffdf6;
+    font-family:'Cormorant Garamond', serif; font-size:18px; color:var(--ink-brown);
   }
   .field input:focus{ outline:2px solid var(--green); outline-offset:1px; }
   .hint{ font-size:15px; color:var(--green-dark); font-weight:600; margin:8px 0 0; min-height:1.2em; }
@@ -182,6 +186,13 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
   .today-foot .when{ font-size:14px; color:rgba(250,243,224,.72); margin:0; }
   .today-foot .state{ font-size:18px; font-weight:600; margin:3px 0 0; }
   .today-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  @media (max-width:430px){
+    .today{ padding:24px 20px; }
+    .today h2{ font-size:33px; }
+    .today-actions{ width:100%; }
+    .today-actions .btn{ flex:1 1 100%; }
+    .card{ padding:22px 18px; }
+  }
 
   /* ---------- Reminder ---------- */
   .note{ border-radius:14px; padding:16px 20px; border:1.5px solid; }
@@ -199,7 +210,8 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
   .day{
     display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%;
     background:#fffdf6; border:1.5px solid rgba(169,124,37,.28); border-radius:12px;
-    padding:12px 16px; cursor:pointer; text-align:left;
+    padding:12px 16px; min-height:56px; cursor:pointer; text-align:left;
+    -webkit-tap-highlight-color:rgba(46,107,88,.15);
     font-family:'Cormorant Garamond', serif; color:var(--ink-brown);
     transition:border-color .15s, background .15s;
   }
