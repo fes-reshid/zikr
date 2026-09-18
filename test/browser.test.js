@@ -18,7 +18,10 @@ try {
     process.exit(0);
 }
 
-const APP_URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
+// Defaults to the source page on disk; point APP_URL at a served build to
+// exercise the deployed artifact instead.
+const APP_URL = process.env.APP_URL ||
+    'file://' + path.resolve(__dirname, '..', 'index.html');
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH || undefined;
 
 const results = [];

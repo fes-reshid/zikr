@@ -37,6 +37,21 @@ Styling comes from the Tailwind CDN script, so the first load needs a network
 connection. For an offline or production deployment, replace that script tag
 with a pre-built Tailwind stylesheet.
 
+## Deploying
+
+`npm run build` inlines `src/core.js` into a single self-contained
+`dist/quran-tracker/index.html`. One file, no relative references, so it works
+at any URL depth — including `/quran-tracker` served without a trailing slash,
+where a relative `src/core.js` would otherwise resolve to `/src/core.js` and
+break the page.
+
+To publish it at `example.com/quran-tracker`, copy `dist/quran-tracker/` into
+the document root of whatever already serves that domain. Nothing else needs to
+change: the app is static, has no server side, and touches no other path.
+
+`npm test` fails if the committed build is stale, so `dist/` cannot drift from
+the source.
+
 ## Tests
 
 ```sh

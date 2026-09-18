@@ -4,9 +4,11 @@
   "private": true,
   "description": "Quran daily tracker and reader - one Juz a day on a 30-day cycle anchored to Rabi' II 1.",
   "scripts": {
-    "test": "node --test test/core.test.js",
+    "build": "node build.js",
+    "test": "node build.js --check && node --test test/core.test.js",
     "test:e2e": "node test/browser.test.js",
-    "serve": "python3 -m http.server 8000"
+    "serve": "python3 -m http.server 8000",
+    "serve:dist": "python3 -m http.server 8000 --directory dist"
   },
   "devDependencies": {
     "playwright-core": "^1.63.0"
