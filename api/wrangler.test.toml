@@ -1,0 +1,21 @@
+# Local-only config for the test suite: no route (that needs a real zone) and a
+# throwaway D1 that miniflare keeps under .wrangler/state.
+name = "quran-tracker-api"
+main = "src/index.js"
+compatibility_date = "2026-09-18"
+
+[vars]
+APP_URL = "http://localhost:8790/quran-tracker/"
+APP_PATH = "/quran-tracker/"
+MAIL_FROM = "Diin Islaam <noreply@diinislaam.com>"
+VAPID_SUBJECT = "mailto:fesbackups@gmail.com"
+# Test-only: lets the suite point push at a local stub. Never set in production.
+ALLOW_INSECURE_PUSH = "1"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "quran-tracker"
+database_id = "00000000-0000-4000-8000-000000000000"
+
+[triggers]
+crons = ["0 * * * *"]

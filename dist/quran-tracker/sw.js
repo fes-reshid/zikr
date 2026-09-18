@@ -9,7 +9,7 @@
  * CACHE carries the build id, so a deploy creates a new cache and the old one
  * is deleted on activate rather than serving a stale page forever.
  */
-var CACHE = 'quran-tracker-ba90945758aa';
+var CACHE = 'quran-tracker-3e5a9251aaf9';
 var SCOPE_PATH = new URL(self.registration.scope).pathname;
 
 var SHELL = [
@@ -50,8 +50,10 @@ self.addEventListener('fetch', function (event) {
     if (request.method !== 'GET') return;
 
     var url = new URL(request.url);
-    if (url.origin !== self.location.origin) return;      // API, audio, fonts
+    if (url.origin !== self.location.origin) return;      // Quran.com, audio, fonts
     if (url.pathname.indexOf(SCOPE_PATH) !== 0) return;   // the rest of the site
+    // Accounts and the reading log must never be answered from a cache.
+    if (url.pathname.indexOf(SCOPE_PATH + 'api') === 0) return;
 
     /*
      * Serve from cache at once so moving between the tracker and the reader
@@ -76,4 +78,54 @@ self.addEventListener('fetch', function (event) {
             });
         })
     );
+});
+
+/*
+ * The reminder arrives with no payload — encrypting one per subscription buys
+ * nothing when the message is always the same — so the worker asks the API
+ * which juz is due. If that fails, the wording still stands on its own.
+ */
+self.addEventListener('push', function (event) {
+    event.waitUntil((async function () {
+        var body = 'You have not marked today as read. If there is no time to read it, at least listen.';
+        var target = SCOPE_PATH + 'reader/';
+
+        try {
+            var response = await fetch(SCOPE_PATH + 'api/me', { credentials: 'same-origin' });
+            if (response.ok) {
+                var data = await response.json();
+                if (data.signedIn && data.juzToday) {
+                    body = 'Juz ' + data.juzToday + ' is still waiting. ' +
+                        'If there is no time to read it, at least listen.';
+                    target = SCOPE_PATH + 'reader/?juz=' + data.juzToday;
+                }
+            }
+        } catch (err) { /* offline: the generic wording is still true */ }
+
+        return self.registration.showNotification('Today\u2019s juz is waiting', {
+            body: body,
+            icon: SCOPE_PATH + 'icons/icon-192.png',
+            badge: SCOPE_PATH + 'icons/icon-192.png',
+            lang: 'en',
+            tag: 'daily-juz',              // one at a time, never a pile
+            renotify: false,
+            data: { url: target }
+        });
+    })());
+});
+
+self.addEventListener('notificationclick', function (event) {
+    event.notification.close();
+    var target = (event.notification.data && event.notification.data.url) || SCOPE_PATH;
+
+    event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+        .then(function (windows) {
+            for (var i = 0; i < windows.length; i++) {
+                if (windows[i].url.indexOf(SCOPE_PATH) !== -1 && 'focus' in windows[i]) {
+                    if ('navigate' in windows[i]) windows[i].navigate(target);
+                    return windows[i].focus();
+                }
+            }
+            return self.clients.openWindow(target);
+        }));
 });

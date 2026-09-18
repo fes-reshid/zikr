@@ -1,0 +1,31 @@
+# Deploy with:
+#   npx wrangler d1 create quran-tracker      (put the id below)
+#   npm run db:remote                          (creates the tables)
+#   npx wrangler secret put VAPID_PRIVATE_JWK
+#   npx wrangler secret put VAPID_PUBLIC_KEY
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler deploy
+
+name = "quran-tracker-api"
+main = "src/index.js"
+compatibility_date = "2026-09-18"
+
+# Only this path is intercepted; every other request continues to the site.
+[[routes]]
+pattern = "diinislaam.com/quran-tracker/api/*"
+zone_name = "diinislaam.com"
+
+[vars]
+APP_URL = "https://diinislaam.com/quran-tracker/"
+APP_PATH = "/quran-tracker/"
+MAIL_FROM = "Diin Islaam <noreply@diinislaam.com>"
+VAPID_SUBJECT = "mailto:fesbackups@gmail.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "quran-tracker"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Hourly, because 20:00 has to mean 20:00 where the person is.
+[triggers]
+crons = ["0 * * * *"]

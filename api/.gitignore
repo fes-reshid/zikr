@@ -1,0 +1,4 @@
+node_modules
+.wrangler/
+# Local secrets for `wrangler dev` and the test suite — never committed.
+.dev.vars

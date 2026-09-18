@@ -1,0 +1,15 @@
+{
+  "name": "zikr-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Accounts, sync and daily reminders for the Qur'an Daily Tracker.",
+  "scripts": {
+    "vapid": "node tools/vapid-keys.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute quran-tracker --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute quran-tracker --remote --file=schema.sql",
+    "test": "node test/api.test.js"
+  }
+}

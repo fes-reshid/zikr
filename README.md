@@ -11,6 +11,11 @@ Two pages for reading one juz of the Qur'ān a day, published as part of
 It installs to a phone's home screen as a progressive web app, so it opens
 without browser chrome and the pages you have already opened work offline.
 
+Signing in is optional and adds only two things: the reading log follows you
+between devices, and a missed day is followed by a notification and an email.
+Without an account everything still works, stored on the device alone — and if
+the API is not deployed, the pages show nothing about accounts at all.
+
 Everything is stored in your browser's `localStorage`. There is no account and
 no server; the only requests leaving the device go to the Quran.com API for
 verse text and recitation audio.
@@ -81,6 +86,54 @@ serving a stale page.
 `npm run icons` regenerates the PNGs from one HTML source with Playwright. They
 are committed, so an ordinary build needs neither a browser nor that script.
 
+## Accounts and reminders
+
+`api/` is a Cloudflare Worker on the route `diinislaam.com/quran-tracker/api/*`
+— the same origin as the pages, so the session cookie needs no CORS and no
+third-party cookie. It holds a D1 database, and an hourly cron trigger sends the
+nudge.
+
+Signing in is by emailed link: there are no passwords to store or leak, and the
+address is needed for the reminder anyway. Tokens and sessions are kept only as
+SHA-256 hashes, the link works once and expires in fifteen minutes, and the
+login endpoint answers identically whether or not an address has an account, so
+it cannot be used to discover who is registered.
+
+The cron runs hourly rather than nightly because "20:00" has to mean 20:00 where
+the person is; each run picks out those whose local clock has just reached their
+chosen hour, have not marked the day, and have not already been nudged. A row is
+claimed before anything is sent, so an overlapping run cannot nudge twice.
+
+Push is sent **without a payload**. Encrypting one per subscription buys nothing
+when the message is always the same, so only the VAPID signature is needed and
+the service worker asks the API which juz is due when it wakes.
+
+### Setting it up
+
+```sh
+cd api
+npm install
+npx wrangler login
+
+npx wrangler d1 create quran-tracker     # put the id into wrangler.toml
+npm run db:remote                        # create the tables
+
+npm run vapid                            # generates the two push keys
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_PRIVATE_JWK
+npx wrangler secret put RESEND_API_KEY   # from resend.com, after verifying the domain
+
+npx wrangler deploy
+```
+
+Until the Worker is deployed the pages simply show no sign-in button, so
+publishing them first is harmless.
+
+`npm test` in `api/` runs the suite against a real `wrangler dev` with a local
+D1. Email and push are pointed at a stub rather than mocked out, so the actual
+send paths run: the test reads the sign-in link out of the email it composed,
+and verifies the VAPID signature on the push it sent against the public key.
+
 ## Deploying
 
 `npm run build` inlines `src/core.js` into a single self-contained
@@ -150,6 +203,8 @@ It skips itself with a message if `playwright-core` is not installed. Set
 | `test/core.test.js` | Unit tests for the date logic |
 | `test/tracker.test.js`, `test/reader.test.js` | End-to-end tests of each page |
 | `test/pwa.test.js` | Manifest, offline behaviour and worker scope |
+| `test/account.test.js` | The sign-in UI, against a stubbed API |
+| `api/` | The Cloudflare Worker: accounts, sync and reminders |
 
 `src/core.js` loads as a plain script in the browser (`window.QuranCore`) and as
 a CommonJS module in Node, so the same code is tested and shipped. It is not an

@@ -7,10 +7,12 @@
     "build": "node build.js",
     "icons": "node tools/make-icons.js",
     "test": "node build.js --check && node --test test/core.test.js",
-    "test:e2e": "node test/tracker.test.js && node test/reader.test.js && node test/pwa.test.js",
+    "test:e2e": "node test/tracker.test.js && node test/reader.test.js && node test/pwa.test.js && node test/account.test.js",
     "test:tracker": "node test/tracker.test.js",
     "test:reader": "node test/reader.test.js",
     "test:pwa": "node test/pwa.test.js",
+    "test:account": "node test/account.test.js",
+    "test:api": "cd api && npm test",
     "serve": "python3 -m http.server 8000 --directory dist"
   },
   "devDependencies": {

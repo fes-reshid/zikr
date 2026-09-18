@@ -146,6 +146,25 @@
     font-size:15px; background:#fbf3df; border:1.5px solid var(--gold-soft);
     color:#6b5a49; border-radius:10px; padding:12px 14px; margin:0;
   }
+  .sheet-pad .lede{ margin:0; font-size:16px; color:#6b5a49; line-height:1.5; }
+  .sheet-pad .fine{ margin:0; font-size:14px; color:#8a7963; line-height:1.45; }
+  .sheet-msg{ margin:0; font-size:15px; font-weight:600; color:var(--green-dark); }
+  .sheet-msg.bad{ color:#9d2f2f; }
+  .account-email{
+    margin:0; font-size:16px; color:var(--ink-navy); font-weight:700;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  .toggle{
+    display:flex; align-items:center; gap:11px; min-height:46px; cursor:pointer;
+    font-size:16px; color:var(--ink-brown);
+  }
+  .toggle input{ accent-color:var(--green); width:20px; height:20px; flex:none; }
+  .hour-row{ display:flex; align-items:center; gap:10px; font-size:16px; }
+  .hour-row select{
+    padding:9px 12px; min-height:44px; border-radius:10px; border:1.5px solid var(--gold-soft);
+    background:#fffdf6; font-family:'Cormorant Garamond', serif; font-size:16px; font-weight:700;
+    color:var(--ink-brown);
+  }
 </style>
 </head>
 <body>
@@ -261,6 +280,64 @@
   </div>
 </div>
 
+<!-- Sign in -->
+<div class="overlay is-hidden" id="signin-modal" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="signin-title">Sign in</h2>
+      <button type="button" class="icon-btn" id="close-signin-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-pad">
+      <p class="lede">Signing in is optional &mdash; the tracker works without it. An account keeps your reading log on every device you use, and lets it remind you when a day goes unread.</p>
+      <form id="signin-form">
+        <div class="field">
+          <label for="signin-email">Email address</label>
+          <input type="email" id="signin-email" required autocomplete="email" inputmode="email" placeholder="you@example.com">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="signin-submit">Email me a sign-in link</button>
+      </form>
+      <p class="sheet-msg" id="signin-message"></p>
+      <p class="fine">No password: we email a link that works once and expires in fifteen minutes. Your address is used for the reminder and nothing else.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Account -->
+<div class="overlay is-hidden" id="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="account-title">Your account</h2>
+      <button type="button" class="icon-btn" id="close-account-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-pad">
+      <p class="account-email" id="account-email"></p>
+      <p class="lede">Remind me if the day&rsquo;s juz is still unread:</p>
+      <label class="toggle" for="opt-push">
+        <input type="checkbox" id="opt-push">
+        Notify me on this device
+      </label>
+      <label class="toggle" for="opt-email">
+        <input type="checkbox" id="opt-email">
+        Email me
+      </label>
+      <div class="hour-row">
+        <label for="remind-hour">at</label>
+        <select id="remind-hour"></select>
+        <span id="remind-zone" class="fine"></span>
+      </div>
+      <p class="warn is-hidden" id="push-warning"></p>
+      <button type="button" class="setting" id="signout-btn">
+        <strong>Sign out</strong>
+        <span>Your reading log stays on this device.</span>
+      </button>
+      <button type="button" class="setting setting-danger" id="delete-account-btn">
+        <strong>Delete account</strong>
+        <span>Removes the account and everything stored with it.</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- @footer -->
 
 <script>
@@ -268,6 +345,9 @@
 </script>
 <script>
 <!-- @pwa-js -->
+</script>
+<script>
+<!-- @account-js -->
 </script>
 <script>
 <!-- @core-js -->
@@ -343,6 +423,24 @@
     var feedbackTitle = $('feedback-title');
     var feedbackDesc = $('feedback-desc');
     var historyList = $('history-list');
+
+    var accountBtn = $('account-btn');
+    var signinModal = $('signin-modal');
+    var signinForm = $('signin-form');
+    var signinEmail = $('signin-email');
+    var signinSubmit = $('signin-submit');
+    var signinMessage = $('signin-message');
+    var closeSigninBtn = $('close-signin-btn');
+    var accountModal = $('account-modal');
+    var closeAccountBtn = $('close-account-btn');
+    var accountEmail = $('account-email');
+    var optPush = $('opt-push');
+    var optEmail = $('opt-email');
+    var remindHour = $('remind-hour');
+    var remindZone = $('remind-zone');
+    var pushWarning = $('push-warning');
+    var signoutBtn = $('signout-btn');
+    var deleteAccountBtn = $('delete-account-btn');
 
     var settingsBtn = $('settings-btn');
     var settingsModal = $('settings-modal');
@@ -496,6 +594,12 @@
         }
         writeStore(LOG_KEY, readingLog);
         renderApp();
+
+        // The page never waits on the network: the local log is what it draws.
+        var Account = window.QuranAccount;
+        if (Account && Account.state.signedIn && userProfile) {
+            Account.setDay(key, value, Core.juzForDate(userProfile.startDate, key));
+        }
     }
 
     function openSettings() {
@@ -564,8 +668,206 @@
     });
 
     document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && !settingsModal.classList.contains(HIDDEN)) closeSettings();
+        if (event.key !== 'Escape') return;
+        if (!signinModal.classList.contains(HIDDEN)) signinModal.classList.add(HIDDEN);
+        else if (!accountModal.classList.contains(HIDDEN)) accountModal.classList.add(HIDDEN);
+        else if (!settingsModal.classList.contains(HIDDEN)) closeSettings();
     });
+
+    // --- Account -------------------------------------------------------
+    var Account = window.QuranAccount;
+
+    function firstName(user) {
+        if (user.name) return user.name.split(/\s+/)[0];
+        return user.email.split('@')[0];
+    }
+
+    function renderAccountButton() {
+        if (!accountBtn) return;
+        // Nothing about accounts is shown unless the API answered.
+        accountBtn.classList.toggle(HIDDEN, !(Account && Account.state.available));
+        if (Account && Account.state.signedIn) {
+            accountBtn.textContent = firstName(Account.state.user);
+            accountBtn.classList.add('signed-in');
+            accountBtn.setAttribute('aria-label', 'Your account');
+        } else {
+            accountBtn.textContent = 'Sign in';
+            accountBtn.classList.remove('signed-in');
+            accountBtn.setAttribute('aria-label', 'Sign in');
+        }
+    }
+
+    for (var h = 0; h < 24; h++) {
+        var hourOption = document.createElement('option');
+        hourOption.value = String(h);
+        hourOption.textContent = (h % 12 === 0 ? 12 : h % 12) + (h < 12 ? ' am' : ' pm');
+        remindHour.appendChild(hourOption);
+    }
+
+    function renderAccountSheet() {
+        if (!Account || !Account.state.signedIn) return;
+        var user = Account.state.user;
+        accountEmail.textContent = user.email;
+        optEmail.checked = user.emailReminders;
+        // `Notification` is absent entirely in some contexts, so only `typeof`
+        // is safe here — a bare reference would throw a ReferenceError.
+        var canNotify = typeof Notification !== 'undefined';
+        optPush.checked = !!user.pushReminders && canNotify &&
+            Notification.permission === 'granted';
+        remindHour.value = String(user.remindHour);
+        remindZone.textContent = user.timezone ? '(' + user.timezone.replace(/_/g, ' ') + ')' : '';
+
+        if (!Account.pushSupported()) {
+            pushWarning.textContent = 'This browser cannot show notifications. ' +
+                'Email reminders still work.';
+            pushWarning.classList.remove(HIDDEN);
+            optPush.disabled = true;
+        } else if (canNotify && Notification.permission === 'denied') {
+            pushWarning.textContent = 'Notifications are blocked for this site in your browser ' +
+                'settings, so only email can reach you.';
+            pushWarning.classList.remove(HIDDEN);
+            optPush.disabled = true;
+        } else {
+            pushWarning.classList.add(HIDDEN);
+            optPush.disabled = false;
+        }
+    }
+
+    function openSignin() {
+        signinMessage.textContent = '';
+        signinMessage.className = 'sheet-msg';
+        signinModal.classList.remove(HIDDEN);
+        signinEmail.focus();
+    }
+
+    function openAccount() {
+        renderAccountSheet();
+        accountModal.classList.remove(HIDDEN);
+        closeAccountBtn.focus();
+    }
+
+    if (accountBtn) {
+        accountBtn.addEventListener('click', function () {
+            if (Account && Account.state.signedIn) openAccount();
+            else openSignin();
+        });
+    }
+
+    closeSigninBtn.addEventListener('click', function () { signinModal.classList.add(HIDDEN); });
+    closeAccountBtn.addEventListener('click', function () { accountModal.classList.add(HIDDEN); });
+    signinModal.addEventListener('click', function (e) {
+        if (e.target === signinModal) signinModal.classList.add(HIDDEN);
+    });
+    accountModal.addEventListener('click', function (e) {
+        if (e.target === accountModal) accountModal.classList.add(HIDDEN);
+    });
+
+    signinForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var email = signinEmail.value.trim();
+        if (!email) return;
+
+        signinSubmit.disabled = true;
+        signinSubmit.textContent = 'Sending…';
+        var result = await Account.requestLink(email);
+        signinSubmit.disabled = false;
+        signinSubmit.textContent = 'Email me a sign-in link';
+
+        signinMessage.textContent = result.message ||
+            (result.ok ? 'Check your email.' : 'Could not send the link.');
+        signinMessage.className = 'sheet-msg' + (result.ok ? '' : ' bad');
+        if (result.ok) signinForm.reset();
+    });
+
+    optEmail.addEventListener('change', function () {
+        Account.saveProfile({ emailReminders: optEmail.checked });
+    });
+
+    optPush.addEventListener('change', async function () {
+        if (optPush.checked) {
+            var result = await Account.enablePush();
+            if (!result.ok) {
+                optPush.checked = false;
+                pushWarning.textContent = result.reason === 'denied'
+                    ? 'Your browser refused permission for notifications.'
+                    : 'Notifications could not be set up on this device.';
+                pushWarning.classList.remove(HIDDEN);
+                return;
+            }
+            pushWarning.classList.add(HIDDEN);
+        } else {
+            await Account.disablePush();
+        }
+        Account.saveProfile({ pushReminders: optPush.checked });
+    });
+
+    remindHour.addEventListener('change', function () {
+        Account.saveProfile({
+            remindHour: Number(remindHour.value),
+            timezone: Account.guessTimeZone()
+        });
+    });
+
+    signoutBtn.addEventListener('click', async function () {
+        await Account.signOut();
+        accountModal.classList.add(HIDDEN);
+        renderAccountButton();
+    });
+
+    deleteAccountBtn.addEventListener('click', async function () {
+        if (!confirm('Delete your account and everything stored with it? ' +
+            'Your reading log stays on this device.')) return;
+        await Account.deleteAccount();
+        accountModal.classList.add(HIDDEN);
+        renderAccountButton();
+    });
+
+    /*
+     * The account is loaded after the page has already drawn from the local
+     * log, so a slow or missing API never delays anything on screen.
+     */
+    function startAccount() {
+        if (!Account) return;
+
+        Account.onChange(function (accountState) {
+            renderAccountButton();
+            if (!accountState.signedIn) return;
+
+            // The account is authoritative once signed in.
+            var merged = {};
+            accountState.days.forEach(function (day) { merged[day] = true; });
+            readingLog = merged;
+            writeStore(LOG_KEY, readingLog);
+
+            if (!userProfile && accountState.user.name && accountState.user.startDate) {
+                userProfile = {
+                    name: accountState.user.name,
+                    startDate: accountState.user.startDate
+                };
+                writeStore(PROFILE_KEY, userProfile);
+            }
+            renderApp();
+        });
+
+        Account.load(Object.keys(readingLog), userProfile);
+
+        var params = new URLSearchParams(location.search);
+        if (params.get('signedin') === '1' || params.get('signin') === 'expired') {
+            if (params.get('signin') === 'expired') {
+                setTimeout(function () {
+                    openSignin();
+                    signinMessage.textContent = 'That link had already been used or expired. ' +
+                        'Here is a fresh one.';
+                    signinMessage.className = 'sheet-msg bad';
+                }, 300);
+            }
+            history.replaceState(null, '', location.pathname);
+        }
+        if (params.get('account') === '1') setTimeout(openAccount, 300);
+    }
+
+    renderAccountButton();
+    startAccount();
 
     // The reader is a separate page and ticks today off when a juz finishes
     // playing, so re-read the log whenever this page is looked at again.

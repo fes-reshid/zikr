@@ -23,6 +23,7 @@ const PARTIALS = {
     '<!-- @footer -->': { file: 'src/chrome-footer.html' },
     '<!-- @chrome-js -->': { file: 'src/chrome.js', note: 'src/chrome.js' },
     '<!-- @pwa-js -->': { file: 'src/pwa.js', note: 'src/pwa.js' },
+    '<!-- @account-js -->': { file: 'src/account.js', note: 'src/account.js' },
     '<!-- @core-js -->': { file: 'src/core.js', note: 'src/core.js' }
 };
 

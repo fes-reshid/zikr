@@ -228,6 +228,35 @@
 <!-- @pwa-js -->
 </script>
 <script>
+<!-- @account-js -->
+</script>
+<script>
+/* The account sheets live on the tracker; this button goes there. */
+(function () {
+    'use strict';
+    var button = document.getElementById('account-btn');
+    if (!button || !window.QuranAccount) return;
+
+    function render(state) {
+        button.classList.toggle('is-hidden', !state.available);
+        if (state.signedIn) {
+            var user = state.user;
+            button.textContent = user.name ? user.name.split(/\s+/)[0] : user.email.split('@')[0];
+            button.classList.add('signed-in');
+        } else {
+            button.textContent = 'Sign in';
+            button.classList.remove('signed-in');
+        }
+    }
+
+    window.QuranAccount.onChange(render);
+    button.addEventListener('click', function () {
+        location.href = '{{ROOT}}?account=1';
+    });
+    window.QuranAccount.load(null, null);
+})();
+</script>
+<script>
 <!-- @core-js -->
 </script>
 <script>

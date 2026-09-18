@@ -4,7 +4,12 @@
       <span class="brand-mark arabic">د</span>
       <span class="brand-text">Diin Islaam<small>دين الإسلام</small></span>
     </a>
-    <button class="menu-btn" id="menuBtn" type="button" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <div class="header-right">
+      <!-- Revealed only once the API answers, so the pages can be published
+           before (or without) the Worker and show nothing that cannot work. -->
+      <button class="account-btn is-hidden" id="account-btn" type="button">Sign in</button>
+      <button class="menu-btn" id="menuBtn" type="button" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
     <nav class="main-links" id="mainNav">
       <a href="https://diinislaam.com/quran.html" class="active">Qur'ān</a>
       <a href="https://diinislaam.com/hadeeth.html">Ḥadīth</a>
