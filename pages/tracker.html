@@ -439,8 +439,6 @@
   </div>
 </div>
 
-<!-- @footer -->
-
 <script>
 <!-- @chrome-js -->
 </script>
@@ -540,6 +538,7 @@
     var historyList = $('history-list');
 
     var accountBtn = $('account-btn');
+    var menuRemindersBtn = $('menu-reminders-btn');
     var signinModal = $('signin-modal');
     var signinForm = $('signin-form');
     var signinFullnameField = $('signin-fullname-field');
@@ -1126,6 +1125,15 @@
 
     if (accountBtn) {
         accountBtn.addEventListener('click', function () {
+            if (Account && Account.state.signedIn) openAccount();
+            else openSignin();
+        });
+    }
+    // Reminders live in the account sheet; the menu's own entry point just
+    // opens the same place — sign in first if there is no account yet,
+    // since a reminder has nowhere to be sent without one.
+    if (menuRemindersBtn) {
+        menuRemindersBtn.addEventListener('click', function () {
             if (Account && Account.state.signedIn) openAccount();
             else openSignin();
         });

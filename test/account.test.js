@@ -404,12 +404,15 @@ const freshStore = () => ({
         await context.close();
     }
 
-    // --- The account sheet ------------------------------------------------
+    // --- The account sheet, reached from the header menu's Reminders -------
     {
         store = freshStore(); apiUp = true; calls.length = 0;
         const { context, page } = await open(browser, { signedInAs: 'amina123' });
-        await page.click('#account-btn');
+        await page.click('#menuBtn');
+        await page.click('#menu-reminders-btn');
         await page.waitForTimeout(400);
+        check('"Reminders" in the header menu opens the account sheet, signed in',
+            await page.isVisible('#account-modal'));
         check('the account sheet shows the username',
             (await page.textContent('#account-name')).trim() === 'amina123');
         check('there is no email reminder option',

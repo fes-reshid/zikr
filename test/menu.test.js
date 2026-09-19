@@ -61,6 +61,7 @@ async function openPage(browser, url, opts) {
         check(label + ': the menu button is there instead',
             await page.isVisible('#menuBtn'));
         check(label + ': the menu starts closed', await page.isHidden('#appMenu'));
+        check(label + ': no footer either', (await page.$('footer')) === null);
         check(label + ': no uncaught page errors', errors.length === 0, errors.join(' | '));
         await context.close();
     }
@@ -78,6 +79,8 @@ async function openPage(browser, url, opts) {
 
         check('it offers Settings',
             /Settings/i.test(await page.textContent('#menu-settings-btn')));
+        check('Reminders',
+            /Reminders/i.test(await page.textContent('#menu-reminders-btn')));
         check('About this app',
             /about this app/i.test(await page.textContent('#menu-about-btn')));
         check('and why to read daily',
@@ -149,6 +152,21 @@ async function openPage(browser, url, opts) {
         await page.waitForTimeout(150);
         check('Settings opens the existing settings sheet directly',
             await page.isVisible('#settings-modal'));
+        await context.close();
+    }
+
+    // --- Reminders from the header menu, not signed in ---------------------
+    // (Signed-in behaviour — landing on the account sheet's reminder block
+    // — is covered in account.test.js, which already has the fake account
+    // module this needs.)
+    {
+        const { context, page } = await openPage(browser, TRACKER_URL);
+        await page.waitForSelector('#menuBtn', { timeout: 5000 });
+        await page.click('#menuBtn');
+        await page.click('#menu-reminders-btn');
+        await page.waitForTimeout(150);
+        check('Reminders asks to sign in first when there is no account yet',
+            await page.isVisible('#signin-modal'));
         await context.close();
     }
 

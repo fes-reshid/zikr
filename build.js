@@ -20,7 +20,6 @@ const ROOT = __dirname;
 const PARTIALS = {
     '<!-- @site-css -->': { file: 'src/site.css' },
     '<!-- @header -->': { file: 'src/chrome-header.html' },
-    '<!-- @footer -->': { file: 'src/chrome-footer.html' },
     '<!-- @chrome-js -->': { file: 'src/chrome.js', note: 'src/chrome.js' },
     '<!-- @pwa-js -->': { file: 'src/pwa.js', note: 'src/pwa.js' },
     '<!-- @account-js -->': { file: 'src/account.js', note: 'src/account.js' },

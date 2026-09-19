@@ -177,14 +177,6 @@ main{ padding:30px 0 60px; }
 .btn-done{ background:var(--green-dark); color:var(--parchment); border-color:rgba(250,243,224,.45); }
 .btn-block{ width:100%; }
 
-/* ---------- Footer ---------- */
-footer{ background:var(--ink-navy); color:#c9d2e0; padding:40px 20px 26px; text-align:center; }
-footer .arabic{ color:var(--gold-soft); font-size:20px; margin:0 0 14px; }
-footer .flinks{ display:flex; justify-content:center; gap:10px 22px; flex-wrap:wrap; margin:0 0 14px; font-size:15px; }
-footer .flinks a{ text-decoration:none; color:#c9d2e0; display:inline-block; padding:6px 0; }
-footer .flinks a:hover{ color:#faf3e0; }
-footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
-
 /* ---------- Spinner ---------- */
 .spinner{
   width:34px; height:34px; border:3px solid rgba(46,107,88,.25); border-top-color:var(--green);
@@ -367,6 +359,9 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
   <div class="app-menu is-hidden" id="appMenu">
     <button type="button" class="app-menu-item" id="menu-settings-btn">
       <span class="app-menu-icon" aria-hidden="true">&#9881;</span> Settings
+    </button>
+    <button type="button" class="app-menu-item" id="menu-reminders-btn">
+      <span class="app-menu-icon" aria-hidden="true">&#128276;</span> Reminders
     </button>
     <button type="button" class="app-menu-item" id="menu-about-btn">
       <span class="app-menu-icon" aria-hidden="true">&#8505;</span> About this app
@@ -696,20 +691,6 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     </div>
   </div>
 </div>
-
-<footer>
-  <p class="arabic">وَقُل رَّبِّ زِدْنِي عِلْمًا</p>
-  <div class="flinks">
-    <a href="https://diinislaam.com/quran.html">Qur'ān</a>
-    <a href="https://diinislaam.com/hadeeth.html">Ḥadīth</a>
-    <a href="https://diinislaam.com/arabic.html">Arabic</a>
-    <a href="https://diinislaam.com/kids.html">Kids</a>
-    <a href="https://diinislaam.com/apps.html">Apps</a>
-    <a href="https://diinislaam.com/hisnul-muslim/index.html">Husnul Muslim</a>
-    <a href="mailto:fesbackups@gmail.com">Contact</a>
-  </div>
-  <p class="fine">© <span id="year"></span> Diin Islaam · diinislaam.com</p>
-</footer>
 
 <script>
 /* src/chrome.js, inlined by build.js — edit the source, not this file. */
@@ -1435,6 +1416,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var historyList = $('history-list');
 
     var accountBtn = $('account-btn');
+    var menuRemindersBtn = $('menu-reminders-btn');
     var signinModal = $('signin-modal');
     var signinForm = $('signin-form');
     var signinFullnameField = $('signin-fullname-field');
@@ -2021,6 +2003,15 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     if (accountBtn) {
         accountBtn.addEventListener('click', function () {
+            if (Account && Account.state.signedIn) openAccount();
+            else openSignin();
+        });
+    }
+    // Reminders live in the account sheet; the menu's own entry point just
+    // opens the same place — sign in first if there is no account yet,
+    // since a reminder has nowhere to be sent without one.
+    if (menuRemindersBtn) {
+        menuRemindersBtn.addEventListener('click', function () {
             if (Account && Account.state.signedIn) openAccount();
             else openSignin();
         });

@@ -247,8 +247,6 @@
 -->
 <audio id="audio" preload="auto" playsinline></audio>
 
-<!-- @footer -->
-
 <script>
 <!-- @chrome-js -->
 </script>
@@ -346,6 +344,7 @@
     var timeTotal = $('time-total');
     var accountBtn = $('account-btn');
     var menuSettingsBtn = $('menu-settings-btn');
+    var menuRemindersBtn = $('menu-reminders-btn');
     var readingStatus = $('reading-status');
     var readingStatusLabel = $('reading-status-label');
     var markReadBtn = $('mark-read-btn');
@@ -1101,6 +1100,10 @@
     // Settings lives on the tracker; this button goes there, same as account.
     if (menuSettingsBtn) {
         menuSettingsBtn.addEventListener('click', function () { location.href = '../?settings=1'; });
+    }
+    // Reminders live in the account sheet on the tracker too.
+    if (menuRemindersBtn) {
+        menuRemindersBtn.addEventListener('click', function () { location.href = '../?account=1'; });
     }
     if (Account) {
         Account.onChange(function (state) {
