@@ -30,12 +30,12 @@
     color:var(--gold); font-weight:700; margin-bottom:6px;
   }
   .field .help{ font-size:15px; color:#6b5a49; margin:0 0 8px; }
-  .field input{
+  .field input, .field select{
     width:100%; padding:12px 14px; min-height:46px; border-radius:10px;
     border:1.5px solid var(--gold-soft); background:#fffdf6;
     font-family:'Cormorant Garamond', serif; font-size:18px; color:var(--ink-brown);
   }
-  .field input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+  .field input:focus, .field select:focus{ outline:2px solid var(--green); outline-offset:1px; }
   .hint{ font-size:15px; color:var(--green-dark); font-weight:600; margin:8px 0 0; min-height:1.2em; }
 
   /* ---------- Today panel ---------- */
@@ -124,7 +124,7 @@
   }
   .sheet{
     background:var(--parchment); border:1.5px solid var(--gold-soft); border-radius:18px;
-    width:100%; max-width:420px; display:flex; flex-direction:column;
+    width:100%; max-width:420px; max-height:85vh; display:flex; flex-direction:column;
     overflow:hidden; box-shadow:0 22px 48px rgba(28,43,70,.34);
   }
   .sheet-head{
@@ -138,7 +138,7 @@
     cursor:pointer; flex:none; font-family:'Cormorant Garamond', serif;
   }
   .icon-btn:hover{ background:rgba(250,243,224,.14); }
-  .sheet-pad{ padding:22px; display:flex; flex-direction:column; gap:12px; }
+  .sheet-pad{ padding:22px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
   .setting{
     width:100%; text-align:left; background:#fffdf6; border:1.5px solid rgba(169,124,37,.3);
     border-radius:12px; padding:14px 18px; cursor:pointer;
@@ -314,6 +314,43 @@
       <button type="button" class="icon-btn" id="close-settings-btn" aria-label="Close settings">&times;</button>
     </div>
     <div class="sheet-pad">
+      <div class="field">
+        <label>Today&rsquo;s Hijri date</label>
+        <p class="hint" id="hijri-preview" style="margin:0 0 8px;"></p>
+        <select id="hijri-offset">
+          <option value="-2">2 days earlier than shown</option>
+          <option value="-1">1 day earlier than shown</option>
+          <option value="0">Automatic (Umm al-Qur&#257; calendar)</option>
+          <option value="1">1 day later than shown</option>
+          <option value="2">2 days later than shown</option>
+        </select>
+        <p class="help" style="margin:6px 0 0;">
+          This is calculated, not based on moon sighting, so it can be a day or two off
+          from what is announced locally. Adjust it here if so &mdash; it also shifts which
+          juz is due each day.
+        </p>
+      </div>
+      <div class="field">
+        <label for="location-select">Location</label>
+        <select id="location-select">
+          <option value="">Detected automatically</option>
+          <optgroup label="East Africa">
+            <option value="Africa/Addis_Ababa">Addis Ababa</option>
+            <option value="Africa/Mogadishu">Mogadishu</option>
+            <option value="Africa/Nairobi">Nairobi</option>
+          </optgroup>
+          <optgroup label="Middle East">
+            <option value="Asia/Riyadh">Riyadh</option>
+            <option value="Asia/Dubai">Dubai</option>
+          </optgroup>
+          <optgroup label="Elsewhere">
+            <option value="Europe/London">London</option>
+            <option value="America/New_York">New York</option>
+            <option value="America/Los_Angeles">Los Angeles</option>
+          </optgroup>
+        </select>
+        <p class="help" id="location-detected-hint" style="margin:6px 0 0;"></p>
+      </div>
       <button type="button" class="setting" id="edit-profile-btn">
         <strong>Edit name &amp; start date</strong>
         <span>Keeps your reading history.</span>
@@ -426,6 +463,8 @@
     var PROFILE_KEY = 'quran_user_profile';
     var LOG_KEY = 'quran_reading_log';
     var PLACE_KEY = 'quran_audio_place';
+    var HIJRI_OFFSET_KEY = 'quran_hijri_offset';
+    var LOCATION_KEY = 'quran_location_tz';
     var REWARD_HADITH = '“Whoever reads a letter from the Book of Allah will have a reward, ' +
         'and that reward will be multiplied by ten.” — Prophet Muhammad ﷺ (Tirmidhi 2910)';
     var HIDDEN = 'is-hidden';
@@ -542,26 +581,70 @@
     var forgetBtn = $('forget-btn');
 
     var settingsBtn = $('settings-btn');
+    var menuSettingsBtn = $('menu-settings-btn');
     var settingsModal = $('settings-modal');
     var closeSettingsBtn = $('close-settings-btn');
     var editProfileBtn = $('edit-profile-btn');
     var clearHistoryBtn = $('clear-history-btn');
     var resetAllBtn = $('reset-all-btn');
     var storageWarning = $('storage-warning');
+    var hijriOffsetSelect = $('hijri-offset');
+    var hijriPreview = $('hijri-preview');
+    var locationSelect = $('location-select');
+    var locationDetectedHint = $('location-detected-hint');
 
     // --- Rendering -----------------------------------------------------
     function todayKey() {
         return Core.formatDateKey(new Date());
     }
 
+    /*
+     * The Hijri date Core computes is the tabular Umm al-Qurā calendar,
+     * not a moon sighting — real, local sightings can land a day or two
+     * either side of it. This lets someone correct for that from Settings;
+     * every Hijri lookup below goes through it, including the cycle-start
+     * search, so the correction is not cosmetic — it moves which juz is due.
+     */
+    function hijriOffsetDays() {
+        var n = Number(readStore(HIJRI_OFFSET_KEY));
+        return isFinite(n) ? Math.max(-2, Math.min(2, Math.round(n))) : 0;
+    }
+
+    function hijriAdjusted(date) {
+        var offset = hijriOffsetDays();
+        if (!offset) return date;
+        var shifted = new Date(date.getTime());
+        shifted.setDate(shifted.getDate() + offset);
+        return shifted;
+    }
+
+    /*
+     * findCycleStart itself must stay on the real calendar — it searches
+     * backward in real days for a tabular "day 1", and searching from an
+     * already-shifted date would just find the same tabular anchor again
+     * (the shift cancels out over a walk back to day 1 of the same month).
+     * So this runs the real search, then shifts the *anchor it found* the
+     * other way — the one adjustment that actually moves Juz 1 to the
+     * corrected date, rather than leaving it exactly where it already was.
+     */
+    function findCycleStartAdjusted(date) {
+        var start = Core.findCycleStart(date);
+        if (!start) return start;
+        var offset = hijriOffsetDays();
+        if (!offset) return start;
+        var parsed = Core.parseDateKey(start);
+        parsed.setDate(parsed.getDate() - offset);
+        return Core.formatDateKey(parsed);
+    }
+
     function hijriSuffix(date) {
-        var formatted = Core.formatHijri(date);
+        var formatted = Core.formatHijri(hijriAdjusted(date));
         return formatted ? ' (' + formatted + ')' : '';
     }
 
     // The year is the same on every history row and only makes them wrap.
     function hijriShort(date) {
-        var parts = Core.hijriParts(date);
+        var parts = Core.hijriParts(hijriAdjusted(date));
         return parts ? ' (' + parts.monthName + ' ' + parts.day + ')' : '';
     }
 
@@ -582,7 +665,7 @@
 
         userNameInput.value = userProfile ? userProfile.name : '';
         startDateInput.value = (userProfile && userProfile.startDate) ||
-            Core.findCycleStart(new Date()) ||
+            findCycleStartAdjusted(new Date()) ||
             todayKey();
         updateStartDateHint();
 
@@ -631,7 +714,7 @@
 
             var startDate = accountState.settings && accountState.settings.startDate;
             if (!startDate) {
-                startDate = Core.findCycleStart(new Date()) || todayKey();
+                startDate = findCycleStartAdjusted(new Date()) || todayKey();
                 window.QuranAccount.saveSettings({
                     startDate: startDate,
                     timezone: window.QuranAccount.guessTimeZone()
@@ -657,7 +740,7 @@
             userProfile = {
                 name: accountState.user.fullName || accountState.user.displayName ||
                     accountState.user.username,
-                startDate: Core.findCycleStart(new Date()) || todayKey()
+                startDate: findCycleStartAdjusted(new Date()) || todayKey()
             };
             writeStore(PROFILE_KEY, userProfile);
             return true;
@@ -671,7 +754,7 @@
             startDateHint.textContent = '';
             return;
         }
-        var formatted = Core.formatHijri(parsed);
+        var formatted = Core.formatHijri(hijriAdjusted(parsed));
         startDateHint.textContent = 'Juz 1 on ' + (formatted || startDateInput.value);
     }
 
@@ -679,7 +762,7 @@
         var day = Core.cycleDay(userProfile.startDate, key);
         var isRead = !!readingLog[key];
 
-        hijriBadgeTop.textContent = Core.formatHijri(today) || 'Today';
+        hijriBadgeTop.textContent = Core.formatHijri(hijriAdjusted(today)) || 'Today';
         greetingName.textContent = 'Assalāmu ʿalaykum, ' + userProfile.name;
         targetJuzTitle.textContent = 'Juz ' + currentJuz;
         cycleProgressLabel.textContent = 'Day ' + day + ' of ' + Core.JUZ_IN_CYCLE + ' in this cycle';
@@ -810,8 +893,22 @@
         if (Account && Account.state.signedIn) Account.setDay(key, value);
     }
 
+    function renderDateLocationSettings() {
+        hijriOffsetSelect.value = String(hijriOffsetDays());
+        var label = Core.formatHijri(hijriAdjusted(new Date()));
+        hijriPreview.textContent = label ? 'Showing as ' + label + '.' : '';
+
+        var savedTz = readStore(LOCATION_KEY);
+        locationSelect.value = savedTz || '';
+        var detected = (window.QuranAccount && window.QuranAccount.guessTimeZone()) || 'UTC';
+        locationDetectedHint.textContent = savedTz
+            ? 'Detected automatically as ' + detected + '.'
+            : 'Detected automatically as ' + detected + ' — pick one above only if that is wrong.';
+    }
+
     function openSettings() {
         storageWarning.classList.toggle(HIDDEN, storageAvailable);
+        renderDateLocationSettings();
         settingsModal.classList.remove(HIDDEN);
         closeSettingsBtn.focus();
     }
@@ -847,7 +944,51 @@
     });
 
     settingsBtn.addEventListener('click', openSettings);
+    if (menuSettingsBtn) menuSettingsBtn.addEventListener('click', openSettings);
     closeSettingsBtn.addEventListener('click', closeSettings);
+
+    hijriOffsetSelect.addEventListener('change', function () {
+        var previousOffset = hijriOffsetDays();
+        var newOffset = Number(hijriOffsetSelect.value);
+        writeStore(HIJRI_OFFSET_KEY, newOffset);
+
+        // The offset also anchors which real day an already-established
+        // cycle started on; slide it by the same change so the juz and day
+        // count stay consistent with the corrected date, rather than only
+        // the headline badge moving while the rest of the dashboard lags.
+        if (userProfile && userProfile.startDate) {
+            var delta = newOffset - previousOffset;
+            var parsed = delta && Core.parseDateKey(userProfile.startDate);
+            if (parsed) {
+                parsed.setDate(parsed.getDate() - delta);
+                userProfile.startDate = Core.formatDateKey(parsed);
+                writeStore(PROFILE_KEY, userProfile);
+
+                // Signed in, the account's own copy is what the next sync
+                // would otherwise overwrite this with — keep it in step too.
+                var Account = window.QuranAccount;
+                if (Account && Account.state.signedIn && Account.state.apiReady) {
+                    Account.saveSettings({ startDate: userProfile.startDate });
+                }
+            }
+        }
+
+        renderDateLocationSettings();
+        renderApp();
+    });
+
+    locationSelect.addEventListener('change', function () {
+        var tz = locationSelect.value;
+        if (tz) writeStore(LOCATION_KEY, tz); else removeStore(LOCATION_KEY);
+        renderDateLocationSettings();
+
+        // Only meaningfully drives anything for a signed-in account with a
+        // working reminder API; harmless — just remembered here — otherwise.
+        var Account = window.QuranAccount;
+        if (Account && Account.state.signedIn && Account.state.apiReady) {
+            Account.saveSettings({ timezone: tz || Account.guessTimeZone() });
+        }
+    });
     settingsModal.addEventListener('click', function (event) {
         if (event.target === settingsModal) closeSettings();
     });
@@ -1085,7 +1226,7 @@
         // account with none yet gets one, and go straight into reading
         // rather than stopping for a form first. The name/start date can
         // still be set later from Settings, for anyone who wants to.
-        var startDate = Core.findCycleStart(new Date()) || todayKey();
+        var startDate = findCycleStartAdjusted(new Date()) || todayKey();
         userProfile = { name: 'Guest', startDate: startDate };
         writeStore(PROFILE_KEY, userProfile);
         location.href = 'reader/?juz=' + Core.juzForDate(startDate, todayKey());
@@ -1208,6 +1349,13 @@
     }, 60000);
 
     renderApp();
+
+    // The reader's header menu redirects here for Settings, since that is
+    // where the modal actually lives.
+    if (new URLSearchParams(location.search).get('settings') === '1') {
+        history.replaceState(null, '', location.pathname);
+        openSettings();
+    }
 })();
 </script>
 </body>

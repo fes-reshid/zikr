@@ -345,6 +345,7 @@
     var timeNow = $('time-now');
     var timeTotal = $('time-total');
     var accountBtn = $('account-btn');
+    var menuSettingsBtn = $('menu-settings-btn');
     var readingStatus = $('reading-status');
     var readingStatusLabel = $('reading-status-label');
     var markReadBtn = $('mark-read-btn');
@@ -1096,6 +1097,10 @@
 
     if (accountBtn) {
         accountBtn.addEventListener('click', function () { location.href = '../?account=1'; });
+    }
+    // Settings lives on the tracker; this button goes there, same as account.
+    if (menuSettingsBtn) {
+        menuSettingsBtn.addEventListener('click', function () { location.href = '../?settings=1'; });
     }
     if (Account) {
         Account.onChange(function (state) {

@@ -1,21 +1,87 @@
 <header class="site">
   <div class="nav-row">
-    <a class="brand" href="https://diinislaam.com/">
-      <span class="brand-mark arabic">د</span>
-      <span class="brand-text">Diin Islaam<small>دين الإسلام</small></span>
-    </a>
     <div class="header-right">
       <!-- Revealed only once the API answers, so the pages can be published
            before (or without) the Worker and show nothing that cannot work. -->
       <button class="account-btn is-hidden" id="account-btn" type="button">Sign in</button>
-      <button class="menu-btn" id="menuBtn" type="button" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
+      <button class="app-menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="appMenu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
-    <nav class="main-links" id="mainNav">
-      <a href="https://diinislaam.com/quran.html" class="active">Qur'ān</a>
-      <a href="https://diinislaam.com/hadeeth.html">Ḥadīth</a>
-      <a href="https://diinislaam.com/arabic.html">Arabic</a>
-      <a href="https://diinislaam.com/kids.html">Kids</a>
-      <a href="https://diinislaam.com/apps.html">Apps</a>
-    </nav>
+  </div>
+  <div class="app-menu is-hidden" id="appMenu">
+    <button type="button" class="app-menu-item" id="menu-settings-btn">
+      <span class="app-menu-icon" aria-hidden="true">&#9881;</span> Settings
+    </button>
+    <button type="button" class="app-menu-item" id="menu-about-btn">
+      <span class="app-menu-icon" aria-hidden="true">&#8505;</span> About this app
+    </button>
+    <button type="button" class="app-menu-item" id="menu-benefits-btn">
+      <span class="app-menu-icon" aria-hidden="true">&#10022;</span> Why read the Qur&rsquo;&#257;n every day
+    </button>
+    <div class="app-menu-divider"></div>
+    <p class="app-menu-label">More from Diin Islaam</p>
+    <a class="app-menu-item" href="https://diinislaam.com/hadeeth.html">&#7716;ad&#299;th</a>
+    <a class="app-menu-item" href="https://diinislaam.com/arabic.html">Arabic</a>
+    <a class="app-menu-item" href="https://diinislaam.com/kids.html">Kids</a>
+    <a class="app-menu-item" href="https://diinislaam.com/apps.html">All apps</a>
   </div>
 </header>
+
+<!-- About this app -->
+<div class="app-overlay is-hidden" id="about-overlay" role="dialog" aria-modal="true" aria-labelledby="about-title">
+  <div class="app-sheet">
+    <div class="app-sheet-head">
+      <h2 id="about-title">About this app</h2>
+      <button type="button" class="app-icon-btn" id="close-about-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="app-sheet-pad">
+      <p>The Qur&rsquo;&#257;n Daily Tracker walks through the Qur&rsquo;&#257;n one juz (of thirty) a day, on a
+        cycle anchored to Rab&#299;&#699; ath-Th&#257;n&#299; 1 of the Hijri calendar &mdash; so day one of every
+        cycle lands on the same day of the Islamic year.</p>
+      <p>Mark each day as read, keep a streak, and read or listen to that day&rsquo;s juz with recitation from
+        several reciters, alongside a translation in English, Oromo, Amharic or Somali &mdash; or Arabic on its
+        own.</p>
+      <p>Signing in uses the same account as the quest games on this site, so your reading log follows you
+        across devices and you can get a reminder if a day goes unread. No email is ever asked for. Everything
+        also works with no account at all &mdash; nothing leaves your device unless you choose to sign in.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Why read the Qur'an every day -->
+<div class="app-overlay is-hidden" id="benefits-overlay" role="dialog" aria-modal="true" aria-labelledby="benefits-title">
+  <div class="app-sheet">
+    <div class="app-sheet-head">
+      <h2 id="benefits-title">Why read the Qur&rsquo;&#257;n every day</h2>
+      <button type="button" class="app-icon-btn" id="close-benefits-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="app-sheet-pad">
+      <div class="benefit">
+        <p class="benefit-ar">مَنْ قَرَأَ حَرْفًا مِنْ كِتَابِ اللَّهِ فَلَهُ بِهِ حَسَنَةٌ، وَالْحَسَنَةُ بِعَشْرِ أَمْثَالِهَا</p>
+        <p class="benefit-tr">&ldquo;Whoever reads a letter from the Book of All&#257;h will have a reward, and
+          that reward will be multiplied by ten.&rdquo;</p>
+        <p class="benefit-src">&mdash; Prophet Muhammad &#65018; (Sunan al-Tirmidh&#299; 2910)</p>
+      </div>
+      <div class="benefit">
+        <p class="benefit-tr">&ldquo;The best among you are those who learn the Qur&rsquo;&#257;n and teach
+          it.&rdquo;</p>
+        <p class="benefit-src">&mdash; Prophet Muhammad &#65018; (&#7778;a&#7717;&#299;&#7717; al-Bukh&#257;r&#299; 5027)</p>
+      </div>
+      <div class="benefit">
+        <p class="benefit-tr">&ldquo;Read the Qur&rsquo;&#257;n, for it will come as an intercessor for its
+          reciters on the Day of Resurrection.&rdquo;</p>
+        <p class="benefit-src">&mdash; Prophet Muhammad &#65018; (&#7778;a&#7717;&#299;&#7717; Muslim 804)</p>
+      </div>
+      <div class="benefit">
+        <p class="benefit-tr">&ldquo;The one who is proficient in reciting the Qur&rsquo;&#257;n is with the
+          noble, obedient scribes (angels), and the one who recites it with difficulty, doing their best to
+          recite it in the best way possible, will have a double reward.&rdquo;</p>
+        <p class="benefit-src">&mdash; Prophet Muhammad &#65018; (&#7778;a&#7717;&#299;&#7717; al-Bukh&#257;r&#299; 4937,
+          &#7778;a&#7717;&#299;&#7717; Muslim 798)</p>
+      </div>
+      <p class="benefit-foot">A few verses a day, read consistently, is what this tracker is built to help
+        with &mdash; a streak is only ever a means to that end, never the point of it.</p>
+    </div>
+  </div>
+</div>

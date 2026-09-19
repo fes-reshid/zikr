@@ -46,24 +46,19 @@ a{color:inherit;}
 .is-hidden{ display:none !important; }
 
 /* ---------- Header ---------- */
+/* No site brand here on purpose: these pages are meant to feel like their
+   own app, not a page on the wider site, so the header carries only the
+   account state and the app's own menu. */
 header.site{
   position:sticky; top:0; z-index:50;
   background:rgba(250,243,224,.92); backdrop-filter:blur(6px);
   border-bottom:1px solid var(--gold-soft);
 }
 .nav-row{
-  display:flex; align-items:center; justify-content:space-between;
+  display:flex; align-items:center; justify-content:flex-end;
   padding:14px 20px; max-width:var(--maxw); margin:0 auto;
 }
-.brand{ display:flex; align-items:center; gap:10px; text-decoration:none; }
-.brand-mark{
-  width:38px; height:38px; border-radius:50%; background:var(--green);
-  display:flex; align-items:center; justify-content:center;
-  color:#faf3e0; font-family:'Amiri'; font-size:19px; flex:none;
-}
-.brand-text{ font-family:'Marcellus'; font-size:22px; color:var(--ink-navy); line-height:1.1; }
-.brand-text small{ display:block; font-family:'Amiri'; font-size:13px; color:var(--gold); font-weight:400; }
-.header-right{ display:flex; align-items:center; gap:10px; order:3; }
+.header-right{ display:flex; align-items:center; gap:10px; position:relative; }
 .account-btn{
   display:inline-flex; align-items:center; gap:7px; max-width:46vw;
   padding:8px 16px; min-height:40px; border-radius:30px;
@@ -73,29 +68,70 @@ header.site{
 }
 .account-btn:hover{ border-color:var(--gold); color:var(--green); }
 .account-btn.signed-in{ background:var(--green-bg); border-color:#a9c9b9; color:var(--green-dark); }
-nav.main-links{ display:flex; align-items:center; gap:28px; }
-nav.main-links a{
-  text-decoration:none; font-size:17px; color:var(--ink-brown); font-weight:600;
-  padding:6px 2px; border-bottom:2px solid transparent; transition:color .15s, border-color .15s;
+
+/* ---------- App menu (the header's "three lines") ---------- */
+.app-menu-btn{
+  display:flex; align-items:center; justify-content:center;
+  width:44px; height:44px; border-radius:8px; border:1px solid var(--gold-soft);
+  background:#fff; cursor:pointer; flex-direction:column; gap:4px; padding:0; flex:none;
 }
-nav.main-links a:hover{ color:var(--green); border-color:var(--gold-soft); }
-nav.main-links a.active{ color:var(--green); border-color:var(--gold); }
-.menu-btn{ display:none; }
-@media (max-width:820px){
-  .account-btn{ font-size:15px; padding:8px 13px; }
-  nav.main-links{
-    display:none; position:absolute; top:100%; left:0; right:0; flex-direction:column; align-items:stretch;
-    background:var(--parchment); border-bottom:1px solid var(--gold-soft);
-    padding:10px 20px 18px; gap:4px; box-shadow:0 12px 20px rgba(60,45,20,.12);
-  }
-  nav.main-links.open{ display:flex; }
-  nav.main-links a{ padding:10px 4px; border-bottom:1px solid rgba(169,124,37,.15); }
-  .menu-btn{
-    display:flex; align-items:center; justify-content:center;
-    width:44px; height:44px; border-radius:8px; border:1px solid var(--gold-soft);
-    background:#fff; cursor:pointer; flex-direction:column; gap:4px; padding:0;
-  }
-  .menu-btn span{ width:20px; height:2px; background:var(--ink-brown); display:block; }
+.app-menu-btn:hover{ border-color:var(--gold); }
+.app-menu-btn span{ width:20px; height:2px; background:var(--ink-brown); display:block; }
+.app-menu{
+  position:absolute; top:calc(100% + 8px); right:0; z-index:55;
+  width:260px; max-width:calc(100vw - 40px);
+  background:var(--parchment); border:1px solid var(--gold-soft); border-radius:14px;
+  box-shadow:0 16px 32px rgba(60,45,20,.18); padding:8px; display:flex; flex-direction:column;
+}
+.app-menu-item{
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  background:none; border:0; border-radius:9px; padding:11px 10px; cursor:pointer;
+  font-family:'Cormorant Garamond', serif; font-size:17px; font-weight:600; color:var(--ink-brown);
+  text-decoration:none;
+}
+.app-menu-item:hover{ background:rgba(169,124,37,.1); }
+.app-menu-icon{ font-size:16px; width:20px; text-align:center; flex:none; color:var(--gold); }
+.app-menu-divider{ height:1px; background:var(--gold-soft); opacity:.4; margin:6px 4px; }
+.app-menu-label{
+  margin:4px 10px 2px; font-size:12px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--gold); font-weight:700;
+}
+
+/* ---------- App overlays (About / Benefits) ---------- */
+.app-overlay{
+  position:fixed; inset:0; z-index:100; background:rgba(28,43,70,.55);
+  backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:16px;
+}
+.app-sheet{
+  background:var(--parchment); border:1.5px solid var(--gold-soft); border-radius:18px;
+  width:100%; max-width:460px; max-height:85vh; display:flex; flex-direction:column;
+  overflow:hidden; box-shadow:0 22px 48px rgba(28,43,70,.34);
+}
+.app-sheet-head{
+  background:var(--green-dark); color:var(--parchment); flex:none;
+  padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:14px;
+}
+.app-sheet-head h2{ font-family:'Marcellus'; font-weight:400; font-size:21px; margin:0; color:var(--parchment); }
+.app-icon-btn{
+  width:36px; height:36px; border-radius:50%; border:1px solid rgba(250,243,224,.35);
+  background:transparent; color:var(--parchment); font-size:20px; line-height:1;
+  cursor:pointer; flex:none; font-family:'Cormorant Garamond', serif;
+}
+.app-icon-btn:hover{ background:rgba(250,243,224,.14); }
+.app-sheet-pad{ padding:22px; overflow-y:auto; font-size:17px; line-height:1.55; }
+.app-sheet-pad p{ margin:0 0 14px; }
+.app-sheet-pad p:last-child{ margin-bottom:0; }
+.benefit{ padding-bottom:16px; margin-bottom:16px; border-bottom:1px solid rgba(169,124,37,.22); }
+.benefit:last-of-type{ border-bottom:0; margin-bottom:0; padding-bottom:0; }
+.benefit-ar{
+  font-family:'Amiri', serif; direction:rtl; text-align:right; color:var(--ink-navy);
+  font-size:22px; line-height:1.9; margin:0 0 10px;
+}
+.benefit-tr{ margin:0 0 6px; color:var(--ink-brown); }
+.benefit-src{ margin:0; font-size:14px; color:var(--gold); font-weight:600; }
+.benefit-foot{ font-size:15px; color:#6b5a49; font-style:italic; }
+@media (max-width:430px){
+  .app-menu{ width:calc(100vw - 40px); }
 }
 
 /* ---------- Page head ---------- */
@@ -298,25 +334,91 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
 <header class="site">
   <div class="nav-row">
-    <a class="brand" href="https://diinislaam.com/">
-      <span class="brand-mark arabic">د</span>
-      <span class="brand-text">Diin Islaam<small>دين الإسلام</small></span>
-    </a>
     <div class="header-right">
       <!-- Revealed only once the API answers, so the pages can be published
            before (or without) the Worker and show nothing that cannot work. -->
       <button class="account-btn is-hidden" id="account-btn" type="button">Sign in</button>
-      <button class="menu-btn" id="menuBtn" type="button" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
+      <button class="app-menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="appMenu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
-    <nav class="main-links" id="mainNav">
-      <a href="https://diinislaam.com/quran.html" class="active">Qur'ān</a>
-      <a href="https://diinislaam.com/hadeeth.html">Ḥadīth</a>
-      <a href="https://diinislaam.com/arabic.html">Arabic</a>
-      <a href="https://diinislaam.com/kids.html">Kids</a>
-      <a href="https://diinislaam.com/apps.html">Apps</a>
-    </nav>
+  </div>
+  <div class="app-menu is-hidden" id="appMenu">
+    <button type="button" class="app-menu-item" id="menu-settings-btn">
+      <span class="app-menu-icon" aria-hidden="true">&#9881;</span> Settings
+    </button>
+    <button type="button" class="app-menu-item" id="menu-about-btn">
+      <span class="app-menu-icon" aria-hidden="true">&#8505;</span> About this app
+    </button>
+    <button type="button" class="app-menu-item" id="menu-benefits-btn">
+      <span class="app-menu-icon" aria-hidden="true">&#10022;</span> Why read the Qur&rsquo;&#257;n every day
+    </button>
+    <div class="app-menu-divider"></div>
+    <p class="app-menu-label">More from Diin Islaam</p>
+    <a class="app-menu-item" href="https://diinislaam.com/hadeeth.html">&#7716;ad&#299;th</a>
+    <a class="app-menu-item" href="https://diinislaam.com/arabic.html">Arabic</a>
+    <a class="app-menu-item" href="https://diinislaam.com/kids.html">Kids</a>
+    <a class="app-menu-item" href="https://diinislaam.com/apps.html">All apps</a>
   </div>
 </header>
+
+<!-- About this app -->
+<div class="app-overlay is-hidden" id="about-overlay" role="dialog" aria-modal="true" aria-labelledby="about-title">
+  <div class="app-sheet">
+    <div class="app-sheet-head">
+      <h2 id="about-title">About this app</h2>
+      <button type="button" class="app-icon-btn" id="close-about-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="app-sheet-pad">
+      <p>The Qur&rsquo;&#257;n Daily Tracker walks through the Qur&rsquo;&#257;n one juz (of thirty) a day, on a
+        cycle anchored to Rab&#299;&#699; ath-Th&#257;n&#299; 1 of the Hijri calendar &mdash; so day one of every
+        cycle lands on the same day of the Islamic year.</p>
+      <p>Mark each day as read, keep a streak, and read or listen to that day&rsquo;s juz with recitation from
+        several reciters, alongside a translation in English, Oromo, Amharic or Somali &mdash; or Arabic on its
+        own.</p>
+      <p>Signing in uses the same account as the quest games on this site, so your reading log follows you
+        across devices and you can get a reminder if a day goes unread. No email is ever asked for. Everything
+        also works with no account at all &mdash; nothing leaves your device unless you choose to sign in.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Why read the Qur'an every day -->
+<div class="app-overlay is-hidden" id="benefits-overlay" role="dialog" aria-modal="true" aria-labelledby="benefits-title">
+  <div class="app-sheet">
+    <div class="app-sheet-head">
+      <h2 id="benefits-title">Why read the Qur&rsquo;&#257;n every day</h2>
+      <button type="button" class="app-icon-btn" id="close-benefits-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="app-sheet-pad">
+      <div class="benefit">
+        <p class="benefit-ar">مَنْ قَرَأَ حَرْفًا مِنْ كِتَابِ اللَّهِ فَلَهُ بِهِ حَسَنَةٌ، وَالْحَسَنَةُ بِعَشْرِ أَمْثَالِهَا</p>
+        <p class="benefit-tr">&ldquo;Whoever reads a letter from the Book of All&#257;h will have a reward, and
+          that reward will be multiplied by ten.&rdquo;</p>
+        <p class="benefit-src">&mdash; Prophet Muhammad &#65018; (Sunan al-Tirmidh&#299; 2910)</p>
+      </div>
+      <div class="benefit">
+        <p class="benefit-tr">&ldquo;The best among you are those who learn the Qur&rsquo;&#257;n and teach
+          it.&rdquo;</p>
+        <p class="benefit-src">&mdash; Prophet Muhammad &#65018; (&#7778;a&#7717;&#299;&#7717; al-Bukh&#257;r&#299; 5027)</p>
+      </div>
+      <div class="benefit">
+        <p class="benefit-tr">&ldquo;Read the Qur&rsquo;&#257;n, for it will come as an intercessor for its
+          reciters on the Day of Resurrection.&rdquo;</p>
+        <p class="benefit-src">&mdash; Prophet Muhammad &#65018; (&#7778;a&#7717;&#299;&#7717; Muslim 804)</p>
+      </div>
+      <div class="benefit">
+        <p class="benefit-tr">&ldquo;The one who is proficient in reciting the Qur&rsquo;&#257;n is with the
+          noble, obedient scribes (angels), and the one who recites it with difficulty, doing their best to
+          recite it in the best way possible, will have a double reward.&rdquo;</p>
+        <p class="benefit-src">&mdash; Prophet Muhammad &#65018; (&#7778;a&#7717;&#299;&#7717; al-Bukh&#257;r&#299; 4937,
+          &#7778;a&#7717;&#299;&#7717; Muslim 798)</p>
+      </div>
+      <p class="benefit-foot">A few verses a day, read consistently, is what this tracker is built to help
+        with &mdash; a streak is only ever a means to that end, never the point of it.</p>
+    </div>
+  </div>
+</div>
 
 <section class="page-head">
   <h1 id="page-title">Juz Reader</h1>
@@ -426,19 +528,51 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     if (year) year.textContent = new Date().getFullYear();
 
     var menuBtn = document.getElementById('menuBtn');
-    var mainNav = document.getElementById('mainNav');
-    if (!menuBtn || !mainNav) return;
+    var appMenu = document.getElementById('appMenu');
 
-    menuBtn.addEventListener('click', function () {
-        var open = mainNav.classList.toggle('open');
-        menuBtn.setAttribute('aria-expanded', String(open));
-    });
-    mainNav.querySelectorAll('a').forEach(function (a) {
-        a.addEventListener('click', function () {
-            mainNav.classList.remove('open');
-            menuBtn.setAttribute('aria-expanded', 'false');
+    function closeMenu() {
+        appMenu.classList.add('is-hidden');
+        menuBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    if (menuBtn && appMenu) {
+        menuBtn.addEventListener('click', function () {
+            var willOpen = appMenu.classList.contains('is-hidden');
+            appMenu.classList.toggle('is-hidden', !willOpen);
+            menuBtn.setAttribute('aria-expanded', String(willOpen));
         });
-    });
+        // A link (or any button whose own handler opens something else)
+        // closes the dropdown on its way out, rather than leaving it open
+        // behind whatever it just triggered.
+        appMenu.addEventListener('click', function (event) {
+            if (event.target.closest('a, button')) closeMenu();
+        });
+        document.addEventListener('click', function (event) {
+            if (appMenu.classList.contains('is-hidden')) return;
+            if (appMenu.contains(event.target) || menuBtn.contains(event.target)) return;
+            closeMenu();
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && !appMenu.classList.contains('is-hidden')) closeMenu();
+        });
+    }
+
+    /** Wires a menu button to open/close a self-contained overlay by id. */
+    function wireOverlay(openBtnId, overlayId, closeBtnId) {
+        var openBtn = document.getElementById(openBtnId);
+        var overlay = document.getElementById(overlayId);
+        var closeBtn = document.getElementById(closeBtnId);
+        if (!openBtn || !overlay) return;
+
+        openBtn.addEventListener('click', function () { overlay.classList.remove('is-hidden'); });
+        if (closeBtn) closeBtn.addEventListener('click', function () { overlay.classList.add('is-hidden'); });
+        overlay.addEventListener('click', function (event) {
+            if (event.target === overlay) overlay.classList.add('is-hidden');
+        });
+    }
+
+    wireOverlay('menu-about-btn', 'about-overlay', 'close-about-btn');
+    wireOverlay('menu-benefits-btn', 'benefits-overlay', 'close-benefits-btn');
 })();
 </script>
 <script>
@@ -1106,6 +1240,7 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
     var timeNow = $('time-now');
     var timeTotal = $('time-total');
     var accountBtn = $('account-btn');
+    var menuSettingsBtn = $('menu-settings-btn');
     var readingStatus = $('reading-status');
     var readingStatusLabel = $('reading-status-label');
     var markReadBtn = $('mark-read-btn');
@@ -1857,6 +1992,10 @@ footer .fine{ font-size:13px; color:#8b96ab; margin:0; }
 
     if (accountBtn) {
         accountBtn.addEventListener('click', function () { location.href = '../?account=1'; });
+    }
+    // Settings lives on the tracker; this button goes there, same as account.
+    if (menuSettingsBtn) {
+        menuSettingsBtn.addEventListener('click', function () { location.href = '../?settings=1'; });
     }
     if (Account) {
         Account.onChange(function (state) {
