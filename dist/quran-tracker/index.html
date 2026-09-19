@@ -587,19 +587,62 @@ main{ padding:30px 0 60px; }
         <label for="location-select">Location</label>
         <select id="location-select">
           <option value="">Detected automatically</option>
-          <optgroup label="East Africa">
-            <option value="Africa/Addis_Ababa">Addis Ababa</option>
-            <option value="Africa/Mogadishu">Mogadishu</option>
-            <option value="Africa/Nairobi">Nairobi</option>
+          <optgroup label="Africa">
+            <option value="Africa/Addis_Ababa">Addis Ababa, Ethiopia</option>
+            <option value="Africa/Mogadishu">Mogadishu, Somalia</option>
+            <option value="Africa/Djibouti">Djibouti</option>
+            <option value="Africa/Nairobi">Nairobi, Kenya</option>
+            <option value="Africa/Kampala">Kampala, Uganda</option>
+            <option value="Africa/Khartoum">Khartoum, Sudan</option>
+            <option value="Africa/Cairo">Cairo, Egypt</option>
+            <option value="Africa/Casablanca">Casablanca, Morocco</option>
+            <option value="Africa/Lagos">Lagos, Nigeria</option>
+            <option value="Africa/Johannesburg">Johannesburg, South Africa</option>
           </optgroup>
-          <optgroup label="Middle East">
-            <option value="Asia/Riyadh">Riyadh</option>
-            <option value="Asia/Dubai">Dubai</option>
+          <optgroup label="Asia">
+            <option value="Asia/Riyadh">Riyadh, Saudi Arabia</option>
+            <option value="Asia/Dubai">Dubai, UAE</option>
+            <option value="Asia/Qatar">Doha, Qatar</option>
+            <option value="Asia/Kuwait">Kuwait City, Kuwait</option>
+            <option value="Asia/Baghdad">Baghdad, Iraq</option>
+            <option value="Asia/Amman">Amman, Jordan</option>
+            <option value="Asia/Beirut">Beirut, Lebanon</option>
+            <option value="Asia/Karachi">Karachi, Pakistan</option>
+            <option value="Asia/Kolkata">New Delhi, India</option>
+            <option value="Asia/Dhaka">Dhaka, Bangladesh</option>
+            <option value="Asia/Jakarta">Jakarta, Indonesia</option>
+            <option value="Asia/Kuala_Lumpur">Kuala Lumpur, Malaysia</option>
+            <option value="Asia/Singapore">Singapore</option>
+            <option value="Asia/Shanghai">Beijing, China</option>
+            <option value="Asia/Tokyo">Tokyo, Japan</option>
           </optgroup>
-          <optgroup label="Elsewhere">
-            <option value="Europe/London">London</option>
-            <option value="America/New_York">New York</option>
-            <option value="America/Los_Angeles">Los Angeles</option>
+          <optgroup label="Europe">
+            <option value="Europe/Istanbul">Istanbul, Turkey</option>
+            <option value="Europe/London">London, UK</option>
+            <option value="Europe/Paris">Paris, France</option>
+            <option value="Europe/Berlin">Berlin, Germany</option>
+            <option value="Europe/Amsterdam">Amsterdam, Netherlands</option>
+            <option value="Europe/Madrid">Madrid, Spain</option>
+            <option value="Europe/Rome">Rome, Italy</option>
+            <option value="Europe/Stockholm">Stockholm, Sweden</option>
+            <option value="Europe/Moscow">Moscow, Russia</option>
+          </optgroup>
+          <optgroup label="North America">
+            <option value="America/New_York">New York, USA</option>
+            <option value="America/Chicago">Chicago, USA</option>
+            <option value="America/Denver">Denver, USA</option>
+            <option value="America/Los_Angeles">Los Angeles, USA</option>
+            <option value="America/Toronto">Toronto, Canada</option>
+            <option value="America/Mexico_City">Mexico City, Mexico</option>
+          </optgroup>
+          <optgroup label="South America">
+            <option value="America/Bogota">Bogot&aacute;, Colombia</option>
+            <option value="America/Sao_Paulo">S&atilde;o Paulo, Brazil</option>
+            <option value="America/Argentina/Buenos_Aires">Buenos Aires, Argentina</option>
+          </optgroup>
+          <optgroup label="Oceania">
+            <option value="Australia/Sydney">Sydney, Australia</option>
+            <option value="Pacific/Auckland">Auckland, New Zealand</option>
           </optgroup>
         </select>
         <p class="help" id="location-detected-hint" style="margin:6px 0 0;"></p>
@@ -1770,6 +1813,42 @@ main{ padding:30px 0 60px; }
         if (Account && Account.state.signedIn) Account.setDay(key, value);
     }
 
+    /*
+     * No geodata is available client-side, so "closest" is approximated by
+     * today's UTC offset rather than true distance — enough to point
+     * someone at a nearby option on the list without claiming more
+     * precision than that (and a few zones' offsets shift with DST, hence
+     * "today's").
+     */
+    function utcOffsetMinutes(timeZone, date) {
+        try {
+            var utc = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+            var local = new Date(date.toLocaleString('en-US', { timeZone: timeZone }));
+            return Math.round((local - utc) / 60000);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function closestLocationOption(detectedZone) {
+        var target = utcOffsetMinutes(detectedZone, new Date());
+        if (target === null) return null;
+
+        var best = null;
+        var bestDiff = Infinity;
+        Array.prototype.forEach.call(locationSelect.options, function (opt) {
+            if (!opt.value) return;
+            var off = utcOffsetMinutes(opt.value, new Date());
+            if (off === null) return;
+            var diff = Math.abs(off - target);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = opt;
+            }
+        });
+        return best;
+    }
+
     function renderDateLocationSettings() {
         hijriOffsetSelect.value = String(hijriOffsetDays());
         var label = Core.formatHijri(hijriAdjusted(new Date()));
@@ -1778,8 +1857,21 @@ main{ padding:30px 0 60px; }
         var savedTz = readStore(LOCATION_KEY);
         locationSelect.value = savedTz || '';
         var detected = (window.QuranAccount && window.QuranAccount.guessTimeZone()) || 'UTC';
-        locationDetectedHint.textContent = savedTz
-            ? 'Detected automatically as ' + detected + '.'
+
+        if (savedTz) {
+            locationDetectedHint.textContent = 'Detected automatically as ' + detected + '.';
+            return;
+        }
+        var listed = Array.prototype.some.call(locationSelect.options,
+            function (o) { return o.value === detected; });
+        if (listed) {
+            locationDetectedHint.textContent = 'Detected automatically as ' + detected + '.';
+            return;
+        }
+        var closest = closestLocationOption(detected);
+        locationDetectedHint.textContent = closest
+            ? 'Detected automatically as ' + detected + ' — the closest one listed is ' +
+                closest.textContent + '.'
             : 'Detected automatically as ' + detected + ' — pick one above only if that is wrong.';
     }
 

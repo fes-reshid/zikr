@@ -304,6 +304,60 @@ async function openPage(browser, url, opts) {
         await context.close();
     }
 
+    // --- Location: the closest match, when the exact zone isn't listed ----
+    {
+        const context = await browser.newContext({ timezoneId: 'America/Anchorage' });
+        await context.route('https://fonts.googleapis.com/**', (r) =>
+            r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+        await context.route('https://fonts.gstatic.com/**', (r) =>
+            r.fulfill({ status: 200, contentType: 'font/woff2', body: '' }));
+        await context.route('https://api.quran.com/**', (r) =>
+            r.fulfill({ status: 500, body: 'blocked for this test' }));
+        const page = await context.newPage();
+        await page.clock.install({ time: new Date(CLOCK) });
+        await page.goto(TRACKER_URL);
+        await page.waitForSelector('#local-setup:not(.is-hidden)', { timeout: 5000 });
+        await page.fill('#user-name', 'Ahmad');
+        await page.click('#setup-form button[type=submit]');
+        await page.waitForTimeout(200);
+
+        await page.click('#menuBtn');
+        await page.click('#menu-settings-btn');
+        await page.waitForTimeout(150);
+
+        const hint = await page.textContent('#location-detected-hint');
+        check('a timezone not on the list still gets a suggestion',
+            /closest one listed is/i.test(hint), hint);
+        check('nothing gets force-selected though — it stays automatic',
+            (await page.inputValue('#location-select')) === '');
+
+        // Verify against the same offset comparison the app itself uses,
+        // rather than assuming a specific city — real-world offsets (DST
+        // included) are exactly the kind of thing not to hardcode here.
+        const verified = await page.evaluate(() => {
+            function offset(tz, date) {
+                var utc = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+                var local = new Date(date.toLocaleString('en-US', { timeZone: tz }));
+                return Math.round((local - utc) / 60000);
+            }
+            var now = new Date();
+            var target = offset('America/Anchorage', now);
+            var select = document.getElementById('location-select');
+            var best = null, bestDiff = Infinity;
+            for (var i = 0; i < select.options.length; i++) {
+                var opt = select.options[i];
+                if (!opt.value) continue;
+                var diff = Math.abs(offset(opt.value, now) - target);
+                if (diff < bestDiff) { bestDiff = diff; best = opt.textContent; }
+            }
+            var hintText = document.getElementById('location-detected-hint').textContent;
+            return { best: best, matches: hintText.indexOf(best) !== -1 };
+        });
+        check('and the named city is genuinely the closest by offset',
+            verified.matches, JSON.stringify(verified));
+        await context.close();
+    }
+
     await browser.close();
 
     const failed = results.filter((r) => !r.ok);
