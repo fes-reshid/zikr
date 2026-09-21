@@ -265,6 +265,51 @@ main{ padding:30px 0 60px; }
   }
   .verse-tr{ font-size:17px; color:#5d4c3d; border-top:1px solid rgba(169,124,37,.2); padding-top:12px; margin:0; }
 
+  /* ---------- Hifz / Mushaf page mode ---------- */
+  .mushaf-page{
+    background:var(--parchment); border:1.5px solid rgba(169,124,37,.3); border-radius:14px;
+    padding:22px 24px 16px; margin-bottom:22px;
+  }
+  .mushaf-bar{
+    display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+    font-family:'Cormorant Garamond', serif; font-size:14px; font-weight:700; color:var(--gold);
+    letter-spacing:.02em; border-bottom:1px solid rgba(169,124,37,.25); padding-bottom:10px; margin-bottom:16px;
+  }
+  .mushaf-bar .surah-tag{ font-family:'Amiri', serif; font-size:16px; }
+  .surah-banner{
+    text-align:center; margin:4px 0 14px; padding:10px 14px;
+    border-top:1.5px solid var(--gold-soft); border-bottom:1.5px solid var(--gold-soft);
+    background:rgba(169,124,37,.07);
+  }
+  .surah-banner .surah-name{ font-family:'Amiri', serif; font-size:21px; color:var(--ink-navy); margin:0; }
+  .surah-banner .surah-name-en{
+    display:block; font-family:'Marcellus'; font-size:12px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--gold); margin-top:4px;
+  }
+  .basmala{
+    font-family:'Amiri', serif; direction:rtl; text-align:center; color:var(--ink-navy);
+    font-size:23px; margin:0 0 14px;
+  }
+  .mushaf-text{
+    font-family:'Amiri', serif; direction:rtl; text-align:justify; text-align-last:center;
+    font-size:clamp(20px, 4.6vw, 24px); line-height:2.35; color:var(--ink-navy); margin:0 0 8px;
+  }
+  .mushaf-verse{ cursor:pointer; border-radius:6px; padding:2px 0; transition:background .15s; }
+  .mushaf-verse:hover{ background:rgba(169,124,37,.12); }
+  .mushaf-verse.playing{ background:rgba(46,107,88,.16); }
+  .ayah-marker{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:1.7em; height:1.7em; border:1.5px solid var(--gold); border-radius:50%;
+    font-size:.5em; color:var(--gold); font-weight:700; margin:0 .15em; vertical-align:middle;
+  }
+  .mushaf-foot{
+    text-align:center; font-family:'Cormorant Garamond', serif; font-size:14px; font-weight:700;
+    color:var(--gold); margin:10px 0 0; padding-top:10px; border-top:1px solid rgba(169,124,37,.2);
+  }
+  @media (max-width:430px){
+    .mushaf-page{ padding:18px 16px 14px; }
+  }
+
   .reader-msg{ text-align:center; padding:48px 20px; color:#6b5a49; }
   .reader-msg p{ font-size:17px; margin:0 0 16px; }
 
@@ -444,6 +489,12 @@ main{ padding:30px 0 60px; }
         <label class="follow" for="follow-toggle">
           <input type="checkbox" id="follow-toggle" checked>
           Follow the recitation
+        </label>
+      </div>
+      <div class="control">
+        <label class="follow" for="hifz-toggle">
+          <input type="checkbox" id="hifz-toggle">
+          Hifz mode (Mushaf page layout)
         </label>
       </div>
     </div>
@@ -1153,6 +1204,7 @@ main{ padding:30px 0 60px; }
     var PROFILE_KEY = 'quran_user_profile';
     var LOG_KEY = 'quran_reading_log';
     var PLACE_KEY = 'quran_audio_place';
+    var HIFZ_KEY = 'quran_hifz_mode';
 
     /*
      * Every reciter Quran.com offers is listed, with these two pulled to the
@@ -1181,6 +1233,78 @@ main{ padding:30px 0 60px; }
     // translation was requested", which loadVerses() already treats as
     // falsy, so nothing else has to special-case it.
     var NONE_TRANSLATION = { id: 0, code: 'none', label: 'Arabic only (no translation)', name: '' };
+
+    /*
+     * The 114 surah names, in order — fixed, canonical data that never
+     * changes, so it is kept here rather than fetched, matched against a
+     * verse's own surah number (the part of its verse_key before the colon).
+     * Index 0 is left empty; surahs are numbered from 1.
+     */
+    var SURAH_NAMES = [
+        null,
+        { en: 'Al-Fatihah', ar: 'الفاتحة' }, { en: 'Al-Baqarah', ar: 'البقرة' },
+        { en: "Ali 'Imran", ar: 'آل عمران' }, { en: 'An-Nisa', ar: 'النساء' },
+        { en: "Al-Ma'idah", ar: 'المائدة' }, { en: "Al-An'am", ar: 'الأنعام' },
+        { en: "Al-A'raf", ar: 'الأعراف' }, { en: 'Al-Anfal', ar: 'الأنفال' },
+        { en: 'At-Tawbah', ar: 'التوبة' }, { en: 'Yunus', ar: 'يونس' },
+        { en: 'Hud', ar: 'هود' }, { en: 'Yusuf', ar: 'يوسف' },
+        { en: "Ar-Ra'd", ar: 'الرعد' }, { en: 'Ibrahim', ar: 'إبراهيم' },
+        { en: 'Al-Hijr', ar: 'الحجر' }, { en: 'An-Nahl', ar: 'النحل' },
+        { en: 'Al-Isra', ar: 'الإسراء' }, { en: 'Al-Kahf', ar: 'الكهف' },
+        { en: 'Maryam', ar: 'مريم' }, { en: 'Taha', ar: 'طه' },
+        { en: 'Al-Anbya', ar: 'الأنبياء' }, { en: 'Al-Hajj', ar: 'الحج' },
+        { en: "Al-Mu'minun", ar: 'المؤمنون' }, { en: 'An-Nur', ar: 'النور' },
+        { en: 'Al-Furqan', ar: 'الفرقان' }, { en: "Ash-Shu'ara", ar: 'الشعراء' },
+        { en: 'An-Naml', ar: 'النمل' }, { en: 'Al-Qasas', ar: 'القصص' },
+        { en: 'Al-Ankabut', ar: 'العنكبوت' }, { en: 'Ar-Rum', ar: 'الروم' },
+        { en: 'Luqman', ar: 'لقمان' }, { en: 'As-Sajdah', ar: 'السجدة' },
+        { en: 'Al-Ahzab', ar: 'الأحزاب' }, { en: 'Saba', ar: 'سبأ' },
+        { en: 'Fatir', ar: 'فاطر' }, { en: 'Ya-Sin', ar: 'يس' },
+        { en: 'As-Saffat', ar: 'الصافات' }, { en: 'Sad', ar: 'ص' },
+        { en: 'Az-Zumar', ar: 'الزمر' }, { en: 'Ghafir', ar: 'غافر' },
+        { en: 'Fussilat', ar: 'فصلت' }, { en: 'Ash-Shura', ar: 'الشورى' },
+        { en: 'Az-Zukhruf', ar: 'الزخرف' }, { en: 'Ad-Dukhan', ar: 'الدخان' },
+        { en: 'Al-Jathiyah', ar: 'الجاثية' }, { en: 'Al-Ahqaf', ar: 'الأحقاف' },
+        { en: 'Muhammad', ar: 'محمد' }, { en: 'Al-Fath', ar: 'الفتح' },
+        { en: 'Al-Hujurat', ar: 'الحجرات' }, { en: 'Qaf', ar: 'ق' },
+        { en: 'Adh-Dhariyat', ar: 'الذاريات' }, { en: 'At-Tur', ar: 'الطور' },
+        { en: 'An-Najm', ar: 'النجم' }, { en: 'Al-Qamar', ar: 'القمر' },
+        { en: 'Ar-Rahman', ar: 'الرحمن' }, { en: "Al-Waqi'ah", ar: 'الواقعة' },
+        { en: 'Al-Hadid', ar: 'الحديد' }, { en: 'Al-Mujadila', ar: 'المجادلة' },
+        { en: 'Al-Hashr', ar: 'الحشر' }, { en: 'Al-Mumtahanah', ar: 'الممتحنة' },
+        { en: 'As-Saff', ar: 'الصف' }, { en: "Al-Jumu'ah", ar: 'الجمعة' },
+        { en: 'Al-Munafiqun', ar: 'المنافقون' }, { en: 'At-Taghabun', ar: 'التغابن' },
+        { en: 'At-Talaq', ar: 'الطلاق' }, { en: 'At-Tahrim', ar: 'التحريم' },
+        { en: 'Al-Mulk', ar: 'الملك' }, { en: 'Al-Qalam', ar: 'القلم' },
+        { en: 'Al-Haqqah', ar: 'الحاقة' }, { en: "Al-Ma'arij", ar: 'المعارج' },
+        { en: 'Nuh', ar: 'نوح' }, { en: 'Al-Jinn', ar: 'الجن' },
+        { en: 'Al-Muzzammil', ar: 'المزمل' }, { en: 'Al-Muddaththir', ar: 'المدثر' },
+        { en: 'Al-Qiyamah', ar: 'القيامة' }, { en: 'Al-Insan', ar: 'الإنسان' },
+        { en: 'Al-Mursalat', ar: 'المرسلات' }, { en: 'An-Naba', ar: 'النبأ' },
+        { en: "An-Nazi'at", ar: 'النازعات' }, { en: 'Abasa', ar: 'عبس' },
+        { en: 'At-Takwir', ar: 'التكوير' }, { en: 'Al-Infitar', ar: 'الإنفطار' },
+        { en: 'Al-Mutaffifin', ar: 'المطففين' }, { en: 'Al-Inshiqaq', ar: 'الإنشقاق' },
+        { en: 'Al-Buruj', ar: 'البروج' }, { en: 'At-Tariq', ar: 'الطارق' },
+        { en: "Al-A'la", ar: 'الأعلى' }, { en: 'Al-Ghashiyah', ar: 'الغاشية' },
+        { en: 'Al-Fajr', ar: 'الفجر' }, { en: 'Al-Balad', ar: 'البلد' },
+        { en: 'Ash-Shams', ar: 'الشمس' }, { en: 'Al-Layl', ar: 'الليل' },
+        { en: 'Ad-Duha', ar: 'الضحى' }, { en: 'Ash-Sharh', ar: 'الشرح' },
+        { en: 'At-Tin', ar: 'التين' }, { en: 'Al-Alaq', ar: 'العلق' },
+        { en: 'Al-Qadr', ar: 'القدر' }, { en: 'Al-Bayyinah', ar: 'البينة' },
+        { en: 'Az-Zalzalah', ar: 'الزلزلة' }, { en: 'Al-Adiyat', ar: 'العاديات' },
+        { en: "Al-Qari'ah", ar: 'القارعة' }, { en: 'At-Takathur', ar: 'التكاثر' },
+        { en: 'Al-Asr', ar: 'العصر' }, { en: 'Al-Humazah', ar: 'الهمزة' },
+        { en: 'Al-Fil', ar: 'الفيل' }, { en: 'Quraysh', ar: 'قريش' },
+        { en: "Al-Ma'un", ar: 'الماعون' }, { en: 'Al-Kawthar', ar: 'الكوثر' },
+        { en: 'Al-Kafirun', ar: 'الكافرون' }, { en: 'An-Nasr', ar: 'النصر' },
+        { en: 'Al-Masad', ar: 'المسد' }, { en: 'Al-Ikhlas', ar: 'الإخلاص' },
+        { en: 'Al-Falaq', ar: 'الفلق' }, { en: 'An-Nas', ar: 'الناس' }
+    ];
+    var BASMALA = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+    var ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    function toArabicDigits(n) {
+        return String(n).replace(/[0-9]/g, function (d) { return ARABIC_DIGITS[+d]; });
+    }
 
     function $(id) { return document.getElementById(id); }
 
@@ -1215,6 +1339,7 @@ main{ padding:30px 0 60px; }
     var nowPlaying = $('now-playing');
     var nowSub = $('now-sub');
     var followToggle = $('follow-toggle');
+    var hifzToggle = $('hifz-toggle');
     var player = $('player');
     var mainEl = document.querySelector('main');
     var seek = $('seek');
@@ -1248,6 +1373,10 @@ main{ padding:30px 0 60px; }
     var verseNodes = {};      // verseKey -> element
     var currentIndex = -1;
     var loadToken = 0;
+    var lastVerses = [];      // the last fetch's raw verses, kept so toggling
+                               // Hifz mode can re-render without refetching
+    var hifzMode = !!readStore(HIFZ_KEY);
+    hifzToggle.checked = hifzMode;
 
     // Kept only for today's due-juz label and the reading log below — the
     // reader has no name/greeting of its own like the tracker does.
@@ -1579,23 +1708,150 @@ main{ padding:30px 0 60px; }
 
     // --- Loading -------------------------------------------------------
     function loadVerses(juz, token) {
-        var query = '?words=false&fields=text_uthmani&per_page=' + PAGE_SIZE +
-            (translationId ? '&translations=' + translationId : '');
+        // page_number/juz_number/hizb_number are fetched unconditionally —
+        // cheap, and it means toggling Hifz mode never needs a re-fetch.
+        var query = '?words=false&fields=text_uthmani,page_number,juz_number,hizb_number&per_page=' +
+            PAGE_SIZE + (translationId ? '&translations=' + translationId : '');
         return getAllPages(function (page) {
             return API + '/verses/by_juz/' + juz + query + '&page=' + page;
         }, 'verses', token);
     }
 
+    /**
+     * Groups verses into their real Mushaf pages (by page_number, already
+     * ascending from the API) and lays each out as dense, justified,
+     * right-to-left text with inline circular ayah markers — a surah banner
+     * and Basmala wherever a surah actually starts within the juz, the same
+     * way a printed Mushaf reads. Falls back to one ungrouped page if
+     * page_number was not returned, rather than rendering nothing.
+     */
+    function renderMushafPages(verses) {
+        var fragment = document.createDocumentFragment();
+        var pageEl = null;
+        var textEl = null;
+        var pageNumber = null;
+        var surahNumber = null;
+
+        function startPage(verse) {
+            // Left exactly as returned (possibly undefined) rather than
+            // coerced to null: coercing it would make every verse compare
+            // unequal to the *next* verse's real undefined, starting a new
+            // page block per verse instead of falling back to one page
+            // when Quran.com does not return page_number at all.
+            pageNumber = verse.page_number;
+            pageEl = document.createElement('div');
+            pageEl.className = 'mushaf-page';
+            if (pageNumber) pageEl.dataset.page = pageNumber;
+
+            var bar = document.createElement('div');
+            bar.className = 'mushaf-bar';
+            var loc = document.createElement('span');
+            var bits = [];
+            if (verse.juz_number) bits.push('Juz’ ' + verse.juz_number);
+            if (verse.hizb_number) bits.push('Hizb ' + verse.hizb_number);
+            loc.textContent = bits.join(' · ');
+            bar.appendChild(loc);
+            var tag = document.createElement('span');
+            tag.className = 'surah-tag';
+            var info = SURAH_NAMES[Number(verse.verse_key.split(':')[0])];
+            tag.textContent = info ? info.en + ' · ' + info.ar : '';
+            bar.appendChild(tag);
+            pageEl.appendChild(bar);
+
+            // A fresh paragraph per page, matching a real Mushaf — but
+            // surahNumber deliberately carries over, so a surah that merely
+            // continues onto this page does not get a second banner and
+            // Basmala as if it were starting again.
+            textEl = null;
+            fragment.appendChild(pageEl);
+        }
+
+        function finishPage() {
+            if (!pageEl) return;
+            var foot = document.createElement('p');
+            foot.className = 'mushaf-foot';
+            foot.textContent = pageNumber || '';
+            pageEl.appendChild(foot);
+        }
+
+        verses.forEach(function (verse) {
+            var parts = verse.verse_key.split(':');
+            var thisSurah = Number(parts[0]);
+            var ayah = Number(parts[1]);
+
+            if (verse.page_number !== pageNumber || !pageEl) {
+                finishPage();
+                startPage(verse);
+            }
+
+            if (thisSurah !== surahNumber) {
+                surahNumber = thisSurah;
+                var info = SURAH_NAMES[thisSurah];
+                var banner = document.createElement('div');
+                banner.className = 'surah-banner';
+                var name = document.createElement('p');
+                name.className = 'surah-name';
+                name.lang = 'ar';
+                name.textContent = info ? info.ar : '';
+                var en = document.createElement('span');
+                en.className = 'surah-name-en';
+                en.textContent = info ? info.en : 'Sūrah ' + thisSurah;
+                name.appendChild(en);
+                banner.appendChild(name);
+                pageEl.appendChild(banner);
+
+                // Every surah opens with the Basmala except At-Tawbah (9).
+                if (ayah === 1 && thisSurah !== 9) {
+                    var basmala = document.createElement('p');
+                    basmala.className = 'basmala';
+                    basmala.lang = 'ar';
+                    basmala.textContent = BASMALA;
+                    pageEl.appendChild(basmala);
+                }
+                textEl = null;
+            }
+
+            if (!textEl) {
+                textEl = document.createElement('p');
+                textEl.className = 'mushaf-text';
+                textEl.lang = 'ar';
+                pageEl.appendChild(textEl);
+            }
+
+            var span = document.createElement('span');
+            span.className = 'mushaf-verse';
+            span.dataset.verseKey = verse.verse_key;
+            var arabic = verse.text_uthmani || verse.text_imlaei ||
+                verse.text_uthmani_simple || verse.text_indopak || '';
+            span.appendChild(document.createTextNode(arabic + ' '));
+            var marker = document.createElement('span');
+            marker.className = 'ayah-marker';
+            marker.textContent = toArabicDigits(ayah);
+            span.appendChild(marker);
+            textEl.appendChild(span);
+            verseNodes[verse.verse_key] = span;
+        });
+
+        finishPage();
+        versesEl.appendChild(fragment);
+    }
+
     function renderVerses(verses) {
+        lastVerses = verses;
         versesEl.innerHTML = '';
         verseNodes = {};
-        var fragment = document.createDocumentFragment();
-        verses.forEach(function (verse) {
-            var card = verseCard(verse);
-            verseNodes[verse.verse_key] = card;
-            fragment.appendChild(card);
-        });
-        versesEl.appendChild(fragment);
+
+        if (hifzMode) {
+            renderMushafPages(verses);
+        } else {
+            var fragment = document.createDocumentFragment();
+            verses.forEach(function (verse) {
+                var card = verseCard(verse);
+                verseNodes[verse.verse_key] = card;
+                fragment.appendChild(card);
+            });
+            versesEl.appendChild(fragment);
+        }
 
         var withTranslation = verses.some(function (v) {
             return v.translations && v.translations.length && v.translations[0].text;
@@ -1605,8 +1861,9 @@ main{ padding:30px 0 60px; }
             (withTranslation && translationName ? ' · ' + translationName : '') +
             ' · playback continues when you switch tabs or lock your phone.';
 
-        // Switching translation rebuilds the cards under a verse that may
-        // already be playing; carry the highlight over rather than losing it.
+        // Switching translation (or Hifz mode) rebuilds the nodes under a
+        // verse that may already be playing; carry the highlight over
+        // rather than losing it.
         if (currentIndex >= 0 && playlist[currentIndex]) {
             var node = verseNodes[playlist[currentIndex].verseKey];
             if (node) {
@@ -1933,6 +2190,14 @@ main{ padding:30px 0 60px; }
         var chosen = translationOptions.filter(function (o) { return o.id === translationId; })[0];
         writeStore('quran_translation_lang', chosen ? chosen.code : '');
         reloadTranslation();
+    });
+
+    hifzToggle.addEventListener('change', function () {
+        hifzMode = hifzToggle.checked;
+        writeStore(HIFZ_KEY, hifzMode);
+        // A pure re-render: the fields it needs are already in lastVerses,
+        // so switching modes never waits on the network.
+        if (lastVerses.length) renderVerses(lastVerses);
     });
 
     document.addEventListener('keydown', function (event) {

@@ -80,11 +80,18 @@ const TRANSLATIONS = [
 ];
 
 // withTranslation mirrors the real API: it only sends a `translations`
-// array back when the request actually asked for one.
+// array back when the request actually asked for one. page_number/
+// juz_number/hizb_number are sent unconditionally, same as the real API
+// (loadVerses() always asks for them) — split across two synthetic pages
+// (verses 1-3 on the first, 4-5 on the second) so Hifz-mode page grouping
+// has something real to group.
 function stubVerses(juz, withTranslation) {
     const verses = [];
     for (let i = 1; i <= VERSE_COUNT; i++) {
-        const verse = { verse_key: juz + ':' + i, text_uthmani: 'نَصٌّ عَرَبِيٌّ ' + i };
+        const verse = {
+            verse_key: juz + ':' + i, text_uthmani: 'نَصٌّ عَرَبِيٌّ ' + i,
+            page_number: i <= 3 ? 100 : 101, juz_number: juz, hizb_number: 13
+        };
         if (withTranslation) {
             verse.translations = [{ text: 'Translation of verse ' + i + '<sup foot_note="3">1</sup>' }];
         }
@@ -442,6 +449,67 @@ function readLog(page) {
             await page.inputValue('#translation-selector') === '0');
         check('and no translation still renders after the reload',
             (await page.$('.verse .verse-tr')) === null);
+        await context.close();
+    }
+
+    // --- Hifz mode (Mushaf page layout) -------------------------------
+    {
+        const { context, page, errors } = await openReader(browser, { query: '?juz=7&autoplay=0' });
+        check('the toggle starts off', !(await page.isChecked('#hifz-toggle')));
+        check('the normal card view is what shows by default',
+            (await page.$$('.verse')).length === VERSE_COUNT);
+
+        await page.click('#hifz-toggle');
+        await page.waitForTimeout(200);
+
+        const pages = await page.$$('.mushaf-page');
+        check('verses split into their real Mushaf pages (two, per the stub)',
+            pages.length === 2, pages.length);
+        check('no more card view underneath', (await page.$$('.verse')).length === 0);
+
+        const firstPageText = await pages[0].textContent();
+        check("the first page names its juz and hizb",
+            /Juz.?\s*7/.test(firstPageText) && /Hizb\s*13/.test(firstPageText), firstPageText);
+        check('and names the surah it is on',
+            /Al-A.raf/.test(firstPageText), firstPageText);
+        check('with the Basmala, since this stub’s verse 1 opens a surah',
+            firstPageText.includes('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ'), firstPageText);
+        check('and the real page number at the foot',
+            (await pages[0].$eval('.mushaf-foot', (el) => el.textContent.trim())) === '100');
+
+        const secondPageText = await pages[1].textContent();
+        check('the second page, merely continuing the same surah, still names it',
+            /Al-A.raf/.test(secondPageText), secondPageText);
+        check('but does not repeat the Basmala — this is the bug that was fixed',
+            !secondPageText.includes('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ'), secondPageText);
+        check('the second page is numbered separately',
+            (await pages[1].$eval('.mushaf-foot', (el) => el.textContent.trim())) === '101');
+
+        const marker = await page.$eval('[data-verse-key="7:1"] .ayah-marker', (el) => el.textContent);
+        check('ayah markers use Arabic-Indic numerals', marker === '١', marker);
+
+        await page.click('[data-verse-key="7:3"]');
+        await page.evaluate(() => document.getElementById('audio').pause());
+        await page.waitForTimeout(150);
+        check('tapping a verse in Hifz mode plays it',
+            /Verse 7:3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+        check('and highlights it',
+            await page.$eval('[data-verse-key="7:3"]', (el) => el.classList.contains('playing')));
+
+        await page.click('#hifz-toggle');
+        await page.waitForTimeout(200);
+        check('toggling off returns to the card view',
+            (await page.$$('.verse')).length === VERSE_COUNT);
+        check('carrying the highlight over',
+            await page.$eval('[data-verse-key="7:3"]', (el) => el.classList.contains('playing')));
+
+        await page.click('#hifz-toggle');
+        await page.reload();
+        await page.waitForSelector('.mushaf-page', { timeout: 10000 });
+        check('the choice is remembered across a reload',
+            await page.isChecked('#hifz-toggle'));
+        check('no uncaught page errors in Hifz mode', errors.length === 0, errors.join(' | '));
         await context.close();
     }
 
