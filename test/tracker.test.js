@@ -85,8 +85,9 @@ function check(name, ok, detail) {
     check('Hijri badge is computed, not hardcoded', /II 7, 1448 AH/.test(badge), badge);
     check('cycle position is shown',
         (await page.textContent('#cycle-progress-label')).trim() === 'Day 7 of 30 in this cycle');
-    check('greeting includes the name',
-        (await page.textContent('#greeting-name')).includes('Ahmad'));
+    check('the name typed in setup was saved to the profile',
+        (await page.evaluate(() =>
+            JSON.parse(localStorage.getItem('quran_user_profile') || '{}').name)) === 'Ahmad');
 
     // --- Resuming a paused reading ------------------------------------------
     // The reader saves { juz, index, verseKey } as it plays; the tracker turns
@@ -184,7 +185,8 @@ function check(name, ok, detail) {
     await page.waitForTimeout(200);
     check('clearing history resets the streak', (await page.textContent('#streak-count')) === '0');
     check('clearing history keeps the profile',
-        (await page.textContent('#greeting-name')).includes('Ahmad'));
+        (await page.evaluate(() =>
+            JSON.parse(localStorage.getItem('quran_user_profile') || '{}').name)) === 'Ahmad');
     check('clearing history also drops the stale resume position',
         await page.evaluate(() => localStorage.getItem('quran_audio_place')) === null);
 

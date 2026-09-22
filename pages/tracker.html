@@ -21,8 +21,6 @@
 <style>
 <!-- @site-css -->
 
-  .greeting{ font-family:'Marcellus'; font-size:25px; color:var(--ink-navy); margin:0; }
-
   /* ---------- Setup form ---------- */
   .field{ margin-bottom:18px; }
   .field label{
@@ -250,8 +248,6 @@
 
     <!-- Dashboard -->
     <div class="stack is-hidden" id="dashboard-view">
-
-      <p class="greeting" id="greeting-name">Assalāmu ʿalaykum</p>
 
       <div class="today">
         <div class="today-top">
@@ -561,7 +557,6 @@
     var startDateInput = $('start-date');
     var startDateHint = $('start-date-hint');
 
-    var greetingName = $('greeting-name');
     var hijriBadgeTop = $('hijri-badge-top');
     var targetJuzTitle = $('target-juz-title');
     var cycleProgressLabel = $('cycle-progress-label');
@@ -806,7 +801,6 @@
         var isRead = !!readingLog[key];
 
         hijriBadgeTop.textContent = Core.formatHijri(hijriAdjusted(today)) || 'Today';
-        greetingName.textContent = 'Assalāmu ʿalaykum, ' + userProfile.name;
         targetJuzTitle.textContent = 'Juz ' + currentJuz;
         cycleProgressLabel.textContent = 'Day ' + day + ' of ' + Core.JUZ_IN_CYCLE + ' in this cycle';
         streakCount.textContent = String(Core.calculateStreak(readingLog, today));

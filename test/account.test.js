@@ -343,9 +343,6 @@ const freshStore = () => ({
         check('signing up saves the session and logs in immediately — ' +
             'no modal, no second click', await page.isHidden('#setup-view') &&
             await page.isVisible('#dashboard-view'));
-        check('the full name is what the greeting shows',
-            (await page.textContent('#greeting-name')).includes('Ahmad Yusuf'),
-            await page.textContent('#greeting-name'));
         check('and what the header shows',
             (await page.textContent('#account-btn')).trim() === 'Ahmad Yusuf');
         check('no uncaught errors on the welcome screen', errors.length === 0,
@@ -475,8 +472,9 @@ const freshStore = () => ({
         // wait on the reminder API to answer at all, and it never does here.
         check('signing in still reaches the dashboard, not stuck on sign-in',
             (await page.isVisible('#dashboard-view')) && (await page.isHidden('#setup-view')));
-        check('with a greeting under their own name',
-            (await page.textContent('#greeting-name')).includes('Fes Reshid'));
+        check('the fallback profile is under their own account name',
+            (await page.evaluate(() =>
+                JSON.parse(localStorage.getItem('quran_user_profile') || '{}').name)) === 'Fes Reshid');
         check('and a juz to read despite the API being down',
             /^Juz \d+$/.test((await page.textContent('#target-juz-title')).trim()),
             await page.textContent('#target-juz-title'));
