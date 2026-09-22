@@ -559,15 +559,22 @@ function readLog(page) {
         await page.click('input[name="repeat-scope"][value="range"]');
         check('choosing "a range of verses" reveals the from/to pickers',
             await page.isVisible('#repeat-range-field'));
+        check('and the "repeat each verse" field, once there is more than one verse to it',
+            await page.isVisible('#verse-repeat-field'));
+        check('the outer field is relabeled for a range',
+            (await page.textContent('#outer-repeat-label')) === 'Repeat the whole range');
 
         await page.selectOption('#repeat-range-start', '7:1');
         await page.selectOption('#repeat-range-end', '7:3');
-        await page.click('.repeat-count-btn[data-count="3"]');
+        // Each verse once per pass — the combined "repeat each verse AND
+        // repeat the whole span" case has its own dedicated test below.
+        await page.click('.verse-repeat-btn[data-count="1"]');
+        await page.click('.repeat-count-btn[data-count="3"]:not(.verse-repeat-btn)');
         await page.click('#start-repeat-btn');
 
         check('the range repeat starts on the range’s first verse, pass 1 of 3',
             /Verse 7:1/.test(await page.textContent('#now-playing')) &&
-            /repeat 1 of 3/.test(await page.textContent('#now-playing')),
+            /pass 1 of 3/.test(await page.textContent('#now-playing')),
             await page.textContent('#now-playing'));
 
         await page.waitForFunction(
@@ -586,11 +593,11 @@ function readLog(page) {
 
         await page.waitForFunction(
             () => /Verse 7:1/.test(document.getElementById('now-playing').textContent) &&
-                  /repeat 2 of 3/.test(document.getElementById('now-playing').textContent),
+                  /pass 2 of 3/.test(document.getElementById('now-playing').textContent),
             { timeout: 8000 }).catch(() => {});
         check('after the range ends it wraps back to the start for pass 2 of 3',
             /Verse 7:1/.test(await page.textContent('#now-playing')) &&
-            /repeat 2 of 3/.test(await page.textContent('#now-playing')),
+            /pass 2 of 3/.test(await page.textContent('#now-playing')),
             await page.textContent('#now-playing'));
 
         await page.waitForFunction(
@@ -601,17 +608,74 @@ function readLog(page) {
         check('leaving the last verse of the range highlighted',
             await page.$eval('[data-verse-key="7:3"]', (el) => el.classList.contains('playing')));
 
+        // The combined case this field exists for: repeat each verse on the
+        // page 3 times AND repeat the whole page 3 times, together.
+        await page.click('[data-verse-key="7:1"]');
+        await page.waitForTimeout(150);
+        await page.click('input[name="repeat-scope"][value="page"]');
+        check('the outer field is relabeled for a page',
+            (await page.textContent('#outer-repeat-label')) === 'Repeat the whole page');
+        check('"repeat each verse" defaults to 3×, so both are meant to be set together',
+            await page.$eval('.verse-repeat-btn[data-count="3"]',
+                (el) => el.classList.contains('active')));
+        await page.click('.repeat-count-btn[data-count="3"]:not(.verse-repeat-btn)');
+        await page.click('#start-repeat-btn');
+
+        check('it starts on the page’s first verse — rep 1 of 3, pass 1 of 3',
+            /Verse 7:1/.test(await page.textContent('#now-playing')) &&
+            /rep 1 of 3/.test(await page.textContent('#now-playing')) &&
+            /pass 1 of 3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:1/.test(document.getElementById('now-playing').textContent) &&
+                  /rep 3 of 3/.test(document.getElementById('now-playing').textContent),
+            { timeout: 8000 }).catch(() => {});
+        check('the same verse repeats 3 times running before it moves on',
+            /Verse 7:1/.test(await page.textContent('#now-playing')) &&
+            /rep 3 of 3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:2/.test(document.getElementById('now-playing').textContent) &&
+                  /rep 1 of 3/.test(document.getElementById('now-playing').textContent),
+            { timeout: 8000 }).catch(() => {});
+        check('only then does it move on, restarting the 3 reps on the next verse',
+            /Verse 7:2/.test(await page.textContent('#now-playing')) &&
+            /rep 1 of 3/.test(await page.textContent('#now-playing')) &&
+            /pass 1 of 3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:1/.test(document.getElementById('now-playing').textContent) &&
+                  /pass 2 of 3/.test(document.getElementById('now-playing').textContent),
+            { timeout: 10000 }).catch(() => {});
+        check('once every verse on the page has had its 3 reps, the whole page repeats — pass 2 of 3',
+            /Verse 7:1/.test(await page.textContent('#now-playing')) &&
+            /rep 1 of 3/.test(await page.textContent('#now-playing')) &&
+            /pass 2 of 3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => document.getElementById('stop-repeat-btn').classList.contains('is-hidden'),
+            { timeout: 20000 }).catch(() => {});
+        check('and after the third full pass — 3 verses × 3 reps × 3 passes — it stops on its own',
+            await page.$eval('#stop-repeat-btn', (el) => el.classList.contains('is-hidden')));
+        check('leaving the last verse of the last pass highlighted',
+            await page.$eval('[data-verse-key="7:3"]', (el) => el.classList.contains('playing')));
+
         // A page repeat with an unlimited count must keep going past one
         // full lap on its own, and only Stop actually ends it.
         await page.click('[data-verse-key="7:2"]');
         await page.waitForTimeout(150);
         await page.click('input[name="repeat-scope"][value="page"]');
+        await page.click('.verse-repeat-btn[data-count="1"]');
         await page.click('.repeat-count-btn[data-count="0"]');
         await page.click('#start-repeat-btn');
 
         check('a page repeat starts from the page’s first verse, in reading order — not the tapped one',
             /Verse 7:1/.test(await page.textContent('#now-playing')) &&
-            /repeat 1 of/.test(await page.textContent('#now-playing')),
+            /pass 1 of/.test(await page.textContent('#now-playing')),
             await page.textContent('#now-playing'));
 
         await page.waitForFunction(
@@ -623,19 +687,19 @@ function readLog(page) {
 
         await page.waitForFunction(
             () => /Verse 7:1/.test(document.getElementById('now-playing').textContent) &&
-                  /repeat 2 of/.test(document.getElementById('now-playing').textContent),
+                  /pass 2 of/.test(document.getElementById('now-playing').textContent),
             { timeout: 8000 }).catch(() => {});
         check('after the last verse on the page it wraps back to the first for the next pass',
             /Verse 7:1/.test(await page.textContent('#now-playing')) &&
-            /repeat 2 of/.test(await page.textContent('#now-playing')),
+            /pass 2 of/.test(await page.textContent('#now-playing')),
             await page.textContent('#now-playing'));
 
         await page.waitForFunction(
             () => /Verse 7:2/.test(document.getElementById('now-playing').textContent) &&
-                  /repeat 2 of/.test(document.getElementById('now-playing').textContent),
+                  /pass 2 of/.test(document.getElementById('now-playing').textContent),
             { timeout: 8000 }).catch(() => {});
         check('an unlimited count keeps it going past a full lap on its own',
-            /repeat 2 of/.test(await page.textContent('#now-playing')) &&
+            /pass 2 of/.test(await page.textContent('#now-playing')) &&
             /∞/.test(await page.textContent('#now-playing')),
             await page.textContent('#now-playing'));
 

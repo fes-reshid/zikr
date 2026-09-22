@@ -614,8 +614,21 @@ main{ padding:30px 0 60px; }
         </div>
       </div>
 
+      <!-- Only meaningful once the span is more than one verse — for "this
+           verse only" it would just be the same number twice over. -->
+      <div class="field is-hidden" id="verse-repeat-field">
+        <label>Repeat each verse</label>
+        <div class="repeat-count-row">
+          <button type="button" class="repeat-count-btn verse-repeat-btn" data-count="1">1&times;</button>
+          <button type="button" class="repeat-count-btn verse-repeat-btn active" data-count="3">3&times;</button>
+          <button type="button" class="repeat-count-btn verse-repeat-btn" data-count="5">5&times;</button>
+          <button type="button" class="repeat-count-btn verse-repeat-btn" data-count="10">10&times;</button>
+        </div>
+        <input type="number" id="verse-repeat-custom" min="1" max="99" placeholder="Or type a number">
+      </div>
+
       <div class="field">
-        <label>How many times</label>
+        <label id="outer-repeat-label">How many times</label>
         <div class="repeat-count-row">
           <button type="button" class="repeat-count-btn" data-count="3">3&times;</button>
           <button type="button" class="repeat-count-btn" data-count="5">5&times;</button>
@@ -1500,6 +1513,9 @@ main{ padding:30px 0 60px; }
     var repeatRangeField = $('repeat-range-field');
     var repeatRangeStart = $('repeat-range-start');
     var repeatRangeEnd = $('repeat-range-end');
+    var verseRepeatField = $('verse-repeat-field');
+    var verseRepeatCustom = $('verse-repeat-custom');
+    var outerRepeatLabel = $('outer-repeat-label');
     var repeatCountCustom = $('repeat-count-custom');
     var startRepeatBtn = $('start-repeat-btn');
     var player = $('player');
@@ -2181,9 +2197,7 @@ main{ padding:30px 0 60px; }
         }
 
         if (repeatState) {
-            var total = repeatState.targetCount === Infinity ? '∞' : repeatState.targetCount;
-            nowPlaying.textContent = 'Verse ' + item.verseKey +
-                '  ·  repeat ' + (repeatState.doneCount + 1) + ' of ' + total;
+            nowPlaying.textContent = repeatStatusText(item.verseKey);
         } else {
             nowPlaying.textContent = 'Verse ' + item.verseKey +
                 '  ·  ' + (index + 1) + ' of ' + playlist.length;
@@ -2224,12 +2238,26 @@ main{ padding:30px 0 60px; }
         return checked ? checked.value : 'verse';
     }
 
+    /** How many full passes through the span — the outer loop. */
     function chosenRepeatCount() {
         var custom = Number(repeatCountCustom.value);
         if (custom > 0) return Math.floor(custom);
-        var activeBtn = document.querySelector('.repeat-count-btn.active');
+        var activeBtn = document.querySelector('.repeat-count-btn.active:not(.verse-repeat-btn)');
         var n = activeBtn ? Number(activeBtn.dataset.count) : 10;
         return n === 0 ? Infinity : n;
+    }
+
+    /**
+     * How many times each verse plays before moving to the next — the inner
+     * loop, only meaningful for a range or a page (a single verse already IS
+     * the whole span, so the outer count alone covers it). Always finite: an
+     * unlimited inner loop would never let the outer one advance at all.
+     */
+    function chosenVerseRepeat() {
+        var custom = Number(verseRepeatCustom.value);
+        if (custom > 0) return Math.max(1, Math.floor(custom));
+        var activeBtn = document.querySelector('.verse-repeat-btn.active');
+        return Math.max(1, activeBtn ? Number(activeBtn.dataset.count) : 3);
     }
 
     function buildRepeatRangeOptions(index) {
@@ -2259,13 +2287,37 @@ main{ padding:30px 0 60px; }
 
         document.querySelector('input[name="repeat-scope"][value="verse"]').checked = true;
         repeatRangeField.classList.add(HIDDEN);
+        verseRepeatField.classList.add(HIDDEN);
+        outerRepeatLabel.textContent = 'How many times';
+
         repeatCountCustom.value = '';
-        document.querySelectorAll('.repeat-count-btn').forEach(function (btn) {
+        document.querySelectorAll('.repeat-count-btn:not(.verse-repeat-btn)').forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.count === '10');
+        });
+
+        verseRepeatCustom.value = '';
+        document.querySelectorAll('.verse-repeat-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.count === '3');
         });
 
         buildRepeatRangeOptions(index);
         repeatOverlay.classList.remove(HIDDEN);
+    }
+
+    /** Verse label text for whatever is currently playing, repeat-aware. */
+    function repeatStatusText(verseKey) {
+        var rs = repeatState;
+        var outerTotal = rs.outerCount === Infinity ? '∞' : rs.outerCount;
+        if (rs.indices.length === 1) {
+            // The same single number the overlay showed for "this verse
+            // only" — nesting a second loop around one verse would just be
+            // the same repeat twice over, so it is never shown separately.
+            return 'Verse ' + verseKey + '  ·  repeat ' + (rs.outerDone + 1) + ' of ' + outerTotal;
+        }
+        var parts = ['Verse ' + verseKey];
+        if (rs.verseRepeat > 1) parts.push('rep ' + (rs.verseDone + 1) + ' of ' + rs.verseRepeat);
+        parts.push('pass ' + (rs.outerDone + 1) + ' of ' + outerTotal);
+        return parts.join('  ·  ');
     }
 
     function renderRepeatStatus() {
@@ -2277,13 +2329,26 @@ main{ padding:30px 0 60px; }
         renderRepeatStatus();
     }
 
-    /** Called instead of the normal auto-advance while a repeat is active. */
+    /**
+     * Called instead of the normal auto-advance while a repeat is active.
+     * Two nested loops: verseDone counts the reps of the verse just
+     * finished before it is allowed to move on, then outerDone counts full
+     * passes through the whole span before the repeat stops on its own.
+     */
     function advanceRepeat() {
+        repeatState.verseDone++;
+        if (repeatState.verseDone < repeatState.verseRepeat) {
+            setCurrent(repeatState.indices[repeatState.cursor], true);
+            renderRepeatStatus();
+            return;
+        }
+
+        repeatState.verseDone = 0;
         repeatState.cursor++;
         if (repeatState.cursor >= repeatState.indices.length) {
             repeatState.cursor = 0;
-            repeatState.doneCount++;
-            if (repeatState.doneCount >= repeatState.targetCount) {
+            repeatState.outerDone++;
+            if (repeatState.outerDone >= repeatState.outerCount) {
                 stopRepeat();
                 return;
             }
@@ -2450,17 +2515,35 @@ main{ padding:30px 0 60px; }
 
     document.querySelectorAll('input[name="repeat-scope"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
-            repeatRangeField.classList.toggle(HIDDEN, repeatScopeValue() !== 'range');
+            var scope = repeatScopeValue();
+            repeatRangeField.classList.toggle(HIDDEN, scope !== 'range');
+            // A single verse already IS the whole span — an inner loop
+            // around it would just double up with the outer one.
+            verseRepeatField.classList.toggle(HIDDEN, scope === 'verse');
+            outerRepeatLabel.textContent = scope === 'page' ? 'Repeat the whole page'
+                : scope === 'range' ? 'Repeat the whole range' : 'How many times';
         });
     });
 
-    document.querySelectorAll('.repeat-count-btn').forEach(function (btn) {
+    // Two independent single-select groups, not one — "repeat each verse"
+    // and "repeat the whole span" are meant to be set together.
+    document.querySelectorAll('.repeat-count-btn:not(.verse-repeat-btn)').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            document.querySelectorAll('.repeat-count-btn').forEach(function (b) {
+            document.querySelectorAll('.repeat-count-btn:not(.verse-repeat-btn)').forEach(function (b) {
                 b.classList.remove('active');
             });
             btn.classList.add('active');
             repeatCountCustom.value = '';
+        });
+    });
+
+    document.querySelectorAll('.verse-repeat-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.verse-repeat-btn').forEach(function (b) {
+                b.classList.remove('active');
+            });
+            btn.classList.add('active');
+            verseRepeatCustom.value = '';
         });
     });
 
@@ -2489,7 +2572,16 @@ main{ padding:30px 0 60px; }
         }
         if (!indices.length) return;
 
-        repeatState = { indices: indices, targetCount: chosenRepeatCount(), doneCount: 0, cursor: 0 };
+        repeatState = {
+            indices: indices,
+            // A single verse only ever has the outer count applied to it —
+            // the inner field is hidden and irrelevant for that scope.
+            verseRepeat: indices.length > 1 ? chosenVerseRepeat() : 1,
+            outerCount: chosenRepeatCount(),
+            cursor: 0,
+            verseDone: 0,
+            outerDone: 0
+        };
         repeatOverlay.classList.add(HIDDEN);
         setCurrent(indices[0], true);
         renderRepeatStatus();
