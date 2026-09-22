@@ -2538,6 +2538,13 @@ main{ padding:30px 0 60px; }
         // A pure re-render: the fields it needs are already in lastVerses,
         // so switching modes never waits on the network.
         if (lastVerses.length) renderVerses(lastVerses);
+
+        // Turning Hifz mode on is itself an invitation to set up a repeat,
+        // not just a switch to the page layout — so it opens the same menu
+        // a tap on a verse would, for whichever verse is current.
+        if (hifzMode && playlist.length && currentIndex >= 0) {
+            openRepeatOverlay(currentIndex);
+        }
     });
 
     document.addEventListener('keydown', function (event) {

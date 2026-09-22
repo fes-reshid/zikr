@@ -464,6 +464,12 @@ function readLog(page) {
         await page.click('#hifz-toggle');
         await page.waitForTimeout(200);
 
+        check('turning Hifz mode on itself opens the repeat menu, for the current verse',
+            (await page.isVisible('#repeat-overlay')) &&
+            /Verse 7:1/.test(await page.textContent('#repeat-verse-label')),
+            await page.textContent('#repeat-verse-label'));
+        await page.click('#close-repeat-btn');
+
         const pages = await page.$$('.mushaf-page');
         check('verses split into their real Mushaf pages (two, per the stub)',
             pages.length === 2, pages.length);
@@ -514,13 +520,24 @@ function readLog(page) {
             (await page.$$('.verse')).length === VERSE_COUNT);
         check('carrying the highlight over',
             await page.$eval('[data-verse-key="7:3"]', (el) => el.classList.contains('playing')));
+        check('turning it off does not pop the repeat menu — only turning it on does',
+            await page.isHidden('#repeat-overlay'));
 
         await page.click('#hifz-toggle');
+        await page.waitForTimeout(200);
+        check('turning it back on opens the menu again, for whatever verse is now current',
+            (await page.isVisible('#repeat-overlay')) &&
+            /Verse 7:3/.test(await page.textContent('#repeat-verse-label')),
+            await page.textContent('#repeat-verse-label'));
+        await page.click('#close-repeat-btn');
+
         await page.reload();
         await page.waitForTimeout(300);
         await page.waitForSelector('.mushaf-page', { timeout: 10000 });
         check('the choice is remembered across a reload',
             await page.isChecked('#hifz-toggle'));
+        check('but restoring it on load does not pop the menu — only an actual click does',
+            await page.isHidden('#repeat-overlay'));
         check('no uncaught page errors in Hifz mode', errors.length === 0, errors.join(' | '));
         await context.close();
     }
@@ -531,6 +548,9 @@ function readLog(page) {
         const { context, page } = await openReader(browser, { query: '?juz=7&autoplay=0' });
         await page.click('#hifz-toggle');
         await page.waitForTimeout(200);
+        // Turning Hifz mode on itself pops the repeat menu now (tested
+        // above); close it so the specific-verse taps below start fresh.
+        await page.click('#close-repeat-btn');
 
         // A range repeat cycles the chosen span, in order, for the chosen
         // number of passes, then stops on its own.
