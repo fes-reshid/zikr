@@ -754,10 +754,8 @@ function readLog(page) {
             (await page.textContent('#reading-status-label')).includes('7'),
             await page.textContent('#reading-status-label'));
 
-        await page.click('#mark-read-btn');
-        await page.waitForTimeout(150);
-        check('clicking again clears it', (await readLog(page))[TODAY] === undefined);
-        check('the button reverts', (await page.textContent('#mark-read-label')).trim() === 'Mark as read');
+        check('and the button locks — a completed day is a record, not a toggle',
+            await page.evaluate(() => document.getElementById('mark-read-btn').disabled));
         await context.close();
     }
 
@@ -881,14 +879,8 @@ function readLog(page) {
                     c.body.day === TODAY && c.body.read === true),
                 JSON.stringify(apiCalls));
 
-            apiCalls.length = 0;
-            await page.click('#mark-read-btn');
-            await page.waitForTimeout(300);
-            check('clicking again clears it locally', (await readLog(page))[TODAY] === undefined);
-            check('and syncs the un-mark to the account',
-                apiCalls.some((c) => c.route === 'readings' && c.body &&
-                    c.body.day === TODAY && c.body.read === false),
-                JSON.stringify(apiCalls));
+            check('and the button locks — a completed day is a record, not a toggle',
+                await page.evaluate(() => document.getElementById('mark-read-btn').disabled));
 
             check('no uncaught page errors while signed in', errors.length === 0, errors.join(' | '));
             await context.close();

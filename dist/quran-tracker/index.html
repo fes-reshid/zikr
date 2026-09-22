@@ -272,8 +272,9 @@ main{ padding:30px 0 60px; }
     font-family:'Cormorant Garamond', serif; color:var(--ink-brown);
     transition:border-color .15s, background .15s;
   }
-  .day:hover{ border-color:var(--gold); background:var(--parchment); }
+  .day:hover:not(:disabled){ border-color:var(--gold); background:var(--parchment); }
   .day:focus-visible{ outline:2px solid var(--green); outline-offset:2px; }
+  .day:disabled{ cursor:default; }
   .day-when{ font-size:18px; font-weight:700; margin:0; }
   .day-when span{ font-size:14px; font-weight:400; color:#8a7963; }
   .day-juz{ font-size:15px; color:var(--green); font-weight:600; margin:2px 0 0; }
@@ -547,7 +548,7 @@ main{ padding:30px 0 60px; }
 
       <div class="card">
         <h2>Recent progress</h2>
-        <p style="margin:0; font-size:16px; color:#8a7963;">The last seven days. Tap any day to correct it.</p>
+        <p style="margin:0; font-size:16px; color:#8a7963;">The last seven days. Tap a day you missed to mark it read.</p>
         <div class="history" id="history-list"></div>
         <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
           <a class="btn btn-ghost" id="open-reader-btn" href="reader/">Open the reader</a>
@@ -1767,6 +1768,7 @@ main{ padding:30px 0 60px; }
         if (isRead) {
             statusText.textContent = 'Completed Juz ' + currentJuz + ' — Jazāk Allāhu khayran';
             toggleReadBtn.className = 'btn btn-done';
+            toggleReadBtn.disabled = true;
             btnLabel.textContent = 'Completed';
 
             feedbackCard.className = 'note note-done';
@@ -1775,6 +1777,7 @@ main{ padding:30px 0 60px; }
         } else {
             statusText.textContent = 'Not read yet today';
             toggleReadBtn.className = 'btn btn-on-dark';
+            toggleReadBtn.disabled = false;
             btnLabel.textContent = 'Mark as read';
 
             feedbackCard.className = 'note note-pending';
@@ -1817,6 +1820,9 @@ main{ padding:30px 0 60px; }
             row.className = 'day';
             row.dataset.dateKey = key;
             row.setAttribute('aria-pressed', String(isRead));
+            // A day already marked read is a record, not a toggle — only a
+            // day still pending can be tapped, to correct one that was missed.
+            row.disabled = isRead;
 
             var left = document.createElement('div');
 
@@ -1867,6 +1873,9 @@ main{ padding:30px 0 60px; }
     }
 
     function setRead(key, value) {
+        // Once a day is marked read, it stays read — a completed day is a
+        // record, not a toggle, so a repeat call can't undo it.
+        if (!value && readingLog[key]) return;
         if (value) {
             readingLog[key] = true;
         } else {

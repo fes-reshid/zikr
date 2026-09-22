@@ -1602,12 +1602,16 @@ main{ padding:30px 0 60px; }
 
         readingStatus.classList.toggle('done', isRead);
         markReadBtn.className = 'btn ' + (isRead ? 'btn-done' : 'btn-primary');
+        markReadBtn.disabled = isRead;
         markReadLabel.textContent = isRead ? 'Completed' : 'Mark as read';
     }
 
     /** The one place today's read state is ever written, from any source. */
     function setTodayRead(value) {
         var key = todayKey();
+        // Once today is marked read, it stays read — a completed day is a
+        // record, not a toggle, so a repeat call can't undo it.
+        if (!value && readingLog[key]) return;
         if (value) readingLog[key] = true; else delete readingLog[key];
         writeStore(LOG_KEY, readingLog);
         renderReadingStatus();

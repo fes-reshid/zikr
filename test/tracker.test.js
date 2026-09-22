@@ -88,52 +88,12 @@ function check(name, ok, detail) {
     check('greeting includes the name',
         (await page.textContent('#greeting-name')).includes('Ahmad'));
 
-    // --- Marking days read ------------------------------------------------
-    check('streak starts at zero', (await page.textContent('#streak-count')) === '0');
-    await page.click('#toggle-read-btn');
-    await page.waitForTimeout(150);
-    check('marking today sets a 1 day streak', (await page.textContent('#streak-count')) === '1');
-    check('the button flips to Completed',
-        (await page.textContent('#btn-label')).trim() === 'Completed');
-    check('the reminder card turns positive',
-        (await page.getAttribute('#feedback-card', 'class')).includes('note-done'));
-
-    const rows = await page.$$('#history-list [data-date-key]');
-    check('history lists 7 days', rows.length === 7, rows.length);
-    const historyJuz = await page.$$eval('#history-list [data-date-key]', (els) =>
-        els.map((el) => el.querySelector('p.day-juz').textContent).join(','));
-    check('history counts the Juz back correctly',
-        historyJuz === 'Juz 7,Juz 6,Juz 5,Juz 4,Juz 3,Juz 2,Juz 1', historyJuz);
-
-    await rows[1].click();
-    await page.waitForTimeout(150);
-    check('back-filling yesterday extends the streak',
-        (await page.textContent('#streak-count')) === '2');
-    await (await page.$$('#history-list [data-date-key]'))[1].click();
-    await page.waitForTimeout(150);
-    check('tapping again clears that day', (await page.textContent('#streak-count')) === '1');
-
-    await page.reload();
-    await page.waitForTimeout(300);
-    check('profile survives a reload', await page.isVisible('#dashboard-view'));
-    check('reading log survives a reload', (await page.textContent('#streak-count')) === '1');
-
-    // --- Reader link ------------------------------------------------------
-    // The reader is a separate page now; the tracker only has to point at it
-    // with the juz that is due today.
-    const quickHref = await page.getAttribute('#quick-read-btn', 'href');
-    const openHref = await page.getAttribute('#open-reader-btn', 'href');
-    check("'Listen & read' links to today's juz", quickHref === 'reader/?juz=7', quickHref);
-    check("'Open the reader' links to today's juz", openHref === 'reader/?juz=7', openHref);
-
     // --- Resuming a paused reading ------------------------------------------
     // The reader saves { juz, index, verseKey } as it plays; the tracker turns
     // that into a "continue where you left off" nudge for today's unfinished
-    // juz, and clears it the moment today is actually marked read.
-    // Today is still marked read from the earlier toggle; undo that first so
-    // the resume card has a chance to show at all.
-    await page.click('#toggle-read-btn');
-    await page.waitForTimeout(150);
+    // juz, cleared the moment today is marked read. This has to run before
+    // today is ever marked below — marking read now locks, so it is the only
+    // point in this run where today is still unread.
     check('no resume card with nothing paused', await page.isHidden('#resume-card'));
 
     await page.evaluate(() => {
@@ -153,14 +113,6 @@ function check(name, ok, detail) {
     const resumeHref = await page.getAttribute('#resume-btn', 'href');
     check('the button resumes on the paused juz', resumeHref === 'reader/?juz=7', resumeHref);
 
-    await page.click('#toggle-read-btn');
-    await page.waitForTimeout(150);
-    check('marking today read clears the resume nudge', await page.isHidden('#resume-card'));
-
-    await page.click('#toggle-read-btn');
-    await page.waitForTimeout(150);
-    check('unmarking it brings the nudge back', await page.isVisible('#resume-card'));
-
     await page.evaluate(() => {
         localStorage.setItem('quran_audio_place',
             JSON.stringify({ juz: 12, index: 3, verseKey: '20:5' }));
@@ -169,6 +121,59 @@ function check(name, ok, detail) {
     await page.waitForTimeout(300);
     check('a paused place on a different juz is not offered as today\'s resume',
         await page.isHidden('#resume-card'));
+
+    // Put back the pause on today's own juz, so marking it read below can be
+    // shown to clear the nudge.
+    await page.evaluate(() => {
+        localStorage.setItem('quran_audio_place',
+            JSON.stringify({ juz: 7, index: 3, verseKey: '7:12' }));
+    });
+    await page.reload();
+    await page.waitForTimeout(300);
+    check('the resume card is back for today\'s own juz', await page.isVisible('#resume-card'));
+
+    // --- Marking days read, once and for good -------------------------------
+    check('streak starts at zero', (await page.textContent('#streak-count')) === '0');
+    await page.click('#toggle-read-btn');
+    await page.waitForTimeout(150);
+    check('marking today sets a 1 day streak', (await page.textContent('#streak-count')) === '1');
+    check('the button flips to Completed',
+        (await page.textContent('#btn-label')).trim() === 'Completed');
+    check('and locks — a completed day is a record, not a toggle',
+        await page.evaluate(() => document.getElementById('toggle-read-btn').disabled));
+    check('the reminder card turns positive',
+        (await page.getAttribute('#feedback-card', 'class')).includes('note-done'));
+    check('marking today read clears the resume nudge', await page.isHidden('#resume-card'));
+
+    const rows = await page.$$('#history-list [data-date-key]');
+    check('history lists 7 days', rows.length === 7, rows.length);
+    const historyJuz = await page.$$eval('#history-list [data-date-key]', (els) =>
+        els.map((el) => el.querySelector('p.day-juz').textContent).join(','));
+    check('history counts the Juz back correctly',
+        historyJuz === 'Juz 7,Juz 6,Juz 5,Juz 4,Juz 3,Juz 2,Juz 1', historyJuz);
+
+    await rows[1].click();
+    await page.waitForTimeout(150);
+    check('back-filling yesterday extends the streak',
+        (await page.textContent('#streak-count')) === '2');
+
+    const backfilledRow = (await page.$$('#history-list [data-date-key]'))[1];
+    check('once marked, that day\'s row locks too — nothing left to tap it back off with',
+        await backfilledRow.evaluate((el) => el.disabled));
+    check('so the streak holds', (await page.textContent('#streak-count')) === '2');
+
+    await page.reload();
+    await page.waitForTimeout(300);
+    check('profile survives a reload', await page.isVisible('#dashboard-view'));
+    check('reading log survives a reload', (await page.textContent('#streak-count')) === '2');
+
+    // --- Reader link ------------------------------------------------------
+    // The reader is a separate page now; the tracker only has to point at it
+    // with the juz that is due today.
+    const quickHref = await page.getAttribute('#quick-read-btn', 'href');
+    const openHref = await page.getAttribute('#open-reader-btn', 'href');
+    check("'Listen & read' links to today's juz", quickHref === 'reader/?juz=7', quickHref);
+    check("'Open the reader' links to today's juz", openHref === 'reader/?juz=7', openHref);
 
     // --- Settings ---------------------------------------------------------
     await page.click('#settings-btn');
