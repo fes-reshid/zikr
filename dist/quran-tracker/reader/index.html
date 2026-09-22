@@ -310,6 +310,35 @@ main{ padding:30px 0 60px; }
     .mushaf-page{ padding:18px 16px 14px; }
   }
 
+  /* ---------- Repeat (Hifz mode) ---------- */
+  .lede{ margin:0; font-size:16px; color:#6b5a49; line-height:1.5; }
+  .field{ margin-bottom:18px; }
+  .field label{
+    display:block; font-size:13px; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--gold); font-weight:700; margin-bottom:8px;
+  }
+  .field select, .field input[type="number"]{
+    width:100%; padding:11px 13px; min-height:44px; border-radius:10px; border:1.5px solid var(--gold-soft);
+    background:#fffdf6; font-family:'Cormorant Garamond', serif; font-size:16px; color:var(--ink-brown);
+  }
+  .repeat-scope{ display:flex; flex-direction:column; gap:6px; }
+  .radio-opt{
+    display:flex; align-items:center; gap:9px; font-size:16px; color:var(--ink-brown);
+    cursor:pointer; padding:5px 0;
+  }
+  .radio-opt input{ accent-color:var(--green); width:18px; height:18px; flex:none; }
+  .repeat-range-row{ display:flex; align-items:center; gap:10px; }
+  .repeat-range-row select{ flex:1; }
+  .repeat-range-row span{ color:#8a7963; font-size:14px; flex:none; }
+  .repeat-count-row{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .repeat-count-btn{
+    padding:9px 16px; border-radius:30px; border:1.5px solid var(--gold-soft); background:#fffdf6;
+    font-family:'Cormorant Garamond', serif; font-size:15px; font-weight:700; color:var(--ink-brown);
+    cursor:pointer;
+  }
+  .repeat-count-btn.active{ background:var(--green); border-color:var(--green); color:var(--parchment); }
+  #repeat-count-custom{ max-width:220px; }
+
   .reader-msg{ text-align:center; padding:48px 20px; color:#6b5a49; }
   .reader-msg p{ font-size:17px; margin:0 0 16px; }
 
@@ -535,11 +564,68 @@ main{ padding:30px 0 60px; }
         <button type="button" class="pbtn" id="next-btn" aria-label="Next verse" disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6h2v12h-2zM5 18V6l8.5 6z"/></svg>
         </button>
+        <button type="button" class="pbtn is-hidden" id="stop-repeat-btn" aria-label="Stop repeating">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
+        </button>
       </div>
       <div class="player-meta">
         <p class="now" id="now-playing">Preparing the recitation…</p>
         <p class="sub" id="now-sub"></p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Repeat, for memorization — Hifz mode only; tapping a verse there opens
+     this instead of just playing it once and moving on. -->
+<div class="app-overlay is-hidden" id="repeat-overlay" role="dialog" aria-modal="true" aria-labelledby="repeat-title">
+  <div class="app-sheet">
+    <div class="app-sheet-head">
+      <h2 id="repeat-title">Repeat for memorization</h2>
+      <button type="button" class="app-icon-btn" id="close-repeat-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="app-sheet-pad">
+      <p class="lede" id="repeat-verse-label" style="margin:0 0 16px;"></p>
+
+      <div class="field">
+        <label>What to repeat</label>
+        <div class="repeat-scope">
+          <label class="radio-opt">
+            <input type="radio" name="repeat-scope" value="verse" checked>
+            This verse only
+          </label>
+          <label class="radio-opt">
+            <input type="radio" name="repeat-scope" value="range">
+            A range of verses
+          </label>
+          <label class="radio-opt">
+            <input type="radio" name="repeat-scope" value="page">
+            The whole page
+          </label>
+        </div>
+      </div>
+
+      <div class="field is-hidden" id="repeat-range-field">
+        <label>From &mdash; to</label>
+        <div class="repeat-range-row">
+          <select id="repeat-range-start"></select>
+          <span>to</span>
+          <select id="repeat-range-end"></select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>How many times</label>
+        <div class="repeat-count-row">
+          <button type="button" class="repeat-count-btn" data-count="3">3&times;</button>
+          <button type="button" class="repeat-count-btn" data-count="5">5&times;</button>
+          <button type="button" class="repeat-count-btn active" data-count="10">10&times;</button>
+          <button type="button" class="repeat-count-btn" data-count="0">Unlimited</button>
+        </div>
+        <input type="number" id="repeat-count-custom" min="1" max="99" placeholder="Or type a number">
+      </div>
+
+      <button type="button" class="btn btn-primary btn-block" id="start-repeat-btn">Start repeating</button>
     </div>
   </div>
 </div>
@@ -1336,10 +1422,19 @@ main{ padding:30px 0 60px; }
     var playIcon = $('play-icon');
     var prevBtn = $('prev-btn');
     var nextBtn = $('next-btn');
+    var stopRepeatBtn = $('stop-repeat-btn');
     var nowPlaying = $('now-playing');
     var nowSub = $('now-sub');
     var followToggle = $('follow-toggle');
     var hifzToggle = $('hifz-toggle');
+    var repeatOverlay = $('repeat-overlay');
+    var closeRepeatBtn = $('close-repeat-btn');
+    var repeatVerseLabel = $('repeat-verse-label');
+    var repeatRangeField = $('repeat-range-field');
+    var repeatRangeStart = $('repeat-range-start');
+    var repeatRangeEnd = $('repeat-range-end');
+    var repeatCountCustom = $('repeat-count-custom');
+    var startRepeatBtn = $('start-repeat-btn');
     var player = $('player');
     var mainEl = document.querySelector('main');
     var seek = $('seek');
@@ -1377,6 +1472,12 @@ main{ padding:30px 0 60px; }
                                // Hifz mode can re-render without refetching
     var hifzMode = !!readStore(HIFZ_KEY);
     hifzToggle.checked = hifzMode;
+
+    // Repeat (Hifz mode): null when nothing is repeating. targetCount is
+    // Infinity for "Unlimited". cursor walks indices; doneCount counts full
+    // passes through it.
+    var repeatState = null;
+    var repeatTapIndex = null;
 
     // Kept only for today's due-juz label and the reading log below — the
     // reader has no name/greeting of its own like the tracker does.
@@ -1881,6 +1982,7 @@ main{ padding:30px 0 60px; }
         pageTitle.textContent = 'Juz ' + juz;
         document.title = 'Juz ' + juz + " — Qur'ān Reader — Diin Islaam";
         stopPlayback();
+        stopRepeat(); // a new juz's playlist makes any repeat indices stale
         setPlayerEnabled(false);
         nowPlaying.textContent = 'Preparing the recitation…';
         nowSub.textContent = '';
@@ -2007,8 +2109,14 @@ main{ padding:30px 0 60px; }
             }
         }
 
-        nowPlaying.textContent = 'Verse ' + item.verseKey +
-            '  ·  ' + (index + 1) + ' of ' + playlist.length;
+        if (repeatState) {
+            var total = repeatState.targetCount === Infinity ? '∞' : repeatState.targetCount;
+            nowPlaying.textContent = 'Verse ' + item.verseKey +
+                '  ·  repeat ' + (repeatState.doneCount + 1) + ' of ' + total;
+        } else {
+            nowPlaying.textContent = 'Verse ' + item.verseKey +
+                '  ·  ' + (index + 1) + ' of ' + playlist.length;
+        }
         nowPlaying.title = nowPlaying.textContent;
         nowSub.textContent = currentReciterLabel();
         prevBtn.disabled = index === 0;
@@ -2017,6 +2125,100 @@ main{ padding:30px 0 60px; }
         updateMediaSession(item);
 
         if (autoplay) play();
+    }
+
+    // --- Repeat (Hifz mode) ---------------------------------------------
+    function playlistIndexOf(verseKey) {
+        for (var i = 0; i < playlist.length; i++) {
+            if (playlist[i].verseKey === verseKey) return i;
+        }
+        return -1;
+    }
+
+    /** Every verse key on the same Mushaf page as verseKey, in reading order. */
+    function versesOnSamePage(verseKey) {
+        var target;
+        for (var i = 0; i < lastVerses.length; i++) {
+            if (lastVerses[i].verse_key === verseKey) { target = lastVerses[i].page_number; break; }
+        }
+        var keys = [];
+        for (var j = 0; j < lastVerses.length; j++) {
+            if (lastVerses[j].page_number === target) keys.push(lastVerses[j].verse_key);
+        }
+        return keys;
+    }
+
+    function repeatScopeValue() {
+        var checked = document.querySelector('input[name="repeat-scope"]:checked');
+        return checked ? checked.value : 'verse';
+    }
+
+    function chosenRepeatCount() {
+        var custom = Number(repeatCountCustom.value);
+        if (custom > 0) return Math.floor(custom);
+        var activeBtn = document.querySelector('.repeat-count-btn.active');
+        var n = activeBtn ? Number(activeBtn.dataset.count) : 10;
+        return n === 0 ? Infinity : n;
+    }
+
+    function buildRepeatRangeOptions(index) {
+        var item = playlist[index];
+        var pageKeys = versesOnSamePage(item.verseKey).filter(function (key) {
+            return playlistIndexOf(key) !== -1; // only verses that actually have audio
+        });
+
+        repeatRangeStart.innerHTML = '';
+        repeatRangeEnd.innerHTML = '';
+        pageKeys.forEach(function (key) {
+            var opt1 = document.createElement('option');
+            opt1.value = key; opt1.textContent = key;
+            repeatRangeStart.appendChild(opt1);
+            var opt2 = document.createElement('option');
+            opt2.value = key; opt2.textContent = key;
+            repeatRangeEnd.appendChild(opt2);
+        });
+        repeatRangeStart.value = item.verseKey;
+        repeatRangeEnd.value = pageKeys[pageKeys.length - 1] || item.verseKey;
+    }
+
+    function openRepeatOverlay(index) {
+        stopRepeat(); // configuring a new repeat supersedes any already running
+        repeatTapIndex = index;
+        repeatVerseLabel.textContent = 'Verse ' + playlist[index].verseKey;
+
+        document.querySelector('input[name="repeat-scope"][value="verse"]').checked = true;
+        repeatRangeField.classList.add(HIDDEN);
+        repeatCountCustom.value = '';
+        document.querySelectorAll('.repeat-count-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.count === '10');
+        });
+
+        buildRepeatRangeOptions(index);
+        repeatOverlay.classList.remove(HIDDEN);
+    }
+
+    function renderRepeatStatus() {
+        stopRepeatBtn.classList.toggle(HIDDEN, !repeatState);
+    }
+
+    function stopRepeat() {
+        repeatState = null;
+        renderRepeatStatus();
+    }
+
+    /** Called instead of the normal auto-advance while a repeat is active. */
+    function advanceRepeat() {
+        repeatState.cursor++;
+        if (repeatState.cursor >= repeatState.indices.length) {
+            repeatState.cursor = 0;
+            repeatState.doneCount++;
+            if (repeatState.doneCount >= repeatState.targetCount) {
+                stopRepeat();
+                return;
+            }
+        }
+        setCurrent(repeatState.indices[repeatState.cursor], true);
+        renderRepeatStatus();
     }
 
     function play() {
@@ -2115,13 +2317,18 @@ main{ padding:30px 0 60px; }
         }
     });
 
-    prevBtn.addEventListener('click', function () { setCurrent(currentIndex - 1, true); });
-    nextBtn.addEventListener('click', function () { setCurrent(currentIndex + 1, true); });
+    // Manually skipping overrides whatever the repeat had queued up next.
+    prevBtn.addEventListener('click', function () { stopRepeat(); setCurrent(currentIndex - 1, true); });
+    nextBtn.addEventListener('click', function () { stopRepeat(); setCurrent(currentIndex + 1, true); });
 
     audio.addEventListener('play', function () { setPlayIcon(true); });
     audio.addEventListener('pause', function () { setPlayIcon(false); });
 
     audio.addEventListener('ended', function () {
+        if (repeatState) {
+            advanceRepeat();
+            return;
+        }
         if (currentIndex < playlist.length - 1) {
             setCurrent(currentIndex + 1, true);
         } else {
@@ -2157,10 +2364,72 @@ main{ padding:30px 0 60px; }
     versesEl.addEventListener('click', function (event) {
         var card = event.target.closest('[data-verse-key]');
         if (!card || !playlist.length) return;
-        var key = card.dataset.verseKey;
-        for (var i = 0; i < playlist.length; i++) {
-            if (playlist[i].verseKey === key) { setCurrent(i, true); return; }
+        var index = playlistIndexOf(card.dataset.verseKey);
+        if (index === -1) return;
+
+        // Hifz mode is where repetition matters; a tap there asks how to
+        // repeat rather than just playing the verse once and moving on.
+        if (hifzMode) {
+            openRepeatOverlay(index);
+        } else {
+            stopRepeat(); // picking a specific verse overrides a running repeat
+            setCurrent(index, true);
         }
+    });
+
+    document.querySelectorAll('input[name="repeat-scope"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            repeatRangeField.classList.toggle(HIDDEN, repeatScopeValue() !== 'range');
+        });
+    });
+
+    document.querySelectorAll('.repeat-count-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.repeat-count-btn').forEach(function (b) {
+                b.classList.remove('active');
+            });
+            btn.classList.add('active');
+            repeatCountCustom.value = '';
+        });
+    });
+
+    closeRepeatBtn.addEventListener('click', function () { repeatOverlay.classList.add(HIDDEN); });
+    repeatOverlay.addEventListener('click', function (event) {
+        if (event.target === repeatOverlay) repeatOverlay.classList.add(HIDDEN);
+    });
+
+    startRepeatBtn.addEventListener('click', function () {
+        var scope = repeatScopeValue();
+        var indices = [];
+
+        if (scope === 'verse') {
+            indices = [repeatTapIndex];
+        } else if (scope === 'range') {
+            var startIdx = playlistIndexOf(repeatRangeStart.value);
+            var endIdx = playlistIndexOf(repeatRangeEnd.value);
+            if (startIdx === -1 || endIdx === -1) return;
+            if (startIdx > endIdx) { var tmp = startIdx; startIdx = endIdx; endIdx = tmp; }
+            for (var i = startIdx; i <= endIdx; i++) indices.push(i);
+        } else {
+            versesOnSamePage(playlist[repeatTapIndex].verseKey).forEach(function (key) {
+                var idx = playlistIndexOf(key);
+                if (idx !== -1) indices.push(idx);
+            });
+        }
+        if (!indices.length) return;
+
+        repeatState = { indices: indices, targetCount: chosenRepeatCount(), doneCount: 0, cursor: 0 };
+        repeatOverlay.classList.add(HIDDEN);
+        setCurrent(indices[0], true);
+        renderRepeatStatus();
+    });
+
+    stopRepeatBtn.addEventListener('click', function () {
+        stopRepeat();
+        // Otherwise the verse already sounding finishes naturally and the
+        // `ended` listener, finding no repeat left, falls through to a
+        // normal auto-advance — "stop" would quietly turn into "skip".
+        audio.pause();
     });
 
     juzSelector.addEventListener('change', function (event) {

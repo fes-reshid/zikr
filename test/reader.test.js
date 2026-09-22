@@ -414,6 +414,7 @@ function readLog(page) {
 
         await page.reload();
         await page.waitForSelector('.verse', { timeout: 10000 });
+        await page.waitForTimeout(300);
         check('the chosen language is remembered across a reload',
             await page.inputValue('#translation-selector') === '142');
         await context.close();
@@ -445,6 +446,7 @@ function readLog(page) {
 
         await page.reload();
         await page.waitForSelector('.verse', { timeout: 10000 });
+        await page.waitForTimeout(300);
         check('Arabic-only is remembered across a reload too',
             await page.inputValue('#translation-selector') === '0');
         check('and no translation still renders after the reload',
@@ -489,13 +491,22 @@ function readLog(page) {
         check('ayah markers use Arabic-Indic numerals', marker === '١', marker);
 
         await page.click('[data-verse-key="7:3"]');
+        await page.waitForTimeout(150);
+        check('tapping a verse in Hifz mode opens the repeat overlay, not a direct play',
+            await page.isVisible('#repeat-overlay'));
+        check('naming the tapped verse',
+            /Verse 7:3/.test(await page.textContent('#repeat-verse-label')),
+            await page.textContent('#repeat-verse-label'));
+
+        await page.click('#start-repeat-btn');
         await page.evaluate(() => document.getElementById('audio').pause());
         await page.waitForTimeout(150);
-        check('tapping a verse in Hifz mode plays it',
+        check('starting a repeat begins playing that verse',
             /Verse 7:3/.test(await page.textContent('#now-playing')),
             await page.textContent('#now-playing'));
         check('and highlights it',
             await page.$eval('[data-verse-key="7:3"]', (el) => el.classList.contains('playing')));
+        check('with a way to stop it', await page.isVisible('#stop-repeat-btn'));
 
         await page.click('#hifz-toggle');
         await page.waitForTimeout(200);
@@ -506,10 +517,184 @@ function readLog(page) {
 
         await page.click('#hifz-toggle');
         await page.reload();
+        await page.waitForTimeout(300);
         await page.waitForSelector('.mushaf-page', { timeout: 10000 });
         check('the choice is remembered across a reload',
             await page.isChecked('#hifz-toggle'));
         check('no uncaught page errors in Hifz mode', errors.length === 0, errors.join(' | '));
+        await context.close();
+    }
+
+    // --- Hifz mode: the repeat overlay's actual repeat behaviour -----------
+    // 7:1-7:3 share page 100, 7:4-7:5 are on page 101 (see stubVerses above).
+    {
+        const { context, page } = await openReader(browser, { query: '?juz=7&autoplay=0' });
+        await page.click('#hifz-toggle');
+        await page.waitForTimeout(200);
+
+        // A range repeat cycles the chosen span, in order, for the chosen
+        // number of passes, then stops on its own.
+        await page.click('[data-verse-key="7:1"]');
+        await page.waitForTimeout(150);
+        await page.click('input[name="repeat-scope"][value="range"]');
+        check('choosing "a range of verses" reveals the from/to pickers',
+            await page.isVisible('#repeat-range-field'));
+
+        await page.selectOption('#repeat-range-start', '7:1');
+        await page.selectOption('#repeat-range-end', '7:3');
+        await page.click('.repeat-count-btn[data-count="3"]');
+        await page.click('#start-repeat-btn');
+
+        check('the range repeat starts on the range’s first verse, pass 1 of 3',
+            /Verse 7:1/.test(await page.textContent('#now-playing')) &&
+            /repeat 1 of 3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:2/.test(document.getElementById('now-playing').textContent),
+            { timeout: 8000 }).catch(() => {});
+        check('it auto-advances through the range in order — second verse',
+            /Verse 7:2/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:3/.test(document.getElementById('now-playing').textContent),
+            { timeout: 8000 }).catch(() => {});
+        check('— and the third',
+            /Verse 7:3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:1/.test(document.getElementById('now-playing').textContent) &&
+                  /repeat 2 of 3/.test(document.getElementById('now-playing').textContent),
+            { timeout: 8000 }).catch(() => {});
+        check('after the range ends it wraps back to the start for pass 2 of 3',
+            /Verse 7:1/.test(await page.textContent('#now-playing')) &&
+            /repeat 2 of 3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => document.getElementById('stop-repeat-btn').classList.contains('is-hidden'),
+            { timeout: 12000 }).catch(() => {});
+        check('after the third full pass it stops on its own — no more stop button',
+            await page.$eval('#stop-repeat-btn', (el) => el.classList.contains('is-hidden')));
+        check('leaving the last verse of the range highlighted',
+            await page.$eval('[data-verse-key="7:3"]', (el) => el.classList.contains('playing')));
+
+        // A page repeat with an unlimited count must keep going past one
+        // full lap on its own, and only Stop actually ends it.
+        await page.click('[data-verse-key="7:2"]');
+        await page.waitForTimeout(150);
+        await page.click('input[name="repeat-scope"][value="page"]');
+        await page.click('.repeat-count-btn[data-count="0"]');
+        await page.click('#start-repeat-btn');
+
+        check('a page repeat starts from the page’s first verse, in reading order — not the tapped one',
+            /Verse 7:1/.test(await page.textContent('#now-playing')) &&
+            /repeat 1 of/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:3/.test(document.getElementById('now-playing').textContent),
+            { timeout: 8000 }).catch(() => {});
+        check('the whole page is in the loop, not just the tapped verse — it reaches the last one',
+            /Verse 7:3/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:1/.test(document.getElementById('now-playing').textContent) &&
+                  /repeat 2 of/.test(document.getElementById('now-playing').textContent),
+            { timeout: 8000 }).catch(() => {});
+        check('after the last verse on the page it wraps back to the first for the next pass',
+            /Verse 7:1/.test(await page.textContent('#now-playing')) &&
+            /repeat 2 of/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => /Verse 7:2/.test(document.getElementById('now-playing').textContent) &&
+                  /repeat 2 of/.test(document.getElementById('now-playing').textContent),
+            { timeout: 8000 }).catch(() => {});
+        check('an unlimited count keeps it going past a full lap on its own',
+            /repeat 2 of/.test(await page.textContent('#now-playing')) &&
+            /∞/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.click('#stop-repeat-btn');
+        check('Stop actually ends it',
+            await page.$eval('#stop-repeat-btn', (el) => el.classList.contains('is-hidden')));
+        const stoppedAt = await page.textContent('#now-playing');
+        await page.waitForTimeout(600);
+        check('and it stays stopped — no further auto-advance after Stop',
+            (await page.textContent('#now-playing')) === stoppedAt);
+
+        // A typed custom count is honoured over whichever preset button
+        // still looks active (openRepeatOverlay resets the preset to 10×,
+        // but never touches a value the listener hasn't typed into yet).
+        await page.click('[data-verse-key="7:5"]');
+        await page.waitForTimeout(150);
+        check('scope defaults back to "this verse only" for a fresh tap',
+            await page.isChecked('input[name="repeat-scope"][value="verse"]'));
+        await page.fill('#repeat-count-custom', '2');
+        await page.click('#start-repeat-btn');
+
+        check('a custom count is honoured over the still-active 10× preset',
+            /repeat 1 of 2/.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        await page.waitForFunction(
+            () => document.getElementById('stop-repeat-btn').classList.contains('is-hidden'),
+            { timeout: 5000 }).catch(() => {});
+        check('and it stops after exactly that many repeats of the single verse',
+            await page.$eval('#stop-repeat-btn', (el) => el.classList.contains('is-hidden')));
+
+        // Manual Prev/Next always overrides whatever repeat is running.
+        await page.click('[data-verse-key="7:1"]');
+        await page.waitForTimeout(150);
+        await page.click('.repeat-count-btn[data-count="0"]');
+        await page.click('#start-repeat-btn');
+        await page.waitForTimeout(300);
+        check('a repeat is running', await page.isVisible('#stop-repeat-btn'));
+
+        await page.click('#next-btn');
+        check('Next stops an active repeat immediately',
+            await page.$eval('#stop-repeat-btn', (el) => el.classList.contains('is-hidden')));
+        check('and moves on as a normal single play — no more "repeat" wording',
+            !/repeat/i.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
+
+        // Tapping a different verse mid-repeat supersedes it too, via
+        // openRepeatOverlay's own stopRepeat() call.
+        await page.click('[data-verse-key="7:2"]');
+        await page.waitForTimeout(150);
+        await page.click('.repeat-count-btn[data-count="0"]');
+        await page.click('#start-repeat-btn');
+        await page.waitForTimeout(300);
+        check('another repeat is now running', await page.isVisible('#stop-repeat-btn'));
+
+        await page.click('[data-verse-key="7:4"]');
+        await page.waitForTimeout(150);
+        check('tapping a different verse mid-repeat stops the running one',
+            await page.$eval('#stop-repeat-btn', (el) => el.classList.contains('is-hidden')));
+        check('and opens that verse’s own overlay instead',
+            await page.isVisible('#repeat-overlay') &&
+            /Verse 7:4/.test(await page.textContent('#repeat-verse-label')),
+            await page.textContent('#repeat-verse-label'));
+        await page.click('#close-repeat-btn');
+
+        // Switching juz invalidates any running repeat (loadJuz's own
+        // stopRepeat() — a new juz's playlist makes the old indices stale).
+        await page.click('[data-verse-key="7:1"]');
+        await page.waitForTimeout(150);
+        await page.click('.repeat-count-btn[data-count="0"]');
+        await page.click('#start-repeat-btn');
+        await page.waitForTimeout(300);
+        check('a repeat is running before the juz change', await page.isVisible('#stop-repeat-btn'));
+
+        await page.selectOption('#juz-selector', '12');
+        await page.waitForTimeout(600);
+        check('changing the juz stops the repeat',
+            await page.$eval('#stop-repeat-btn', (el) => el.classList.contains('is-hidden')));
+
         await context.close();
     }
 
