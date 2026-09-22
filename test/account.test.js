@@ -38,6 +38,7 @@ const TYPES = {
 
 let store = null;        // the stubbed account's server-side record
 let apiUp = true;
+let failReadingsCount = 0; // how many more POST /readings calls should fail
 const calls = [];
 
 function startServer() {
@@ -86,6 +87,10 @@ function startServer() {
                                             days: store.days });
                     }
                     if (route === 'readings') {
+                        if (failReadingsCount > 0) {
+                            failReadingsCount--;
+                            return reply(503, { error: 'down' });
+                        }
                         const set = new Set(store.days);
                         if (parsed.read === false) set.delete(parsed.day); else set.add(parsed.day);
                         store.days = [...set].sort().reverse();
@@ -487,6 +492,35 @@ const freshStore = () => ({
         check('the reminder settings are hidden', await page.isHidden('#reminder-block'));
         check('and the sheet explains why', await page.isVisible('#api-warning'));
         check('no uncaught errors with the API down', errors.length === 0, errors.join(' | '));
+        await context.close();
+    }
+
+    // --- A mark-as-read whose write to the server fails must not be lost --
+    // This is the bug behind "I marked it read and it's not saving": the
+    // click always updates the local log first, but the sync to the server
+    // used to be pure fire-and-forget — if that one POST failed, the next
+    // refresh() trusted the server's (still missing that day) list and wiped
+    // the local mark. It must now be retried, and reflected, until confirmed.
+    {
+        store = freshStore(); apiUp = true; failReadingsCount = 1; calls.length = 0;
+        const { context, page, errors } = await open(browser,
+            { seed: false, signedInAs: 'hania', fullName: 'Hania Feysel' });
+
+        await page.click('#toggle-read-btn');
+        await page.waitForTimeout(250);
+        check('marking today read shows locally even though the write to the server just failed',
+            (await page.textContent('#btn-label')).trim() === 'Completed');
+        check('and the server genuinely does not have it yet — the failure was real, not faked',
+            !store.days.includes('2026-09-18'), JSON.stringify(store.days));
+
+        // A later visit — same device, a fresh load — retries it.
+        await page.reload();
+        await page.waitForTimeout(900);
+        check('the mark survives a reload instead of reverting to unread',
+            (await page.textContent('#btn-label')).trim() === 'Completed');
+        check('because the retried write actually reached the server this time',
+            store.days.includes('2026-09-18'), JSON.stringify(store.days));
+        check('no uncaught errors recovering a failed write', errors.length === 0, errors.join(' | '));
         await context.close();
     }
 

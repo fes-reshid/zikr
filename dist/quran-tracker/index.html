@@ -884,6 +884,7 @@ main{ padding:30px 0 60px; }
 
     var API = './api/';
     var SYNCED_KEY = 'quran_synced_with';
+    var PENDING_KEY = 'quran_pending_writes';
     var CLOUD_WAIT_MS = 8000; // ultimate fallback only; the error listener below is what actually fires fast
 
     var state = {
@@ -978,6 +979,49 @@ main{ padding:30px 0 60px; }
         catch (err) { return 'UTC'; }
     }
 
+    function readPending() {
+        try { return JSON.parse(readLocal(PENDING_KEY) || '{}') || {}; } catch (err) { return {}; }
+    }
+    function writePending(pending) { writeLocal(PENDING_KEY, JSON.stringify(pending)); }
+
+    /*
+     * Marking a day never waits on the network (see setDay below), so a
+     * write that failed to reach the server — a cold Worker, a dropped
+     * connection, a moment of downtime — has to be retried somewhere, or it
+     * quietly vanishes the next time this runs: the GET below is trusted as
+     * the day list, and that day was never in it. Replaying whatever is
+     * still pending here, before that GET's answer is accepted, is what
+     * keeps a mark-as-read from reverting itself on the next visit.
+     */
+    async function flushPending() {
+        var pending = readPending();
+        var days = Object.keys(pending);
+        for (var i = 0; i < days.length; i++) {
+            var day = days[i];
+            var result = await api('POST', 'readings', { day: day, read: pending[day] });
+            if (result.ok) {
+                state.days = result.body.days || state.days;
+                delete pending[day];
+            }
+        }
+        writePending(pending);
+
+        // Anything still pending — the retry above just failed too — is
+        // still this device's most recent, real intent, more so than
+        // whatever the server answered with. Overlay it onto state.days so
+        // a caller reading state right after this sees that intent rather
+        // than the server's stale answer, and it survives one more round.
+        var stillPending = Object.keys(pending);
+        if (stillPending.length) {
+            var set = {};
+            state.days.forEach(function (d) { set[d] = true; });
+            stillPending.forEach(function (day) {
+                if (pending[day]) set[day] = true; else delete set[day];
+            });
+            state.days = Object.keys(set);
+        }
+    }
+
     /* Pull the account's reading log, merging this device's in on first use. */
     async function refresh() {
         var result;
@@ -998,6 +1042,7 @@ main{ padding:30px 0 60px; }
         state.apiReady = true;
         state.settings = result.body.settings;
         state.days = result.body.days || [];
+        await flushPending();
 
         var marker = state.user ? state.user.uid : '';
         if (readLocal(SYNCED_KEY) !== marker) {
@@ -1099,6 +1144,10 @@ main{ padding:30px 0 60px; }
     async function signOut() {
         try { await cloud().studentLogout(); } catch (err) { /* already out */ }
         try { localStorage.removeItem(SYNCED_KEY); } catch (err) { /* ignore */ }
+        // A pending write is only meaningful for the account that made it —
+        // on a shared device, replaying it after someone else signs in would
+        // write to the wrong account.
+        try { localStorage.removeItem(PENDING_KEY); } catch (err) { /* ignore */ }
     }
 
     async function saveSettings(fields) {
@@ -1110,12 +1159,30 @@ main{ padding:30px 0 60px; }
         return result.ok;
     }
 
-    /** Fire and forget: the local log stays the thing the page renders. */
+    /*
+     * Fire and forget: the local log stays the thing the page renders, so
+     * this never makes the caller wait. But "fire and forget" must not mean
+     * "and maybe lose it" — the write is recorded as pending first, and only
+     * cleared once the server has actually confirmed it, so a failed
+     * attempt gets replayed by the next refresh() instead of silently
+     * reverting on the next visit.
+     */
     function setDay(day, read) {
         if (!state.signedIn) return Promise.resolve(false);
+        var pending = readPending();
+        pending[day] = read;
+        writePending(pending);
+
         return api('POST', 'readings', { day: day, read: read })
             .then(function (result) {
-                if (result.ok) state.days = result.body.days || state.days;
+                if (result.ok) {
+                    state.days = result.body.days || state.days;
+                    var stillPending = readPending();
+                    if (stillPending[day] === read) {
+                        delete stillPending[day];
+                        writePending(stillPending);
+                    }
+                }
                 return result.ok;
             })
             .catch(function () { return false; });
