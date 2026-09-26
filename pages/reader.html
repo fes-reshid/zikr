@@ -1246,6 +1246,15 @@
         seek.disabled = !enabled;
     }
 
+    /** Reflects the current verse and repeatState (if any) in the player bar. */
+    function updateNowPlayingLabel() {
+        var item = playlist[currentIndex];
+        if (!item) return;
+        nowPlaying.textContent = repeatState ? repeatStatusText(item.verseKey)
+            : 'Verse ' + item.verseKey + '  ·  ' + (currentIndex + 1) + ' of ' + playlist.length;
+        nowPlaying.title = nowPlaying.textContent;
+    }
+
     function setCurrent(index, autoplay) {
         if (index < 0 || index >= playlist.length) return;
 
@@ -1269,13 +1278,7 @@
             }
         }
 
-        if (repeatState) {
-            nowPlaying.textContent = repeatStatusText(item.verseKey);
-        } else {
-            nowPlaying.textContent = 'Verse ' + item.verseKey +
-                '  ·  ' + (index + 1) + ' of ' + playlist.length;
-        }
-        nowPlaying.title = nowPlaying.textContent;
+        updateNowPlayingLabel();
         nowSub.textContent = currentReciterLabel();
         prevBtn.disabled = index === 0;
         nextBtn.disabled = index === playlist.length - 1;
@@ -1400,6 +1403,7 @@
     function stopRepeat() {
         repeatState = null;
         renderRepeatStatus();
+        updateNowPlayingLabel();
     }
 
     /**
@@ -1731,11 +1735,16 @@
         // so switching modes never waits on the network.
         if (lastVerses.length) renderVerses(lastVerses);
 
-        // Turning Hifz mode on is itself an invitation to set up a repeat,
-        // not just a switch to the page layout — so it opens the same menu
-        // a tap on a verse would, for whichever verse is current.
-        if (hifzMode && playlist.length && currentIndex >= 0) {
-            openRepeatOverlay(currentIndex);
+        if (hifzMode) {
+            // Turning Hifz mode on is itself an invitation to set up a
+            // repeat, not just a switch to the page layout — so it opens
+            // the same menu a tap on a verse would, for whichever verse is
+            // current.
+            if (playlist.length && currentIndex >= 0) openRepeatOverlay(currentIndex);
+        } else {
+            // Repetition belongs to Hifz mode — leaving it should not leave
+            // a repeat quietly still counting down in the background.
+            stopRepeat();
         }
     });
 

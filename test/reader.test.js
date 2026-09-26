@@ -522,6 +522,11 @@ function readLog(page) {
             await page.$eval('[data-verse-key="7:3"]', (el) => el.classList.contains('playing')));
         check('turning it off does not pop the repeat menu — only turning it on does',
             await page.isHidden('#repeat-overlay'));
+        check('and it stops the repeat that was running — repetition belongs to Hifz mode',
+            await page.isHidden('#stop-repeat-btn'));
+        check('now-playing drops back to plain playlist wording, no more "repeat"',
+            !/repeat/i.test(await page.textContent('#now-playing')),
+            await page.textContent('#now-playing'));
 
         await page.click('#hifz-toggle');
         await page.waitForTimeout(200);
