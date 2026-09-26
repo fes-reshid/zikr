@@ -1556,11 +1556,29 @@ main{ padding:30px 0 60px; }
     var hifzMode = !!readStore(HIFZ_KEY);
     hifzToggle.checked = hifzMode;
 
-    // Repeat (Hifz mode): null when nothing is repeating. targetCount is
-    // Infinity for "Unlimited". cursor walks indices; doneCount counts full
-    // passes through it.
+    // Repeat (Hifz mode): null when nothing is repeating. outerCount is
+    // Infinity for "Unlimited". cursor walks indices; verseDone/outerDone
+    // count reps of the current verse and full passes through it.
     var repeatState = null;
     var repeatTapIndex = null;
+
+    // A pause this page did not ask for — a phone call, another app taking
+    // over the speaker — is remembered so playback can pick back up on its
+    // own once the interruption is over, instead of the listener finding
+    // their recitation silently stopped. expectingPause is set immediately
+    // before every pause() call this page itself makes, so the 'pause'
+    // listener can tell the two apart.
+    var expectingPause = false;
+    var interruptedPlayback = false;
+
+    function requestPause() {
+        // Only arm the flag when a 'pause' event will actually follow —
+        // pausing an already-paused (or sourceless) element fires nothing,
+        // which would otherwise leave it stuck true until whatever the next
+        // real pause happens to be, wrongly waving it through as expected.
+        if (!audio.paused) expectingPause = true;
+        audio.pause();
+    }
 
     // Kept only for today's due-juz label and the reading log below — the
     // reader has no name/greeting of its own like the tracker does.
@@ -2370,7 +2388,7 @@ main{ padding:30px 0 60px; }
 
     function stopPlayback() {
         try {
-            audio.pause();
+            requestPause();
             audio.removeAttribute('src');
             audio.load();
         } catch (err) { /* nothing playing */ }
@@ -2404,7 +2422,7 @@ main{ padding:30px 0 60px; }
         if (!('mediaSession' in navigator)) return;
         var handlers = {
             play: function () { play(); },
-            pause: function () { audio.pause(); },
+            pause: function () { requestPause(); },
             previoustrack: function () { setCurrent(currentIndex - 1, true); },
             nexttrack: function () { setCurrent(currentIndex + 1, true); }
         };
@@ -2449,7 +2467,7 @@ main{ padding:30px 0 60px; }
             if (!audio.currentSrc && playlist.length) setCurrent(Math.max(currentIndex, 0), true);
             else play();
         } else {
-            audio.pause();
+            requestPause();
         }
     });
 
@@ -2457,8 +2475,35 @@ main{ padding:30px 0 60px; }
     prevBtn.addEventListener('click', function () { stopRepeat(); setCurrent(currentIndex - 1, true); });
     nextBtn.addEventListener('click', function () { stopRepeat(); setCurrent(currentIndex + 1, true); });
 
-    audio.addEventListener('play', function () { setPlayIcon(true); });
-    audio.addEventListener('pause', function () { setPlayIcon(false); });
+    audio.addEventListener('play', function () {
+        setPlayIcon(true);
+        interruptedPlayback = false;
+    });
+
+    audio.addEventListener('pause', function () {
+        setPlayIcon(false);
+        if (expectingPause) {
+            expectingPause = false;
+        } else if (audio.currentSrc && !audio.ended) {
+            // This page never asked for that — a call coming in, another
+            // app taking the speaker — so resume is left to the visibility
+            // listener below rather than to the listener noticing and
+            // pressing play again themselves.
+            interruptedPlayback = true;
+        }
+    });
+
+    // The most reliable sign an interruption has passed: the tab is back in
+    // the foreground. A call backgrounds the browser for its duration and
+    // returns it when it ends; the same is true of most apps that take over
+    // the speaker. There is no direct "audio focus regained" event on the
+    // web, so this is the closest dependable proxy for it.
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && interruptedPlayback) {
+            interruptedPlayback = false;
+            play();
+        }
+    });
 
     audio.addEventListener('ended', function () {
         if (repeatState) {
@@ -2592,7 +2637,7 @@ main{ padding:30px 0 60px; }
         // Otherwise the verse already sounding finishes naturally and the
         // `ended` listener, finding no repeat left, falls through to a
         // normal auto-advance — "stop" would quietly turn into "skip".
-        audio.pause();
+        requestPause();
     });
 
     juzSelector.addEventListener('change', function (event) {

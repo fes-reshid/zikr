@@ -782,6 +782,60 @@ function readLog(page) {
         await context.close();
     }
 
+    // --- Resuming after an interruption (a call, another app's audio) ------
+    // A longer clip than the per-verse stub (0.2s) is swapped in first, so
+    // this tests the pause/resume mechanism itself without racing the
+    // stub's own short natural duration.
+    {
+        const { context, page, errors } = await openReader(browser, { query: '?juz=7&autoplay=0' });
+        const longWav = silentWav(3, 8000).toString('base64');
+
+        await page.evaluate((base64) => {
+            document.getElementById('audio').src = 'data:audio/wav;base64,' + base64;
+        }, longWav);
+        await page.evaluate(() => document.getElementById('audio').play());
+        await page.waitForTimeout(150);
+        check('playback is underway',
+            await page.evaluate(() => !document.getElementById('audio').paused));
+        check('and genuinely still mid-clip, not already finished',
+            await page.evaluate(() => !document.getElementById('audio').ended));
+
+        // Exactly what a phone call or another app taking the speaker looks
+        // like from here: the audio pauses without this page's involvement.
+        await page.evaluate(() => document.getElementById('audio').pause());
+        await page.waitForTimeout(100);
+        check('an unrequested pause does not resume on its own yet',
+            await page.evaluate(() => document.getElementById('audio').paused));
+
+        // The interruption ends and the tab is back in the foreground.
+        await page.evaluate(() => {
+            Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+            document.dispatchEvent(new Event('visibilitychange'));
+        });
+        await page.waitForTimeout(200);
+        check('playback resumes on its own once the tab is foregrounded again',
+            await page.evaluate(() => !document.getElementById('audio').paused));
+
+        // A pause the listener actually asked for must never auto-resume.
+        await page.click('#play-btn'); // their own pause, mid-playback
+        await page.waitForTimeout(150);
+        check('a manual pause is not treated as an interruption',
+            await page.evaluate(() => document.getElementById('audio').paused));
+
+        await page.evaluate(() => {
+            Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+            document.dispatchEvent(new Event('visibilitychange'));
+            Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+            document.dispatchEvent(new Event('visibilitychange'));
+        });
+        await page.waitForTimeout(200);
+        check('so it does not resume just because the tab regained focus',
+            await page.evaluate(() => document.getElementById('audio').paused));
+
+        check('no uncaught page errors handling the interruption', errors.length === 0, errors.join(' | '));
+        await context.close();
+    }
+
     // --- Degrading -------------------------------------------------------
     {
         const { context, page } = await openReader(browser, {
