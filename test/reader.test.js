@@ -454,6 +454,41 @@ function readLog(page) {
         await context.close();
     }
 
+    // --- A translation with one sentence per <p> and no punctuation of ---
+    // its own (Oromo, reported: "...taaneIddoo jireenya...") needs a full
+    // stop inserted at each paragraph join, not just textContent's silent
+    // run-together.
+    {
+        const { context, page } = await openReader(browser, { query: '?juz=7&autoplay=0' });
+        await page.route('https://api.quran.com/api/v4/verses/by_juz/7**', (route) => {
+            const url = route.request().url();
+            if (!url.includes('translations=')) { route.continue(); return; }
+            route.fulfill({
+                status: 200, contentType: 'application/json',
+                body: JSON.stringify({
+                    verses: [{
+                        verse_key: '7:1', text_uthmani: 'نَصٌّ عَرَبِيٌّ 1',
+                        page_number: 100, juz_number: 7, hizb_number: 13,
+                        translations: [{ text:
+                            '<p>Lubbu qabeeyyiin tokkollee sooranni ishee</p>' +
+                            '<p>Iddoo jireenya isheetiifi iddoo du’a ishees ni beeka</p>' +
+                            '<p>Hundumtuu kitaaba ifa ta’e keessa jira.</p>' }]
+                    }],
+                    pagination: { current_page: 1, next_page: null, total_pages: 1 }
+                })
+            });
+        });
+        await page.reload();
+        await page.waitForSelector('.verse-tr', { timeout: 10000 });
+
+        const text = await page.textContent('.verse-tr');
+        check('each <p> gets its own full stop, joined with a space — no run-together',
+            text === 'Lubbu qabeeyyiin tokkollee sooranni ishee. Iddoo jireenya isheetiifi ' +
+                'iddoo du’a ishees ni beeka. Hundumtuu kitaaba ifa ta’e keessa jira.',
+            text);
+        await context.close();
+    }
+
     // --- Hifz mode (Mushaf page layout) -------------------------------
     {
         const { context, page, errors } = await openReader(browser, { query: '?juz=7&autoplay=0' });

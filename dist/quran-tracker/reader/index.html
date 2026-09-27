@@ -1874,10 +1874,32 @@ main{ padding:30px 0 60px; }
      * Quran.com translations embed footnote markup. Render them as text with
      * the footnote markers dropped, so nothing from the network is ever
      * injected as live HTML.
+     *
+     * Some translations (Oromo among them) put each sentence in its own
+     * <p>, with no punctuation of its own to mark where one ends and the
+     * next begins — relying on the paragraph break itself. Plain
+     * textContent has no idea a paragraph break ever existed and runs
+     * every one of them together with no gap at all: "...taaneIddoo...".
+     * A footnote's inline <sup> (removed above) never causes this — only
+     * an actual <p> boundary does — so a single <p> (or none) is left
+     * exactly as it always was.
      */
     function translationText(html) {
         var doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
         doc.querySelectorAll('sup').forEach(function (node) { node.remove(); });
+
+        var paragraphs = doc.body.querySelectorAll('p');
+        if (paragraphs.length > 1) {
+            var sentences = [];
+            paragraphs.forEach(function (p) {
+                var sentence = (p.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!sentence) return;
+                if (!/[.!?؟。]$/.test(sentence)) sentence += '.';
+                sentences.push(sentence);
+            });
+            return sentences.join(' ');
+        }
+
         return doc.body.textContent.replace(/\s+/g, ' ').trim();
     }
 
