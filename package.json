@@ -6,8 +6,8 @@
   "scripts": {
     "build": "node build.js",
     "icons": "node tools/make-icons.js",
-    "test": "node build.js --check && node --test test/core.test.js",
-    "test:e2e": "node test/tracker.test.js && node test/reader.test.js && node test/pwa.test.js && node test/account.test.js && node test/admin-report.test.js && node test/menu.test.js",
+    "test": "node build.js --check && node --test test/core.test.js video-editor/test/timeline.test.js video-editor/test/webm.test.js",
+    "test:e2e": "node test/tracker.test.js && node test/reader.test.js && node test/pwa.test.js && node test/account.test.js && node test/admin-report.test.js && node test/menu.test.js && node video-editor/test/editor.test.js",
     "test:tracker": "node test/tracker.test.js",
     "test:reader": "node test/reader.test.js",
     "test:pwa": "node test/pwa.test.js",
@@ -15,7 +15,9 @@
     "test:api": "cd api && npm test",
     "serve": "python3 -m http.server 8000 --directory dist",
     "test:admin": "node test/admin-report.test.js",
-    "test:menu": "node test/menu.test.js"
+    "test:menu": "node test/menu.test.js",
+    "test:video-editor": "node video-editor/test/editor.test.js",
+    "serve:video-editor": "python3 -m http.server 8001 --directory video-editor"
   },
   "devDependencies": {
     "playwright-core": "^1.63.0",

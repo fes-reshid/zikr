@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel Video Editor</title>
+<meta name="description" content="A video editor that runs entirely in the browser: cut, trim and layer clips, add titles and music, and export a video file. Nothing is uploaded.">
+<meta name="color-scheme" content="dark">
+<style>
+:root {
+    --bg: #0e1014;
+    --panel: #151920;
+    --panel-2: #1b2029;
+    --panel-3: #232a35;
+    --line: #2a313d;
+    --line-2: #394253;
+    --text: #e7eaf0;
+    --muted: #8d95a5;
+    --faint: #5d6576;
+    --accent: #5b8cff;
+    --accent-ink: #0b1633;
+    --playhead: #ff4d6d;
+    --warn: #f2b84b;
+    --danger: #ff6b6b;
+    --video: #3c5ea3;
+    --image: #2f7a6c;
+    --audio: #2e7a4d;
+    --text-clip: #7d56a0;
+    --radius: 6px;
+    --head-w: 132px;
+    --row-h: 56px;
+    --ruler-h: 26px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) 6px var(--timeline-h, 36vh);
+    /* An explicit column, or the timeline's wide content would widen the page. */
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+    background: var(--panel-3);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
+    padding: 5px 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.icon { padding: 5px 7px; }
+button.ghost { background: transparent; border-color: transparent; }
+button.ghost:hover:not(:disabled) { background: var(--panel-3); border-color: var(--line-2); }
+button[aria-pressed="true"] { background: #2b3c63; border-color: var(--accent); }
+svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+input[type="text"], input[type="number"], select, textarea {
+    background: var(--bg);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
+    padding: 5px 8px;
+    min-width: 0;
+}
+input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid var(--line-2); border-radius: var(--radius); background: none; }
+input[type="range"] { accent-color: var(--accent); min-width: 0; }
+[hidden] { display: none !important; }
+
+/* Pinned to rows, so hiding the resizer on phones cannot shift the rest up. */
+.topbar { grid-row: 1; }
+.workspace { grid-row: 2; }
+.resizer { grid-row: 3; }
+.timeline-panel { grid-row: 4; }
+
+/* ---------------------------------------------------------------- top bar */
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+    overflow-x: auto;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .02em; margin-right: 6px; }
+.brand-mark { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), var(--playhead)); display: grid; place-items: center; }
+.brand-mark svg { width: 12px; height: 12px; fill: #fff; stroke: none; }
+#project-name { width: 180px; background: transparent; border-color: transparent; font-weight: 600; }
+#project-name:hover, #project-name:focus { border-color: var(--line-2); background: var(--bg); }
+.topbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.topbar .spacer { flex: 1; }
+.topbar > * { flex: none; }
+
+/* -------------------------------------------------------------- workspace */
+.workspace {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr) 290px;
+    min-height: 0;
+}
+.panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
+.panel + .panel { border-left: 1px solid var(--line); }
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    min-height: 42px;
+}
+.panel-head button { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--text); }
+.panel-body { flex: 1; overflow: auto; min-height: 0; }
+
+/* media bin */
+.media-list { padding: 8px; display: grid; gap: 6px; align-content: start; }
+.media-empty {
+    margin: 8px;
+    padding: 28px 16px;
+    border: 1px dashed var(--line-2);
+    border-radius: 10px;
+    text-align: center;
+    color: var(--muted);
+}
+.media-empty strong { display: block; color: var(--text); margin-bottom: 4px; font-weight: 600; }
+.media-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    padding: 5px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor: grab;
+    user-select: none;
+}
+.media-item:hover { background: var(--panel-2); border-color: var(--line); }
+.media-thumb {
+    width: 64px; height: 36px; border-radius: 4px; background: var(--panel-3) center/cover no-repeat;
+    display: grid; place-items: center; color: var(--muted); overflow: hidden;
+}
+.media-meta { min-width: 0; }
+.media-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-info { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+.media-item.missing .media-thumb { outline: 1px dashed var(--warn); }
+.media-item.missing .media-info { color: var(--warn); font-family: inherit; }
+.media-actions { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 2px; background: var(--panel-2); border-radius: var(--radius); }
+.media-item:not(.missing) .media-actions { opacity: 0; }
+.media-item:hover .media-actions, .media-item:focus-within .media-actions { opacity: 1; }
+.banner { margin: 8px; padding: 10px 12px; border-radius: 8px; background: #3a2f16; color: #f6dfab; border: 1px solid #5b4a22; }
+.banner button { margin-top: 8px; }
+
+/* viewer */
+.viewer { background: #0a0c0f; }
+.stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 12px; position: relative; }
+#preview { background: #000; box-shadow: 0 0 0 1px var(--line), 0 10px 40px rgba(0,0,0,.5); display: block; }
+.stage-hint {
+    position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+    color: var(--faint); text-align: center; padding: 20px;
+}
+.transport {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 8px 12px; border-top: 1px solid var(--line); background: var(--panel); flex-wrap: wrap;
+}
+.timecode { font-family: var(--mono); font-size: 13px; min-width: 190px; text-align: center; color: var(--muted); }
+.timecode b { color: var(--text); font-weight: 500; }
+#play { width: 40px; justify-content: center; }
+
+/* inspector */
+.inspector-body { padding: 12px; display: grid; gap: 14px; align-content: start; }
+.insp-title { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.insp-title span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; padding: 2px 6px; border-radius: 4px; background: var(--panel-3); color: var(--muted); flex: none; }
+.group { display: grid; gap: 8px; }
+.group-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.field { display: grid; grid-template-columns: 84px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
+.field > label { color: var(--muted); }
+.field output { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; }
+.field.wide { grid-template-columns: 84px minmax(0, 1fr); }
+.field textarea { resize: vertical; min-height: 64px; }
+.check { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.row-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; color: var(--muted); }
+kbd { justify-self: start; font-family: var(--mono); font-size: 11px; background: var(--panel-3); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--text); white-space: nowrap; }
+
+/* ------------------------------------------------------------- timeline */
+.resizer { background: var(--panel); border-top: 1px solid var(--line); cursor: row-resize; }
+.resizer:hover, .resizer.active { background: var(--accent); }
+.timeline-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
+.tl-toolbar {
+    display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-bottom: 1px solid var(--line);
+    overflow-x: auto; flex: none;
+}
+.tl-toolbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px; flex: none; }
+.tl-toolbar .spacer { flex: 1; }
+.tl-toolbar label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+#zoom { width: 120px; }
+.timeline { flex: 1; overflow: auto; position: relative; min-height: 0; background: var(--bg); outline: none; }
+.tl-inner { position: relative; min-height: 100%; }
+.tl-rulerrow { display: flex; position: sticky; top: 0; z-index: 5; height: var(--ruler-h); }
+.tl-corner {
+    position: sticky; left: 0; z-index: 6; width: var(--head-w); flex: none;
+    background: var(--panel); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; align-items: center; padding: 0 8px;
+}
+.tl-ruler { position: relative; flex: none; background: var(--panel); border-bottom: 1px solid var(--line); cursor: ew-resize; overflow: hidden; }
+.tick { position: absolute; bottom: 0; width: 1px; background: var(--line-2); height: 6px; }
+.tick.major { height: 11px; background: var(--muted); }
+.tick span { position: absolute; left: 4px; bottom: 9px; font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.tl-row { display: flex; height: var(--row-h); border-bottom: 1px solid var(--line); }
+.tl-head {
+    position: sticky; left: 0; z-index: 4; width: var(--head-w); flex: none; background: var(--panel);
+    border-right: 1px solid var(--line); display: flex; align-items: center; gap: 2px; padding: 0 4px 0 8px;
+}
+.tl-head .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 12px; }
+.tl-head .name small { display: block; font-weight: 400; color: var(--faint); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.tl-head button { padding: 3px; }
+.tl-head button svg { width: 14px; height: 14px; }
+.tl-head button.on { color: var(--warn); }
+.tl-lane { position: relative; flex: none; }
+.tl-row.drop-target .tl-lane { background: rgba(91, 140, 255, .08); }
+.tl-row.dim .tl-lane { opacity: .45; }
+.clip {
+    position: absolute; top: 4px; bottom: 4px; border-radius: 5px; overflow: hidden; cursor: grab;
+    background: var(--video); border: 1px solid rgba(255,255,255,.14); color: #fff; user-select: none; touch-action: none;
+}
+.clip.k-image { background: var(--image); }
+.clip.k-audio { background: var(--audio); }
+.clip.k-text { background: var(--text-clip); }
+.clip.missing { background: repeating-linear-gradient(45deg, #4a3a1c 0 8px, #3a2d15 8px 16px); }
+.clip.selected { border-color: #fff; box-shadow: 0 0 0 1px #fff, 0 0 0 3px rgba(91,140,255,.6); z-index: 2; }
+.clip.dragging { opacity: .85; cursor: grabbing; z-index: 3; }
+.clip-thumbs { position: absolute; inset: 16px 0 0; background-repeat: repeat-x; background-size: auto 100%; opacity: .55; }
+.clip-wave { position: absolute; left: 0; bottom: 0; width: 100%; height: calc(100% - 16px); opacity: .9; }
+.clip-label {
+    position: absolute; left: 8px; right: 8px; top: 1px; font-size: 11px; font-weight: 600; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.6); pointer-events: none;
+}
+.clip-fade { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+.clip-fade.in { left: 0; background: linear-gradient(to top right, rgba(0,0,0,.45) 50%, transparent 50%); }
+.clip-fade.out { right: 0; background: linear-gradient(to top left, rgba(0,0,0,.45) 50%, transparent 50%); }
+.handle { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 1; }
+.handle.l { left: 0; }
+.handle.r { right: 0; }
+.clip:hover .handle, .clip.selected .handle { background: rgba(255,255,255,.22); }
+.handle::after { content: ""; position: absolute; top: 35%; bottom: 35%; left: 3px; width: 2px; border-radius: 1px; background: rgba(255,255,255,.7); }
+.tl-playhead { position: absolute; top: 0; bottom: 0; width: 0; z-index: 3; pointer-events: none; }
+.tl-playhead::before { content: ""; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--playhead); }
+.tl-playhead::after {
+    content: ""; position: absolute; top: 0; left: -7px; border: 7px solid transparent; border-top: 9px solid var(--playhead); border-bottom: 0;
+}
+.tl-snapline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--warn); z-index: 3; pointer-events: none; }
+
+/* ------------------------------------------------------------ overlays */
+.drop-overlay {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; pointer-events: none;
+    background: rgba(14, 16, 20, .82); border: 3px dashed var(--accent); font-size: 18px; font-weight: 600;
+}
+.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0,0,0,.6); padding: 16px; }
+.dialog {
+    width: min(440px, 100%); background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px;
+    padding: 20px; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.dialog h2 { margin: 0; font-size: 16px; }
+.dialog p { margin: 0; color: var(--muted); }
+.dialog .field { grid-template-columns: 90px minmax(0, 1fr); }
+.dialog .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+progress { width: 100%; height: 8px; accent-color: var(--accent); }
+.export-result a { color: var(--accent); font-weight: 600; }
+.toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 70;
+    background: var(--panel-3); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); max-width: calc(100% - 32px);
+}
+.media-host { position: fixed; left: -10px; top: -10px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+
+/* ------------------------------------------------------------ narrow */
+@media (max-width: 900px) {
+    body { grid-template-rows: auto minmax(0, 1fr) 0 minmax(220px, 40vh); }
+    .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(200px, 1fr) auto; overflow: auto; }
+    .bin, .inspector { display: none; }
+    .workspace.show-bin .bin, .workspace.show-inspector .inspector { display: flex; max-height: 40vh; border-left: 0; border-top: 1px solid var(--line); }
+    .resizer { display: none; }
+    .topbar { gap: 4px; }
+    .brand { margin-right: 0; }
+    #project-name { display: none; }
+    #resolution { width: 96px; }
+    .hide-narrow { display: none !important; }
+    :root { --head-w: 96px; }
+}
+@media (min-width: 901px) { .show-narrow { display: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg></span><span class="hide-narrow">Reel</span></div>
+    <input id="project-name" type="text" aria-label="Project name" spellcheck="false">
+    <select id="resolution" aria-label="Frame size" title="Frame size">
+        <option value="1280x720">1280×720 · 16:9</option>
+        <option value="1920x1080">1920×1080 · 16:9</option>
+        <option value="1080x1920">1080×1920 · 9:16</option>
+        <option value="1080x1080">1080×1080 · 1:1</option>
+        <option value="1080x1350">1080×1350 · 4:5</option>
+    </select>
+    <select id="fps" aria-label="Frame rate" title="Frame rate" class="hide-narrow">
+        <option value="24">24 fps</option>
+        <option value="25">25 fps</option>
+        <option value="30">30 fps</option>
+        <option value="60">60 fps</option>
+    </select>
+    <span class="sep hide-narrow"></span>
+    <button id="undo" class="icon ghost" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
+    <button id="redo" class="icon ghost" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></svg></button>
+    <span class="spacer"></span>
+    <button id="toggle-bin" class="show-narrow">Media</button>
+    <button id="toggle-inspector" class="show-narrow">Details</button>
+    <button id="new-project" class="ghost hide-narrow" title="Start a new project">New</button>
+    <button id="open-project" class="ghost hide-narrow" title="Open a saved project (.json)">Open</button>
+    <button id="save-project" class="ghost hide-narrow" title="Save the project as a file">Save</button>
+    <input id="open-input" type="file" accept=".json,application/json" hidden>
+    <button id="export" class="primary"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span class="hide-narrow">Export</span></button>
+</header>
+
+<main class="workspace" id="workspace">
+    <section class="panel bin" aria-label="Media">
+        <div class="panel-head">
+            <span>Media</span>
+            <button id="import"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Import</button>
+            <input id="import-input" type="file" multiple accept="video/*,audio/*,image/*" hidden>
+        </div>
+        <div class="panel-body">
+            <div id="restore-banner" class="banner" hidden></div>
+            <div id="media-empty" class="media-empty">
+                <strong>Drop files here</strong>
+                Video, audio and images. They stay on this device — nothing is uploaded.
+            </div>
+            <div id="media-list" class="media-list"></div>
+        </div>
+    </section>
+
+    <section class="panel viewer" aria-label="Preview">
+        <div class="stage" id="stage">
+            <canvas id="preview" width="1280" height="720"></canvas>
+            <div class="stage-hint" id="stage-hint">Import media, then double-click it or drag it onto the timeline.</div>
+        </div>
+        <div class="transport">
+            <button id="to-start" class="icon ghost" title="Go to start (Home)" aria-label="Go to start"><svg viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M18 5l-9 7 9 7z"/></svg></button>
+            <button id="prev-frame" class="icon ghost" title="Previous frame (←)" aria-label="Previous frame"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <button id="play" class="icon" title="Play / pause (Space)" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg></button>
+            <button id="next-frame" class="icon ghost" title="Next frame (→)" aria-label="Next frame"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+            <button id="to-end" class="icon ghost" title="Go to end (End)" aria-label="Go to end"><svg viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M6 5l9 7-9 7z"/></svg></button>
+            <span class="timecode"><b id="timecode">00:00.00</b> / <span id="duration">00:00.00</span></span>
+            <button id="snapshot" class="icon ghost" title="Save this frame as a PNG" aria-label="Save frame as image"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 012-2h2l2-2h6l2 2h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        </div>
+    </section>
+
+    <section class="panel inspector" aria-label="Inspector">
+        <div class="panel-head"><span>Inspector</span></div>
+        <div class="panel-body"><div id="inspector" class="inspector-body"></div></div>
+    </section>
+</main>
+
+<div class="resizer" id="resizer" role="separator" aria-orientation="horizontal" aria-label="Resize timeline"></div>
+
+<section class="timeline-panel" aria-label="Timeline">
+    <div class="tl-toolbar">
+        <button id="tool-split" class="ghost" title="Split at playhead (S)"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/></svg><span class="hide-narrow">Split</span></button>
+        <button id="tool-delete" class="ghost" title="Delete (Del) — Shift+Del closes the gap"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><span class="hide-narrow">Delete</span></button>
+        <button id="tool-duplicate" class="ghost" title="Duplicate (Ctrl+D)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg><span class="hide-narrow">Duplicate</span></button>
+        <button id="add-text" class="ghost" title="Add a title at the playhead (T)"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="hide-narrow">Title</span></button>
+        <span class="sep"></span>
+        <button id="add-video-track" class="ghost hide-narrow" title="Add a video track">+ Video track</button>
+        <button id="add-audio-track" class="ghost hide-narrow" title="Add an audio track">+ Audio track</button>
+        <span class="spacer"></span>
+        <button id="snap" class="ghost" aria-pressed="true" title="Snap to clip edges and the playhead"><svg viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0012 0V3M6 7h4M14 7h4"/></svg><span class="hide-narrow">Snap</span></button>
+        <span class="sep"></span>
+        <button id="zoom-out" class="icon ghost" title="Zoom out (−)" aria-label="Zoom out"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg></button>
+        <input id="zoom" type="range" min="0" max="100" value="45" aria-label="Timeline zoom">
+        <button id="zoom-in" class="icon ghost" title="Zoom in (+)" aria-label="Zoom in"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-4-4"/></svg></button>
+        <button id="zoom-fit" class="ghost" title="Fit the whole project">Fit</button>
+    </div>
+    <div class="timeline" id="timeline" tabindex="-1"></div>
+</section>
+
+<div id="export-dialog" class="modal" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <h2 id="export-title">Export video</h2>
+        <div id="export-setup" class="group">
+            <div class="field"><label for="export-format">Format</label><select id="export-format"></select></div>
+            <div class="field"><label for="export-quality">Quality</label>
+                <select id="export-quality">
+                    <option value="2500000">Draft · 2.5 Mbps</option>
+                    <option value="6000000" selected>Good · 6 Mbps</option>
+                    <option value="12000000">High · 12 Mbps</option>
+                </select>
+            </div>
+            <p id="export-summary"></p>
+            <p>Export plays the project through once in real time. Keep this tab in front until it finishes.</p>
+        </div>
+        <div id="export-progress" class="group" hidden>
+            <progress id="export-bar" max="1" value="0"></progress>
+            <p id="export-status">Starting…</p>
+        </div>
+        <div id="export-result" class="export-result group" hidden></div>
+        <div class="actions">
+            <button id="export-cancel">Cancel</button>
+            <button id="export-start" class="primary">Export</button>
+        </div>
+    </div>
+</div>
+
+<div id="drop-overlay" class="drop-overlay" hidden>Drop to import</div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<div id="media-host" class="media-host" aria-hidden="true"></div>
+
+<script src="timeline.js"></script>
+<script src="webm.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

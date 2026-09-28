@@ -8,7 +8,11 @@ Two pages for reading one juz of the Qur'ān a day, published as part of
 | `/quran-tracker/` | The day's juz, your streak, and the last week of progress |
 | `/quran-tracker/reader/` | Reads and recites any juz, verse by verse |
 
-It installs to a phone's home screen as a progressive web app, so it opens
+The repo also holds **Reel**, a separate video editor that runs entirely in
+the browser, in [`video-editor/`](video-editor/README.md). It shares nothing
+with the tracker and is not part of its build.
+
+The tracker installs to a phone's home screen as a progressive web app, so it opens
 without browser chrome and the pages you have already opened work offline.
 
 Signing in is optional and uses the site's existing accounts — the same
@@ -254,6 +258,7 @@ It skips itself with a message if `playwright-core` is not installed. Set
 | `test/admin-report.test.js` | The admin table and its Excel download |
 | `src/xlsx.js` | A minimal .xlsx writer |
 | `api/` | The Cloudflare Worker: accounts, sync and reminders |
+| `video-editor/` | Reel, a separate in-browser video editor — see its own README |
 
 `src/core.js` loads as a plain script in the browser (`window.QuranCore`) and as
 a CommonJS module in Node, so the same code is tested and shipped. It is not an
