@@ -8,7 +8,8 @@
  * the editor still works when opened straight off disk.
  *
  * Times are seconds, as floats. A clip occupies [start, start + duration) on
- * its track; for video and audio, `in` is where in the source file it begins.
+ * its track; for video and audio, `in` is where in the source file it begins,
+ * and `speed` is how many seconds of source play per second of timeline.
  */
 (function (root, factory) {
     const api = factory();
@@ -26,8 +27,14 @@
     const DEFAULT_STILL = 5;
     /** Floating-point slack when comparing clip edges. */
     const EPS = 1e-6;
+    const MIN_SPEED = 0.25;
+    const MAX_SPEED = 4;
 
     const DEFAULT_FILTERS = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, blur: 0 };
+
+    const TRANSITIONS = ['crossfade', 'dip', 'slide', 'push', 'wipe', 'zoom'];
+    const MOTIONS = ['zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'pan-up', 'pan-down'];
+    const TEXT_ANIMS = ['fade', 'rise', 'pop', 'slide', 'typewriter', 'words'];
 
     let idCounter = 0;
     function newId(prefix) {
@@ -49,6 +56,16 @@
         return Math.round(v * 1e6) / 1e6;
     }
 
+    function smooth(u) {
+        const x = clamp(u, 0, 1);
+        return x * x * (3 - 2 * x);
+    }
+
+    function easeOut(u) {
+        const x = clamp(u, 0, 1);
+        return 1 - Math.pow(1 - x, 3);
+    }
+
     /* ---------------------------------------------------------------- project */
 
     function createProject(options) {
@@ -61,16 +78,19 @@
             height: o.height || 720,
             fps: o.fps || 30,
             background: o.background || '#000000',
+            // How far ducked tracks drop while someone is speaking (a gain).
+            duckAmount: o.duckAmount === undefined ? 0.25 : o.duckAmount,
             // Listed top to bottom as the timeline shows them. Upper video
             // tracks are drawn over lower ones, as in any editor.
             tracks: o.tracks || [
                 { id: 'T1', kind: 'text', name: 'Titles', muted: false, hidden: false },
                 { id: 'V2', kind: 'video', name: 'Overlay', muted: false, hidden: false },
                 { id: 'V1', kind: 'video', name: 'Video', muted: false, hidden: false },
-                { id: 'A1', kind: 'audio', name: 'Audio', muted: false, hidden: false }
+                { id: 'A1', kind: 'audio', name: 'Audio', muted: false, hidden: false, duck: false }
             ],
             media: [],
-            clips: []
+            clips: [],
+            markers: []
         };
     }
 
@@ -93,14 +113,15 @@
     }
 
     /** Adds a track of a kind, above the others of that kind. */
-    function addTrack(project, kind) {
+    function addTrack(project, kind, name) {
         const p = clone(project);
         const prefix = { video: 'V', audio: 'A', text: 'T' }[kind];
         if (!prefix) throw new Error('Unknown track kind: ' + kind);
         let n = 1;
         while (p.tracks.some((t) => t.id === prefix + n)) n += 1;
         const names = { video: 'Video', audio: 'Audio', text: 'Titles' };
-        const track = { id: prefix + n, kind: kind, name: names[kind] + ' ' + n, muted: false, hidden: false };
+        const track = { id: prefix + n, kind: kind, name: name || names[kind] + ' ' + n, muted: false, hidden: false };
+        if (kind === 'audio') track.duck = false;
         const firstOfKind = p.tracks.findIndex((t) => t.kind === kind);
         if (firstOfKind === -1) {
             // Keep the conventional order: titles, video, audio.
@@ -111,6 +132,14 @@
             p.tracks.splice(firstOfKind, 0, track);
         }
         return p;
+    }
+
+    /** The id the next addTrack(kind) will use. */
+    function nextTrackId(project, kind) {
+        const prefix = { video: 'V', audio: 'A', text: 'T' }[kind];
+        let n = 1;
+        while (project.tracks.some((t) => t.id === prefix + n)) n += 1;
+        return prefix + n;
     }
 
     function updateTrack(project, id, patch) {
@@ -136,6 +165,7 @@
     /** What a clip is: 'video', 'image', 'audio' or 'text'. */
     function clipKind(project, clip) {
         if (clip.type === 'text') return 'text';
+        if (clip.audioOnly) return 'audio';
         const m = getMedia(project, clip.mediaId);
         return m ? m.type : 'video';
     }
@@ -145,6 +175,17 @@
         if (kind === 'text') return 'text';
         if (kind === 'audio') return 'audio';
         return 'video';
+    }
+
+    /** True for clips whose source plays through time: video and audio, not freeze frames. */
+    function isTimed(project, clip) {
+        if (clip.type === 'text' || clip.freeze) return false;
+        const k = clipKind(project, clip);
+        return k === 'video' || k === 'audio';
+    }
+
+    function speedOf(clip) {
+        return clip.speed > 0 ? clip.speed : 1;
     }
 
     function clipEnd(clip) {
@@ -172,7 +213,9 @@
     function isFree(project, trackId, start, duration, excludeId) {
         if (start < -EPS) return false;
         const end = start + duration;
-        return !trackClips(project, trackId, excludeId)
+        const skip = Array.isArray(excludeId) ? excludeId : [excludeId];
+        return !project.clips
+            .filter((c) => c.track === trackId && skip.indexOf(c.id) === -1)
             .some((c) => overlaps(start, end, c.start, clipEnd(c)));
     }
 
@@ -211,6 +254,7 @@
             start: start || 0,
             duration: round(bounded ? media.duration : DEFAULT_STILL),
             in: 0,
+            speed: 1,
             volume: 1,
             muted: false,
             fadeIn: 0,
@@ -223,6 +267,8 @@
                 x: 0.5,
                 y: 0.5,
                 opacity: 1,
+                bgFill: 'none',
+                motion: null,
                 filters: clone(DEFAULT_FILTERS)
             });
         }
@@ -250,7 +296,9 @@
             y: 0.5,
             opacity: 1,
             fadeIn: 0.3,
-            fadeOut: 0.3
+            fadeOut: 0.3,
+            anim: 'none',
+            animDuration: 0.6
         };
     }
 
@@ -299,6 +347,13 @@
         return p;
     }
 
+    /** The same patch applied to several clips at once. */
+    function updateClips(project, ids, patch) {
+        let p = project;
+        ids.forEach(function (id) { p = updateClip(p, id, patch); });
+        return p;
+    }
+
     /**
      * Moves a clip to a new start and, optionally, another track of the right
      * kind. If the spot is taken it slides to the nearest gap; if there is
@@ -319,12 +374,31 @@
         return p;
     }
 
-    /** How far a clip's source can stretch: Infinity for stills and titles. */
+    /**
+     * Shifts several clips by the same amount, keeping their spacing. The
+     * whole move is refused if any of them would land on another clip, and
+     * the shift is clamped so none goes before zero.
+     */
+    function moveClips(project, ids, delta) {
+        const moving = project.clips.filter((c) => ids.indexOf(c.id) !== -1);
+        if (!moving.length) return project;
+        const earliest = Math.min.apply(null, moving.map((c) => c.start));
+        const d = Math.max(delta, -earliest);
+        if (Math.abs(d) < EPS) return project;
+        const ok = moving.every((c) => isFree(project, c.track, c.start + d, c.duration, ids));
+        if (!ok) return project;
+        const p = clone(project);
+        p.clips.forEach(function (c) { if (ids.indexOf(c.id) !== -1) c.start = round(c.start + d); });
+        return p;
+    }
+
+    /** How far a clip's source can stretch: Infinity for stills, titles and freeze frames. */
     function sourceLength(project, clip) {
+        if (clip.freeze) return Infinity;
         const kind = clipKind(project, clip);
         if (kind === 'video' || kind === 'audio') {
             const m = getMedia(project, clip.mediaId);
-            return m && m.duration ? m.duration : clip.in + clip.duration;
+            return m && m.duration ? m.duration : (clip.in || 0) + clip.duration * speedOf(clip);
         }
         return Infinity;
     }
@@ -341,23 +415,24 @@
         const end = clipEnd(clip);
         const p = clone(project);
         const c = p.clips.find((x) => x.id === id);
-        const bounded = clipKind(project, clip) === 'video' || clipKind(project, clip) === 'audio';
+        const bounded = isTimed(project, clip);
+        const speed = speedOf(clip);
 
         if (edge === 'start') {
             const prevEnd = others.filter((o) => clipEnd(o) <= clip.start + EPS)
                 .reduce((m, o) => Math.max(m, clipEnd(o)), 0);
             let lo = prevEnd;
-            if (bounded) lo = Math.max(lo, clip.start - clip.in);
+            if (bounded) lo = Math.max(lo, clip.start - (clip.in || 0) / speed);
             const hi = end - MIN_DURATION;
             const s = round(clamp(time, lo, hi));
             const delta = s - clip.start;
             c.start = s;
             c.duration = round(end - s);
-            if (clip.type !== 'text') c.in = round(Math.max(0, clip.in + delta));
+            if (clip.type !== 'text' && !clip.freeze) c.in = round(Math.max(0, (clip.in || 0) + delta * speed));
         } else if (edge === 'end') {
             const nextStart = others.filter((o) => o.start >= end - EPS)
                 .reduce((m, o) => Math.min(m, o.start), Infinity);
-            const hi = Math.min(nextStart, clip.start + sourceLength(project, clip) - (clip.in || 0));
+            const hi = Math.min(nextStart, clip.start + (sourceLength(project, clip) - (clip.in || 0)) / speed);
             const e = clamp(time, clip.start + MIN_DURATION, hi);
             c.duration = round(e - clip.start);
         } else {
@@ -391,7 +466,8 @@
         right.duration = round(end - time);
         right.fadeIn = 0;
         right.fadeOut = Math.min(right.fadeOut || 0, right.duration);
-        if (right.type !== 'text') right.in = round((clip.in || 0) + offset);
+        right.transition = null;
+        if (right.type !== 'text' && !right.freeze) right.in = round((clip.in || 0) + offset * speedOf(clip));
         p.clips.splice(p.clips.indexOf(left) + 1, 0, right);
         return p;
     }
@@ -410,7 +486,7 @@
      * same track moves left to close the gap.
      */
     function deleteClips(project, ids, ripple) {
-        let p = clone(project);
+        const p = clone(project);
         const removed = p.clips.filter((c) => ids.indexOf(c.id) !== -1)
             .sort((a, b) => b.start - a.start);
         removed.forEach(function (r) {
@@ -427,7 +503,7 @@
     function duplicateClip(project, id) {
         const clip = getClip(project, id);
         if (!clip) return { project: project, id: null };
-        const copy = Object.assign(clone(clip), { id: newId('c') });
+        const copy = Object.assign(clone(clip), { id: newId('c'), transition: null });
         const at = findFreeStart(project, clip.track, clipEnd(clip), clip.duration, null);
         let start = at;
         if (start === null || start < clipEnd(clip) - EPS) start = trackEnd(project, clip.track);
@@ -435,6 +511,167 @@
         const p = clone(project);
         p.clips.push(copy);
         return { project: p, id: copy.id };
+    }
+
+    /** What Ctrl+C keeps: the clips, and where the earliest of them started. */
+    function copyClips(project, ids) {
+        const clips = project.clips.filter((c) => ids.indexOf(c.id) !== -1).map(clone);
+        if (!clips.length) return null;
+        return { clips: clips, base: Math.min.apply(null, clips.map((c) => c.start)) };
+    }
+
+    /**
+     * Pastes copied clips with their spacing kept, the earliest at `time`.
+     * Each goes on its own track when that still exists, else its kind's main
+     * track, sliding to the nearest gap if its spot is taken.
+     */
+    function pasteClips(project, clipboard, time) {
+        let p = project;
+        const ids = [];
+        if (!clipboard) return { project: p, ids: ids };
+        clipboard.clips.forEach(function (src) {
+            if (src.type !== 'text' && !getMedia(p, src.mediaId)) return;
+            const copy = Object.assign(clone(src), { id: newId('c'), transition: null });
+            copy.start = round(time + (src.start - clipboard.base));
+            const kind = trackKindFor(clipKind(p, copy));
+            const own = getTrack(p, copy.track);
+            if (!own || own.kind !== kind) {
+                const t = lowestTrack(p, kind);
+                if (!t) return;
+                copy.track = t.id;
+            }
+            const next = addClip(p, copy);
+            if (next !== p) { p = next; ids.push(copy.id); }
+        });
+        return { project: p, ids: ids };
+    }
+
+    /* ------------------------------------------------------- speed and freeze */
+
+    /**
+     * Plays a clip faster or slower. Its in-point stays; its length changes
+     * to cover the same source, stopping short of the next clip and the end
+     * of the file.
+     */
+    function setSpeed(project, id, speed) {
+        const clip = getClip(project, id);
+        if (!clip || !isTimed(project, clip)) return project;
+        const s = clamp(speed, MIN_SPEED, MAX_SPEED);
+        const span = clip.duration * speedOf(clip);
+        const nextStart = trackClips(project, clip.track, id)
+            .filter((o) => o.start >= clipEnd(clip) - EPS)
+            .reduce((m, o) => Math.min(m, o.start), Infinity);
+        const maxBySource = (sourceLength(project, clip) - (clip.in || 0)) / s;
+        const duration = round(Math.max(MIN_DURATION, Math.min(span / s, nextStart - clip.start, maxBySource)));
+        const p = clone(project);
+        const c = p.clips.find((x) => x.id === id);
+        c.speed = round(s);
+        c.duration = duration;
+        c.fadeIn = Math.min(c.fadeIn || 0, duration);
+        c.fadeOut = Math.min(c.fadeOut || 0, duration);
+        return p;
+    }
+
+    /**
+     * Holds the frame under the playhead for `hold` seconds: the video is
+     * split there, a still of that frame is inserted, and everything after
+     * it on the track moves along to make room.
+     */
+    function freezeFrame(project, id, time, hold) {
+        const clip = getClip(project, id);
+        const len = hold > 0 ? hold : 2;
+        if (!clip || clipKind(project, clip) !== 'video' || clip.freeze || clip.audioOnly) return { project: project, id: null };
+        if (time < clip.start - EPS || time > clipEnd(clip) + EPS) return { project: project, id: null };
+        const frameAt = clamp(sourceTime(clip, Math.min(time, clipEnd(clip) - 1e-3)), 0, sourceLength(project, clip));
+        // Too near an edge to split: hold at that edge instead.
+        let at = time;
+        if (at < clip.start + MIN_DURATION) at = clip.start;
+        else if (at > clipEnd(clip) - MIN_DURATION) at = clipEnd(clip);
+        let p = splitClip(project, id, at);
+        p = clone(p);
+        p.clips.forEach(function (c) {
+            if (c.track === clip.track && c.start >= at - EPS) c.start = round(c.start + len);
+        });
+        const still = Object.assign(clone(clip), {
+            id: newId('c'), start: round(at), duration: round(len), in: round(frameAt),
+            speed: 1, freeze: true, muted: true, fadeIn: 0, fadeOut: 0, transition: null, motion: null
+        });
+        p.clips.push(still);
+        return { project: p, id: still.id };
+    }
+
+    /**
+     * Moves a video clip's sound to its own clip on an audio track (adding a
+     * track if none is free), and mutes the original.
+     */
+    function detachAudio(project, id) {
+        const clip = getClip(project, id);
+        if (!clip || clipKind(project, clip) !== 'video' || clip.freeze) return { project: project, id: null };
+        let p = project;
+        let track = p.tracks.find((t) => t.kind === 'audio' && isFree(p, t.id, clip.start, clip.duration, null));
+        if (!track) {
+            const tid = nextTrackId(p, 'audio');
+            p = addTrack(p, 'audio');
+            track = getTrack(p, tid);
+        }
+        const sound = {
+            id: newId('c'), type: 'media', mediaId: clip.mediaId, track: track.id, audioOnly: true,
+            start: clip.start, duration: clip.duration, in: clip.in || 0, speed: speedOf(clip),
+            volume: clip.volume === undefined ? 1 : clip.volume, muted: false,
+            fadeIn: clip.fadeIn || 0, fadeOut: clip.fadeOut || 0
+        };
+        p = clone(p);
+        p.clips.push(sound);
+        p.clips.find((c) => c.id === id).muted = true;
+        return { project: p, id: sound.id };
+    }
+
+    /* ------------------------------------------------------------ transitions */
+
+    /** The clip that ends exactly where this one starts on its track, if any. */
+    function previousAdjacent(project, clip) {
+        return trackClips(project, clip.track, clip.id)
+            .find((o) => Math.abs(clipEnd(o) - clip.start) < 1e-3) || null;
+    }
+
+    /**
+     * The window over which a clip's incoming transition runs: centred on
+     * the cut, and no longer than either clip. Null if it has none or there
+     * is no clip right before it.
+     */
+    function transitionWindow(project, clip) {
+        const tr = clip.transition;
+        if (!tr || !tr.type || !(tr.duration > 0)) return null;
+        const from = previousAdjacent(project, clip);
+        if (!from) return null;
+        const d = Math.min(tr.duration, clip.duration, from.duration);
+        return { from: from, to: clip, type: tr.type, start: clip.start - d / 2, end: clip.start + d / 2, duration: d };
+    }
+
+    /** The transition running on a track at `time`, with its 0–1 progress, or null. */
+    function transitionAt(project, trackId, time) {
+        const clips = trackClips(project, trackId);
+        for (let i = 0; i < clips.length; i += 1) {
+            const w = transitionWindow(project, clips[i]);
+            if (w && time >= w.start - EPS && time < w.end - EPS) {
+                return Object.assign(w, { progress: clamp((time - w.start) / w.duration, 0, 1) });
+            }
+        }
+        return null;
+    }
+
+    function setTransition(project, id, type, duration) {
+        if (!type || type === 'none') return updateClip(project, id, { transition: null });
+        return updateClip(project, id, { transition: { type: type, duration: duration > 0 ? duration : 1 } });
+    }
+
+    /** Puts the same transition on every cut between touching clips on visual and audio tracks. */
+    function transitionAllCuts(project, type, duration) {
+        let p = project;
+        project.clips.forEach(function (c) {
+            if (previousAdjacent(project, c)) p = setTransition(p, c.id, type, duration);
+        });
+        return p;
     }
 
     /* --------------------------------------------------------------- playback */
@@ -446,7 +683,8 @@
 
     /** Where in its source file a clip is at timeline time `time`. */
     function sourceTime(clip, time) {
-        return (clip.in || 0) + (time - clip.start);
+        if (clip.freeze) return clip.in || 0;
+        return (clip.in || 0) + (time - clip.start) * speedOf(clip);
     }
 
     /** 0–1 envelope from the clip's fade-in and fade-out at `time`. */
@@ -459,9 +697,26 @@
         return clamp(a, 0, 1);
     }
 
+    /** Fade for a clip that may be shown a little past its edges by a transition. */
+    function edgeFade(clip, time) {
+        return fadeAt(clip, clamp(time, clip.start, clipEnd(clip) - 1e-3));
+    }
+
+    /**
+     * How the two sides of a transition are weighted at `progress`: `from`
+     * and `to` are 0–1 opacities (and gains, for sound).
+     */
+    function transitionMix(type, progress) {
+        if (type === 'dip') return { from: clamp(1 - 2 * progress, 0, 1), to: clamp(2 * progress - 1, 0, 1) };
+        if (type === 'crossfade' || type === 'zoom') return { from: 1 - progress, to: progress };
+        // Slides and wipes move the pictures instead; the sound still crossfades.
+        return { from: 1, to: 1, soundFrom: 1 - progress, soundTo: progress };
+    }
+
     /**
      * What to draw at `time`, bottom layer first: one entry per visible video
-     * track with a clip under the playhead, then the titles on top.
+     * track with a clip under the playhead (two during a transition), then
+     * the titles on top.
      */
     function renderLayers(project, time) {
         const active = activeClips(project, time);
@@ -469,24 +724,126 @@
         const tracks = project.tracks.slice().reverse();
         ['video', 'text'].forEach(function (kind) {
             tracks.filter((t) => t.kind === kind && !t.hidden).forEach(function (t) {
+                const tr = transitionAt(project, t.id, time);
+                if (tr) {
+                    const mix = transitionMix(tr.type, tr.progress);
+                    [['from', tr.from, mix.from], ['to', tr.to, mix.to]].forEach(function (side) {
+                        const c = side[1];
+                        const k = clipKind(project, c);
+                        if (k === 'audio') return;
+                        layers.push({
+                            clip: c, kind: k,
+                            alpha: edgeFade(c, time) * (c.opacity === undefined ? 1 : c.opacity) * side[2],
+                            transition: { type: tr.type, progress: tr.progress, role: side[0] }
+                        });
+                    });
+                    return;
+                }
                 active.filter((c) => c.track === t.id).forEach(function (c) {
-                    layers.push({ clip: c, kind: clipKind(project, c), alpha: fadeAt(c, time) * (c.opacity === undefined ? 1 : c.opacity) });
+                    const k = clipKind(project, c);
+                    if (k === 'audio') return;
+                    layers.push({ clip: c, kind: k, alpha: fadeAt(c, time) * (c.opacity === undefined ? 1 : c.opacity) });
                 });
             });
         });
         return layers;
     }
 
-    /** Clips whose sound should be playing at `time`, with their gain. */
-    function audibleClips(project, time) {
-        return activeClips(project, time)
-            .filter(function (c) {
-                const kind = clipKind(project, c);
-                if (kind !== 'video' && kind !== 'audio') return false;
-                const track = getTrack(project, c.track);
-                return track && !track.muted && !c.muted;
-            })
-            .map((c) => ({ clip: c, gain: (c.volume === undefined ? 1 : c.volume) * fadeAt(c, time) }));
+    /**
+     * Every clip whose source should be positioned at `time` — those under
+     * the playhead plus both sides of any running transition — with the time
+     * in the source, clamped inside the file.
+     */
+    function mediaAt(project, time) {
+        const seen = new Set();
+        const out = [];
+        function add(c) {
+            if (seen.has(c.id) || c.type === 'text') return;
+            const kind = clipKind(project, c);
+            if (kind === 'image') return;
+            seen.add(c.id);
+            const len = sourceLength(project, c);
+            const src = clamp(sourceTime(c, time), 0, isFinite(len) ? Math.max(0, len - 0.04) : Infinity);
+            out.push({ clip: c, sourceTime: src, playing: isTimed(project, c), inside: c.start <= time + EPS && time < clipEnd(c) - EPS });
+        }
+        project.tracks.forEach(function (t) {
+            const tr = transitionAt(project, t.id, time);
+            if (tr) { add(tr.from); add(tr.to); }
+        });
+        activeClips(project, time).forEach(add);
+        return out;
+    }
+
+    /**
+     * Clips whose sound should be playing at `time`, with their gain. Pass
+     * `duck` (a function of time returning a gain) to lower ducked tracks.
+     */
+    function audibleClips(project, time, duck) {
+        const out = [];
+        const seen = new Set();
+        function push(c, weight) {
+            if (seen.has(c.id) || !isTimed(project, c)) return;
+            const track = getTrack(project, c.track);
+            if (!track || track.muted || c.muted) return;
+            seen.add(c.id);
+            let gain = (c.volume === undefined ? 1 : c.volume) * edgeFade(c, time) * weight;
+            if (duck && track.duck) gain *= duck(time);
+            out.push({ clip: c, gain: gain });
+        }
+        project.tracks.forEach(function (t) {
+            const tr = transitionAt(project, t.id, time);
+            if (!tr) return;
+            const mix = transitionMix(tr.type, tr.progress);
+            push(tr.from, mix.soundFrom === undefined ? mix.from : mix.soundFrom);
+            push(tr.to, mix.soundTo === undefined ? mix.to : mix.soundTo);
+        });
+        activeClips(project, time).forEach(function (c) { push(c, 1); });
+        return out;
+    }
+
+    /** The clip that starts exactly where this one ends on its track, if any. */
+    function nextAdjacent(project, clip) {
+        const end = clipEnd(clip);
+        return trackClips(project, clip.track, clip.id).find((o) => Math.abs(o.start - end) < 1e-3) || null;
+    }
+
+    /**
+     * The span of timeline a clip's sound can be heard over: its own, widened
+     * by the transitions on either side of it.
+     */
+    function soundWindow(project, clip) {
+        let start = clip.start;
+        let end = clipEnd(clip);
+        const inW = transitionWindow(project, clip);
+        if (inW) start = inW.start;
+        const next = nextAdjacent(project, clip);
+        const outW = next && transitionWindow(project, next);
+        if (outW) end = outW.end;
+        return { start: start, end: end, incoming: inW, outgoing: outW };
+    }
+
+    /**
+     * One clip's gain at `time` — the same value audibleClips gives it, but
+     * computed directly, so rendering a long project's sound stays fast.
+     * Pass the clip's soundWindow to avoid recomputing it for every sample.
+     */
+    function clipGainAt(project, clip, time, duck, win) {
+        if (!isTimed(project, clip) || clip.muted) return 0;
+        const track = getTrack(project, clip.track);
+        if (!track || track.muted) return 0;
+        const w = win || soundWindow(project, clip);
+        if (time < w.start - EPS || time >= w.end - EPS) return 0;
+        let weight = 1;
+        if (w.incoming && time < w.incoming.end) {
+            const mix = transitionMix(w.incoming.type, clamp((time - w.incoming.start) / w.incoming.duration, 0, 1));
+            weight = mix.soundTo === undefined ? mix.to : mix.soundTo;
+        } else if (w.outgoing && time >= w.outgoing.start) {
+            const mix = transitionMix(w.outgoing.type, clamp((time - w.outgoing.start) / w.outgoing.duration, 0, 1));
+            weight = mix.soundFrom === undefined ? mix.from : mix.soundFrom;
+        }
+        let gain = (clip.volume === undefined ? 1 : clip.volume) * edgeFade(clip, time) * weight;
+        if (duck && track.duck) gain *= duck(time);
+        return gain;
     }
 
     /**
@@ -507,6 +864,56 @@
         return { x: cx - w / 2, y: cy - h / 2, w: w, h: h };
     }
 
+    /**
+     * Slow pan-and-zoom ("Ken Burns") at `time`: an extra scale and an offset
+     * as fractions of the frame, eased over the clip's length.
+     */
+    function motionAt(clip, time) {
+        const m = clip.motion;
+        if (!m || !m.type || m.type === 'none') return { scale: 1, dx: 0, dy: 0 };
+        const a = m.amount > 0 ? m.amount : 0.15;
+        const u = smooth((time - clip.start) / Math.max(clip.duration, 1e-3));
+        const drift = a / 2 * (1 - 2 * u); // +a/2 → −a/2
+        switch (m.type) {
+        case 'zoom-in': return { scale: 1 + a * u, dx: 0, dy: 0 };
+        case 'zoom-out': return { scale: 1 + a * (1 - u), dx: 0, dy: 0 };
+        case 'pan-left': return { scale: 1 + a, dx: drift, dy: 0 };
+        case 'pan-right': return { scale: 1 + a, dx: -drift, dy: 0 };
+        case 'pan-up': return { scale: 1 + a, dx: 0, dy: drift };
+        case 'pan-down': return { scale: 1 + a, dx: 0, dy: -drift };
+        default: return { scale: 1, dx: 0, dy: 0 };
+        }
+    }
+
+    /**
+     * How a title's entrance animation looks at `time`: opacity, offset and
+     * scale, and `reveal` — the share of characters (typewriter) or words
+     * (word by word) shown so far.
+     */
+    function textAnimAt(clip, time) {
+        const out = { alpha: 1, dx: 0, dy: 0, scale: 1, reveal: 1, unit: 'none' };
+        const type = clip.anim;
+        if (!type || type === 'none') return out;
+        const d = clip.animDuration > 0 ? clip.animDuration : 0.6;
+        const local = Math.max(0, time - clip.start);
+        const e = easeOut(local / d);
+        if (type === 'fade') out.alpha = clamp(local / d, 0, 1);
+        else if (type === 'rise') { out.alpha = clamp(local / d, 0, 1); out.dy = 0.05 * (1 - e); }
+        else if (type === 'slide') { out.alpha = clamp(local / d, 0, 1); out.dx = -0.08 * (1 - e); }
+        else if (type === 'pop') {
+            const u = clamp(local / d, 0, 1);
+            const back = 1 + 2.7 * Math.pow(u - 1, 3) + 1.7 * Math.pow(u - 1, 2);
+            out.alpha = clamp(u * 3, 0, 1);
+            out.scale = 0.6 + 0.4 * back;
+        } else if (type === 'typewriter' || type === 'words') {
+            // Spread across most of the clip, so the last word lands before it ends.
+            const span = Math.max(d, clip.duration * 0.75);
+            out.reveal = clamp(local / span, 0, 1);
+            out.unit = type === 'typewriter' ? 'chars' : 'words';
+        }
+        return out;
+    }
+
     /** A canvas `filter` string for a clip's colour settings. */
     function filterString(filters) {
         const f = Object.assign({}, DEFAULT_FILTERS, filters || {});
@@ -519,18 +926,108 @@
         return parts.length ? parts.join(' ') : 'none';
     }
 
+    /* ---------------------------------------------------------------- ducking */
+
+    /**
+     * Gain over time for ducked tracks: drops to the project's duckAmount
+     * while anything on a track that is not ducked is making sound, and
+     * comes back up after it stops. `levelAt(clip, sourceTime)` returns that
+     * clip's loudness 0–1 (return 1 if unknown). Sampled every `step` seconds
+     * with a quick attack and a slower release, so it does not pump.
+     */
+    function duckEnvelope(project, levelAt, step, threshold) {
+        const dt = step || 0.05;
+        const thr = threshold === undefined ? 0.04 : threshold;
+        const amount = project.duckAmount === undefined ? 0.25 : project.duckAmount;
+        const total = projectDuration(project);
+        const n = Math.ceil(total / dt) + 1;
+        const gains = new Float32Array(n);
+        if (!project.tracks.some((t) => t.kind === 'audio' && t.duck)) { gains.fill(1); return { step: dt, gains: gains }; }
+        const attack = 1 - Math.exp(-dt / 0.08);
+        const release = 1 - Math.exp(-dt / 0.5);
+        let g = 1;
+        let hold = 0;
+        for (let i = 0; i < n; i += 1) {
+            const t = i * dt;
+            const voice = activeClips(project, t).some(function (c) {
+                if (!isTimed(project, c) || c.muted) return false;
+                const track = getTrack(project, c.track);
+                if (!track || track.muted || track.duck) return false;
+                return levelAt(c, sourceTime(c, t)) * (c.volume === undefined ? 1 : c.volume) > thr;
+            });
+            // Bridge the short gaps between words.
+            hold = voice ? 0.35 : Math.max(0, hold - dt);
+            const target = voice || hold > 0 ? amount : 1;
+            g += (target - g) * (target < g ? attack : release);
+            gains[i] = g;
+        }
+        return { step: dt, gains: gains };
+    }
+
+    /** Reads a duck envelope at `time`, interpolating between samples. */
+    function envelopeAt(env, time) {
+        if (!env || !env.gains.length) return 1;
+        const x = time / env.step;
+        const i = Math.floor(x);
+        if (i < 0) return env.gains[0];
+        if (i >= env.gains.length - 1) return env.gains[env.gains.length - 1];
+        return env.gains[i] + (env.gains[i + 1] - env.gains[i]) * (x - i);
+    }
+
+    /* ---------------------------------------------------------------- markers */
+
+    function addMarker(project, time, label) {
+        const p = clone(project);
+        p.markers = (p.markers || []).slice();
+        const m = { id: newId('k'), time: round(Math.max(0, time)), label: label || '' };
+        p.markers.push(m);
+        p.markers.sort((a, b) => a.time - b.time);
+        return { project: p, id: m.id };
+    }
+
+    function updateMarker(project, id, patch) {
+        const p = clone(project);
+        const m = (p.markers || []).find((x) => x.id === id);
+        if (!m) return project;
+        Object.assign(m, patch);
+        if (patch.time !== undefined) m.time = round(Math.max(0, patch.time));
+        p.markers.sort((a, b) => a.time - b.time);
+        return p;
+    }
+
+    function removeMarker(project, id) {
+        const p = clone(project);
+        p.markers = (p.markers || []).filter((m) => m.id !== id);
+        return p;
+    }
+
+    /** "00:00 Intro" lines, as YouTube reads chapters from a description. */
+    function chaptersText(project) {
+        const marks = (project.markers || []).slice().sort((a, b) => a.time - b.time);
+        if (!marks.length || marks[0].time > 0.5) marks.unshift({ time: 0, label: 'Start' });
+        return marks.map(function (m, i) {
+            const s = Math.floor(m.time);
+            const h = Math.floor(s / 3600);
+            const mm = String(Math.floor(s / 60) % 60).padStart(2, '0');
+            const ss = String(s % 60).padStart(2, '0');
+            return (h ? h + ':' : '') + mm + ':' + ss + ' ' + (m.label || 'Chapter ' + (i + 1));
+        }).join('\n');
+    }
+
     /* ------------------------------------------------------------ interaction */
 
     /**
-     * Snaps `time` to the nearest clip edge, playhead or zero within
-     * `threshold` seconds, ignoring the clip being dragged.
+     * Snaps `time` to the nearest clip edge, marker, playhead or zero within
+     * `threshold` seconds, ignoring the clips being dragged.
      */
     function snapTime(project, time, threshold, excludeId, extra) {
+        const skip = Array.isArray(excludeId) ? excludeId : [excludeId];
         const points = [0].concat(extra || []);
         project.clips.forEach(function (c) {
-            if (c.id === excludeId) return;
+            if (skip.indexOf(c.id) !== -1) return;
             points.push(c.start, clipEnd(c));
         });
+        (project.markers || []).forEach(function (m) { points.push(m.time); });
         let best = time;
         let bestDist = threshold;
         points.forEach(function (pt) {
@@ -578,6 +1075,89 @@
     /** Snaps a time to the frame grid. */
     function toFrame(time, fps) {
         return Math.round(time * fps) / fps;
+    }
+
+    /* ------------------------------------------------------------ text, RTL */
+
+    const ARABIC_RE = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
+
+    /** True if the text contains Arabic script, so it is laid out right to left. */
+    function isArabic(text) {
+        return ARABIC_RE.test(String(text || ''));
+    }
+
+    /** 12 → "١٢", for ayah numbers. */
+    function arabicDigits(n) {
+        return String(n).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
+    }
+
+    /* ------------------------------------------------------------- subtitles */
+
+    /**
+     * Groups timed words into caption lines: a new line at sentence ends,
+     * pauses longer than `gap`, or when a line would pass `maxChars` or
+     * `maxDuration`. Words are { text, start, end }.
+     */
+    function wordsToCaptions(words, options) {
+        const o = Object.assign({ maxChars: 42, maxDuration: 4, gap: 0.6 }, options);
+        const cues = [];
+        let cur = null;
+        words.forEach(function (w) {
+            const text = String(w.text).trim();
+            if (!text) return;
+            const joined = cur ? cur.text + ' ' + text : text;
+            const breakHere = !cur || w.start - cur.end > o.gap || joined.length > o.maxChars ||
+                w.end - cur.start > o.maxDuration || /[.!?؟。]$/.test(cur.text);
+            if (breakHere) {
+                if (cur) cues.push(cur);
+                cur = { start: w.start, end: w.end, text: text };
+            } else {
+                cur.text = joined;
+                cur.end = w.end;
+            }
+        });
+        if (cur) cues.push(cur);
+        return cues.map((c) => ({ start: round(c.start), end: round(Math.max(c.end, c.start + 0.3)), text: c.text }));
+    }
+
+    function subtitleTime(t, sep) {
+        const ms = Math.round(Math.max(0, t) * 1000);
+        const pad = (n, w) => String(n).padStart(w || 2, '0');
+        return pad(Math.floor(ms / 3600000)) + ':' + pad(Math.floor(ms / 60000) % 60) + ':' +
+            pad(Math.floor(ms / 1000) % 60) + sep + pad(ms % 1000, 3);
+    }
+
+    function toSRT(cues) {
+        return cues.map((c, i) => (i + 1) + '\n' + subtitleTime(c.start, ',') + ' --> ' +
+            subtitleTime(c.end, ',') + '\n' + c.text + '\n').join('\n');
+    }
+
+    function toVTT(cues) {
+        return 'WEBVTT\n\n' + cues.map((c) => subtitleTime(c.start, '.') + ' --> ' +
+            subtitleTime(c.end, '.') + '\n' + c.text + '\n').join('\n');
+    }
+
+    /** Reads SRT or WebVTT into cues. */
+    function parseSubtitles(text) {
+        const hms = function (s) {
+            const parts = s.trim().replace(',', '.').split(':').map(Number);
+            return parts.reduce((a, x) => a * 60 + x, 0);
+        };
+        const cues = [];
+        String(text).replace(/^﻿/, '').replace(/\r/g, '').split(/\n\s*\n/).forEach(function (block) {
+            const m = block.match(/((?:\d+:)?\d+:\d+[.,]\d+)\s*-->\s*((?:\d+:)?\d+:\d+[.,]\d+)[^\n]*\n([\s\S]*)/);
+            if (!m) return;
+            const body = m[3].replace(/<[^>]+>/g, '').trim();
+            if (body) cues.push({ start: hms(m[1]), end: hms(m[2]), text: body });
+        });
+        return cues;
+    }
+
+    /** Subtitle cues from the titles on a text track, in time order. */
+    function trackCues(project, trackId) {
+        return trackClips(project, trackId)
+            .filter((c) => c.type === 'text' && String(c.text || '').trim())
+            .map((c) => ({ start: c.start, end: clipEnd(c), text: c.text }));
     }
 
     /* ---------------------------------------------------------------- history */
@@ -629,7 +1209,7 @@
         p.version = VERSION;
         p.media = p.media.map(function (m) {
             const out = {};
-            ['id', 'name', 'type', 'mime', 'size', 'lastModified', 'duration', 'width', 'height']
+            ['id', 'name', 'type', 'mime', 'size', 'lastModified', 'duration', 'width', 'height', 'origin']
                 .forEach(function (k) { if (m[k] !== undefined) out[k] = m[k]; });
             return out;
         });
@@ -651,6 +1231,7 @@
         }
         const base = createProject();
         const p = Object.assign(base, data);
+        if (!Array.isArray(p.markers)) p.markers = [];
         const trackIds = new Set(p.tracks.map((t) => t.id));
         const mediaIds = new Set(p.media.map((m) => m.id));
         p.clips = p.clips.filter(function (c) {
@@ -667,14 +1248,21 @@
     }
 
     return {
-        FORMAT, VERSION, MIN_DURATION, DEFAULT_STILL, DEFAULT_FILTERS,
+        FORMAT, VERSION, MIN_DURATION, DEFAULT_STILL, DEFAULT_FILTERS, MIN_SPEED, MAX_SPEED,
+        TRANSITIONS, MOTIONS, TEXT_ANIMS,
         newId, clone, clamp,
-        createProject, addMedia, getMedia, getClip, getTrack, addTrack, updateTrack, removeTrack,
-        clipKind, trackKindFor, clipEnd, trackClips, trackEnd, projectDuration, lowestTrack,
-        isFree, findFreeStart, clipFromMedia, textClip, addClip, appendMedia, updateClip,
-        moveClip, trimClip, splitClip, splitAt, deleteClips, duplicateClip, sourceLength,
-        activeClips, sourceTime, fadeAt, renderLayers, audibleClips, placeRect, filterString,
+        createProject, addMedia, getMedia, getClip, getTrack, addTrack, nextTrackId, updateTrack, removeTrack,
+        clipKind, trackKindFor, isTimed, speedOf, clipEnd, trackClips, trackEnd, projectDuration, lowestTrack,
+        isFree, findFreeStart, clipFromMedia, textClip, addClip, appendMedia, updateClip, updateClips,
+        moveClip, moveClips, trimClip, splitClip, splitAt, deleteClips, duplicateClip, copyClips, pasteClips,
+        sourceLength, setSpeed, freezeFrame, detachAudio,
+        previousAdjacent, transitionWindow, transitionAt, setTransition, transitionAllCuts, transitionMix,
+        activeClips, sourceTime, fadeAt, edgeFade, renderLayers, mediaAt, audibleClips, placeRect,
+        nextAdjacent, soundWindow, clipGainAt,
+        motionAt, textAnimAt, filterString, duckEnvelope, envelopeAt,
+        addMarker, updateMarker, removeMarker, chaptersText,
         snapTime, rulerStep, formatTime, parseTime, toFrame,
+        isArabic, arabicDigits, wordsToCaptions, toSRT, toVTT, parseSubtitles, trackCues,
         History, serialize, deserialize, matchMedia
     };
 }));

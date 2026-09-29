@@ -4,8 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reel Video Editor</title>
-<meta name="description" content="A video editor that runs entirely in the browser: cut, trim and layer clips, add titles and music, and export a video file. Nothing is uploaded.">
+<meta name="description" content="A free video editor that runs entirely in the browser: cut, trim and layer clips, add Arabic and English titles, Qur’an verse videos with recitation, captions and music, and export MP4. Nothing is uploaded.">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#151920">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Video Editor">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Scheherazade+New:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Reem+Kufi:wght@400;700&family=Cairo:wght@400;700&family=Cormorant+Garamond:wght@600;700&family=Marcellus&display=swap" rel="stylesheet">
 <style>
 :root {
     --bg: #0e1014;
@@ -216,7 +226,8 @@ kbd { justify-self: start; font-family: var(--mono); font-size: 11px; background
 .tl-toolbar .spacer { flex: 1; }
 .tl-toolbar label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 #zoom { width: 120px; }
-.timeline { flex: 1; overflow: auto; position: relative; min-height: 0; background: var(--bg); outline: none; }
+/* Touch gestures (pan, pinch, drag) are handled in script. */
+.timeline { flex: 1; overflow: auto; position: relative; min-height: 0; background: var(--bg); outline: none; touch-action: none; }
 .tl-inner { position: relative; min-height: 100%; }
 .tl-rulerrow { display: flex; position: sticky; top: 0; z-index: 5; height: var(--ruler-h); }
 .tl-corner {
@@ -295,6 +306,66 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 }
 .media-host { position: fixed; left: -10px; top: -10px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 
+/* ------------------------------------------------ markers and badges */
+.marker {
+    position: absolute; top: 0; bottom: 0; width: 0; z-index: 2; cursor: grab;
+}
+.marker::before {
+    content: ""; position: absolute; top: 2px; left: -1px; width: 12px; height: 12px;
+    background: var(--warn); clip-path: polygon(0 0, 100% 0, 100% 60%, 0 100%);
+}
+.marker span {
+    position: absolute; top: 1px; left: 14px; font-size: 10px; color: var(--warn); white-space: nowrap;
+    max-width: 140px; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+.marker.selected::before { background: #fff; }
+.marker.selected span { color: #fff; }
+.tl-markerline { position: absolute; top: var(--ruler-h); bottom: 0; width: 1px; background: rgba(242, 184, 75, .35); z-index: 1; pointer-events: none; }
+.clip.primary { box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--accent); }
+.clip.freeze { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 6px, transparent 6px 12px); }
+.clip-tr {
+    position: absolute; left: 0; top: 0; bottom: 0; pointer-events: none;
+    background: linear-gradient(to right, rgba(255,255,255,.35), rgba(255,255,255,0));
+    border-left: 2px solid #fff;
+}
+.clip-badge { position: absolute; right: 10px; top: 1px; font-size: 11px; pointer-events: none; opacity: .9; }
+.marker-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.marker-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marker-row button:first-child { font-family: var(--mono); font-size: 11px; }
+.hint { margin: 0; color: var(--faint); font-size: 12px; line-height: 1.45; }
+
+/* --------------------------------------------------------- tools menu */
+.menu-wrap { position: relative; }
+.menu {
+    position: fixed; z-index: 80; width: max-content; min-width: 240px; max-width: min(360px, calc(100vw - 16px));
+    max-height: 70vh; overflow: auto; padding: 6px;
+    background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px;
+    box-shadow: 0 16px 50px rgba(0,0,0,.55);
+}
+.menu-section { padding: 8px 10px 4px; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.menu-item { display: flex; width: 100%; background: transparent; border-color: transparent; padding: 7px 10px; text-align: left; white-space: normal; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--panel-3); border-color: var(--line-2); }
+#quran-video { font-family: "Amiri", serif; font-size: 14px; }
+
+/* ------------------------------------------------------ generic dialogs */
+.dialog.wide { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.dialog-body { display: grid; gap: 10px; }
+.dialog-body .field.wide { grid-template-columns: 110px minmax(0, 1fr); }
+.dialog-body .field .hint { grid-column: 2; }
+.dialog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px 18px; }
+.field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.field-pair .field.wide { grid-template-columns: 70px minmax(0, 1fr); }
+.dialog-status { min-height: 1.4em; color: var(--text) !important; }
+.dialog-status:empty { display: none; }
+
+/* ------------------------------------------------------------ touch */
+@media (pointer: coarse) {
+    :root { --row-h: 64px; }
+    .handle { width: 18px; }
+    .handle::after { left: 8px; }
+    button.icon { padding: 8px 10px; }
+}
+
 /* ------------------------------------------------------------ narrow */
 @media (max-width: 900px) {
     body { grid-template-rows: auto minmax(0, 1fr) 0 minmax(220px, 40vh); }
@@ -305,7 +376,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     .topbar { gap: 4px; }
     .brand { margin-right: 0; }
     #project-name { display: none; }
-    #resolution { width: 96px; }
+    #resolution { width: 84px; }
     .hide-narrow { display: none !important; }
     :root { --head-w: 96px; }
 }
@@ -333,9 +404,15 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     <span class="sep hide-narrow"></span>
     <button id="undo" class="icon ghost" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
     <button id="redo" class="icon ghost" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></svg></button>
+    <span class="sep hide-narrow"></span>
+    <button id="quran-video" class="ghost" title="Make a Qur’an verse video: recitation, Arabic and translation, timed ayah by ayah">﴿ ﴾ <span class="hide-narrow" style="font-family: system-ui, sans-serif; font-size: 13px">Qur’ān video</span></button>
+    <div class="menu-wrap">
+        <button id="tools" class="ghost" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="Tools"><svg class="show-narrow" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="hide-narrow">Tools</span> <svg class="hide-narrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
     <span class="spacer"></span>
-    <button id="toggle-bin" class="show-narrow">Media</button>
-    <button id="toggle-inspector" class="show-narrow">Details</button>
+    <a id="help-link" class="hide-narrow" href="help.html" target="_blank" rel="noopener" style="color: var(--muted); text-decoration: none; padding: 5px 8px">Help</a>
+    <button id="toggle-bin" class="show-narrow icon" title="Media" aria-label="Show media"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+    <button id="toggle-inspector" class="show-narrow icon" title="Details" aria-label="Show details"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
     <button id="new-project" class="ghost hide-narrow" title="Start a new project">New</button>
     <button id="open-project" class="ghost hide-narrow" title="Open a saved project (.json)">Open</button>
     <button id="save-project" class="ghost hide-narrow" title="Save the project as a file">Save</button>
@@ -390,9 +467,11 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
         <button id="tool-delete" class="ghost" title="Delete (Del) — Shift+Del closes the gap"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><span class="hide-narrow">Delete</span></button>
         <button id="tool-duplicate" class="ghost" title="Duplicate (Ctrl+D)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg><span class="hide-narrow">Duplicate</span></button>
         <button id="add-text" class="ghost" title="Add a title at the playhead (T)"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="hide-narrow">Title</span></button>
+        <button id="add-marker" class="ghost" title="Add a marker at the playhead (M) — markers become YouTube chapters"><svg viewBox="0 0 24 24"><path d="M6 21V4h12l-3 4 3 4H6"/></svg><span class="hide-narrow">Marker</span></button>
         <span class="sep"></span>
-        <button id="add-video-track" class="ghost hide-narrow" title="Add a video track">+ Video track</button>
-        <button id="add-audio-track" class="ghost hide-narrow" title="Add an audio track">+ Audio track</button>
+        <button id="add-video-track" class="ghost hide-narrow" title="Add a video track">+ Video</button>
+        <button id="add-audio-track" class="ghost hide-narrow" title="Add an audio track">+ Audio</button>
+        <button id="add-text-track" class="ghost hide-narrow" title="Add a titles track">+ Titles</button>
         <span class="spacer"></span>
         <button id="snap" class="ghost" aria-pressed="true" title="Snap to clip edges and the playhead"><svg viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0012 0V3M6 7h4M14 7h4"/></svg><span class="hide-narrow">Snap</span></button>
         <span class="sep"></span>
@@ -417,7 +496,7 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
                 </select>
             </div>
             <p id="export-summary"></p>
-            <p>Export plays the project through once in real time. Keep this tab in front until it finishes.</p>
+            <p id="export-note"></p>
         </div>
         <div id="export-progress" class="group" hidden>
             <progress id="export-bar" max="1" value="0"></progress>
@@ -431,12 +510,29 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
     </div>
 </div>
 
+<div id="tools-menu" class="menu" role="menu" aria-label="Tools" hidden></div>
 <div id="drop-overlay" class="drop-overlay" hidden>Drop to import</div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <div id="media-host" class="media-host" aria-hidden="true"></div>
 
-<script src="timeline.js"></script>
-<script src="webm.js"></script>
-<script src="editor.js"></script>
+<!-- ?v= is stamped with the release by tools/deploy-video-editor.sh, so browsers and the offline cache pick up new versions. -->
+<script src="timeline.js?v=dev"></script>
+<script src="audio-core.js?v=dev"></script>
+<script src="webm.js?v=dev"></script>
+<script src="editor.js?v=dev"></script>
+<script src="media-store.js?v=dev"></script>
+<script src="audio-mix.js?v=dev"></script>
+<script src="export-fast.js?v=dev"></script>
+<script src="quran.js?v=dev"></script>
+<script src="captions.js?v=dev"></script>
+<script>
+// Works offline after the first visit (http only; the service worker cannot run from a file).
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {
+    window.addEventListener('load', function () {
+        var v = (document.querySelector('script[src^="editor.js"]').getAttribute('src').split('v=')[1]) || 'dev';
+        navigator.serviceWorker.register('sw.js?v=' + v).catch(function () {});
+    });
+}
+</script>
 </body>
 </html>
