@@ -1267,7 +1267,7 @@
         if (track.kind === 'audio') {
             buttons.push(el('button', {
                 className: 'ghost' + (track.duck ? ' on' : ''),
-                title: track.duck ? 'Ducking on: this track goes quieter while someone speaks' : 'Duck this track under speech (for background music)',
+                title: track.duck ? 'Ducking on: this track goes quieter while someone speaks' : 'Duck this track under speech (for background sound, such as a nasheed)',
                 'aria-label': (track.duck ? 'Stop ducking ' : 'Duck ') + track.name,
                 'aria-pressed': track.duck ? 'true' : 'false',
                 html: ICONS.duck,
@@ -1979,7 +1979,7 @@
                 const duck = el('input', { type: 'checkbox' });
                 duck.checked = !!track.duck;
                 duck.addEventListener('change', function () { apply(T.updateTrack(state.project, track.id, { duck: duck.checked })); });
-                sound.push(el('label', { className: 'check', title: 'For background music: the whole track goes quieter while anything else is speaking' }, [duck, 'Duck ' + track.id + ' under speech']));
+                sound.push(el('label', { className: 'check', title: 'For background sound, such as a nasheed: the whole track goes quieter while anything else is speaking' }, [duck, 'Duck ' + track.id + ' under speech']));
             }
             box.append(group('Sound', sound));
         }
@@ -2113,7 +2113,7 @@
             ]),
             group('Ducking', [
                 control('Duck to', duck, duckOut),
-                el('p', { className: 'hint', text: 'Turn ducking on for a music track with its ▁▃▅ button: it drops to this level while anything else is speaking.' })
+                el('p', { className: 'hint', text: 'Turn ducking on for a background-sound track (a nasheed, say) with its ▁▃▅ button: it drops to this level while anything else is speaking.' })
             ]),
             group('Markers', markers.length ? markers.concat([el('div', { className: 'row-buttons' }, [button('Copy chapters for YouTube', copyChapters)])])
                 : [el('p', { className: 'hint', text: 'Press M to drop a marker at the playhead. Markers snap clips, and become YouTube chapters.' })]),

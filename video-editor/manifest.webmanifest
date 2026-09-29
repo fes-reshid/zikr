@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Video Editor — Diin Islaam",
   "short_name": "Video Editor",
-  "description": "Edit videos in your browser: cut, layer, titles in Arabic and English, Qur’an verse videos with recitation, captions, music and MP4 export. Works offline; nothing is uploaded.",
+  "description": "Edit videos in your browser: cut, layer, titles in Arabic and English, Qur’an verse videos with recitation, captions and MP4 export. Works offline; nothing is uploaded.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

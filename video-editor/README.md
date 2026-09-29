@@ -31,7 +31,7 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **Layers & look** | Upper tracks draw over lower ones. Scale and position give picture-in-picture, with presets. Also: slow pan-and-zoom (Ken Burns), a blurred-copy fill for vertical frames, colour controls, opacity and fades. |
 | **Titles** | Multi-line titles in Latin or Arabic fonts (Amiri, Scheherazade New, Noto Naskh Arabic, Reem Kufi, Cairo, plus the site's Cormorant and Marcellus). Arabic is laid out right to left. Entrance animations: fade, rise, pop, slide, typewriter and word by word. |
 | **Qur'ān verse videos** | Pick a surah, ayat, reciter and translation. The editor adds each ayah's recitation, the Arabic and translation timed ayah by ayah, a title card, the Bismillah and a background, as one undo step. |
-| **Sound** | Per-clip volume up to 200%, fades, mute and detached audio. **Ducking** lowers a music track whenever anything else is speaking. **Clean up voice** is AI noise removal. Audio clips show waveforms. |
+| **Sound** | Per-clip volume up to 200%, fades, mute and detached audio. **Ducking** lowers a background-sound track (a nasheed, say) whenever anything else is speaking. **Clean up voice** is AI noise removal. Audio clips show waveforms. |
 | **Captions** | Speech to text with Whisper on the device. It also imports .srt/.vtt files and saves any titles track as subtitles. |
 | **Markers** | Drop them with M, drag them, rename them, and copy them as YouTube chapters. |
 | **Audio editor** | "Edit in audio editor" opens a clip's sound in the site's `/audio-editor/`, and its "Send to Video Editor" brings audio back. |
@@ -99,7 +99,7 @@ about 1.2–1.7 s.
 **Ducking.** Waveform peaks, which are also used for drawing, give each
 clip's loudness. The model turns them into a gain envelope for ducked tracks:
 a quick drop while anything else is audible, a slower recovery, and short
-pauses between words bridged, so the music doesn't pump.
+pauses between words bridged, so the background doesn't pump.
 
 **Qur'ān videos.** Text and translation come from the Quran.com API (the same
 one the site's reader uses), and translations are matched by name, never by a
