@@ -212,6 +212,26 @@ async function pixel(page, t, fx, fy) {
     }, [fx, fy]);
 }
 
+/** Left and right edge of the bright (text) pixels in the frame at `t`, and the frame width. */
+async function inkBox(page, t) {
+    await page.evaluate((time) => window.Reel.seek(time), t);
+    await page.waitForTimeout(300);
+    return page.evaluate(function () {
+        window.Reel.drawFrame();
+        const c = document.getElementById('preview');
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let left = Infinity;
+        let right = -1;
+        for (let y = 0; y < c.height; y += 2) {
+            for (let x = 0; x < c.width; x += 1) {
+                const i = (y * c.width + x) * 4;
+                if (d[i] > 200 && d[i + 1] > 200 && d[i + 2] > 200) { if (x < left) left = x; if (x > right) right = x; }
+            }
+        }
+        return { left: left, right: right, width: c.width };
+    });
+}
+
 async function whitePixels(page, t) {
     await page.evaluate((time) => window.Reel.seek(time), t);
     await page.waitForTimeout(300);
@@ -513,6 +533,37 @@ async function probeFile(page, bytes) {
         const arabic = (await project(page)).clips.find((c) => c.id === title.id);
         check('an Arabic title keeps its text and font', arabic.text === 'بسم الله الرحمن الرحيم' && arabic.font === 'amiri');
         check('and is drawn right to left', await whitePixels(page, 4.5) > 400 && await page.evaluate(() => window.TimelineCore.isArabic(window.Reel.project.clips.find((c) => c.type === 'text').text)));
+
+        // A long ayah, big: it must wrap and stay whole and centred in the frame — also in a
+        // browser that reads canvas textAlign 'right' as the reading end (emulated here), the
+        // difference that once pushed the start of an ayah off the edge.
+        await page.locator('.inspector-body textarea').fill('ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ ﴿٢﴾');
+        await page.locator('.inspector-body textarea').blur();
+        await page.getByRole('slider', { name: 'Size', exact: true }).fill('150');
+        await page.getByRole('combobox', { name: 'Entrance' }).selectOption('none');
+        let ink = await inkBox(page, 2);
+        check('a big Arabic title wraps inside the frame, centred', ink.left > 0 && ink.right < ink.width - 1 &&
+            Math.abs((ink.left + ink.right) / 2 - ink.width / 2) < ink.width * 0.05, JSON.stringify(ink));
+        await page.evaluate(function () {
+            const d = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'textAlign');
+            window.__restoreAlign = () => Object.defineProperty(CanvasRenderingContext2D.prototype, 'textAlign', d);
+            Object.defineProperty(CanvasRenderingContext2D.prototype, 'textAlign', {
+                configurable: true,
+                get() { return d.get.call(this); },
+                set(v) { d.set.call(this, v === 'right' ? 'end' : v === 'left' ? 'start' : v); }
+            });
+        });
+        const quirk = await inkBox(page, 2);
+        check('and stays whole where canvas right-alignment behaves differently', quirk.left > 0 && quirk.right < quirk.width - 1 &&
+            Math.abs(quirk.left - ink.left) < 4 && Math.abs(quirk.right - ink.right) < 4, JSON.stringify(quirk));
+        await page.evaluate(() => window.__restoreAlign());
+        await page.getByRole('slider', { name: 'Size', exact: true }).fill('60');
+        await page.getByRole('combobox', { name: 'Entrance' }).selectOption('words');
+        const clipStart = (await project(page)).clips.find((c) => c.id === title.id).start;
+        const partWay = await inkBox(page, clipStart + 1.2);
+        const whole = await inkBox(page, clipStart + 4.5);
+        check('word by word reveals an ayah from its start, on the right', partWay.right > 0 && Math.abs(partWay.right - whole.right) < 6 &&
+            partWay.left > whole.left + 40, JSON.stringify(partWay) + ' of ' + JSON.stringify(whole));
         await clickClip(page, title.id);
         await page.keyboard.press('Delete');
         check('Delete removes it', !(await project(page)).clips.some((c) => c.id === title.id));

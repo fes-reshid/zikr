@@ -652,6 +652,16 @@
         c.fillText(media ? media.name : '', r.x + r.w / 2, r.y + r.h / 2 + size * 0.6);
     }
 
+    /**
+     * The width a line really covers: the larger of its advance width and
+     * its ink, since Arabic marks and swashes can reach past the advance.
+     */
+    function lineWidth(c, text) {
+        const m = c.measureText(text);
+        const ink = (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || 0);
+        return Math.max(m.width, ink);
+    }
+
     /** Word-wraps each paragraph to `maxWidth` using the context's current font. */
     function wrapLines(c, text, maxWidth) {
         const out = [];
@@ -660,7 +670,7 @@
             let line = '';
             words.forEach(function (w) {
                 const next = line + w;
-                if (line.trim() && c.measureText(next).width > maxWidth) {
+                if (line.trim() && lineWidth(c, next) > maxWidth) {
                     out.push(line.trimEnd());
                     line = w.trimStart();
                 } else {
@@ -673,25 +683,49 @@
     }
 
     /**
-     * Draws a title. Arabic is laid out right to left with room for its
-     * marks; each line is anchored at its reading start, so typewriter and
-     * word-by-word reveals grow in place instead of re-centring.
+     * Wraps a title to the frame, and if a single word is still too wide,
+     * makes the whole title smaller until it fits — a title never runs off
+     * the edge.
+     */
+    function layoutText(c, clip, text, size, W) {
+        const maxW = W * 0.9;
+        let s = size;
+        for (let tries = 0; tries < 4; tries += 1) {
+            c.font = fontCss(clip, s);
+            const lines = wrapLines(c, text, maxW);
+            const widths = lines.map((l) => lineWidth(c, l));
+            const widest = Math.max.apply(null, widths);
+            if (widest <= maxW * 1.001 || s < 8) return { size: s, lines: lines, widths: widths };
+            s = Math.max(8, s * maxW / widest * 0.98);
+        }
+        c.font = fontCss(clip, s);
+        const lines = wrapLines(c, text, maxW);
+        return { size: s, lines: lines, widths: lines.map((l) => lineWidth(c, l)) };
+    }
+
+    /**
+     * Draws a title. Every line is drawn centred on its own middle — the one
+     * alignment every browser treats the same for right-to-left text — and
+     * typewriter and word-by-word reveals are a clip that grows from the
+     * reading start (the right for Arabic), so nothing depends on how a
+     * browser aligns partial right-to-left strings.
      */
     function drawText(c, clip, t, W, H) {
         const text = String(clip.text || '');
         if (!text.trim()) return;
         const anim = T.textAnimAt(clip, t);
         c.globalAlpha *= anim.alpha;
-        // Sizes are authored against a 720-line frame and scale with it.
-        const size = clip.fontSize * (H / 720);
         ensureFont(fontCss(clip, 40));
-        c.font = fontCss(clip, size);
         const rtl = T.isArabic(text);
         c.direction = rtl ? 'rtl' : 'ltr';
         c.textBaseline = 'middle';
-        const lines = wrapLines(c, text, W * 0.9);
+        c.textAlign = 'center';
+        // Sizes are authored against a 720-line frame and scale with it.
+        const lay = layoutText(c, clip, text, clip.fontSize * (H / 720), W);
+        const size = lay.size;
+        const lines = lay.lines;
+        const widths = lay.widths;
         const lineH = size * (rtl ? 1.6 : 1.22);
-        const widths = lines.map((l) => c.measureText(l).width);
         const blockW = Math.max.apply(null, widths);
         const blockH = lines.length * lineH;
         const cx = (clip.x + anim.dx) * W;
@@ -721,7 +755,7 @@
         }
         c.fillStyle = clip.color || '#fff';
 
-        // How much of the text the reveal animation shows.
+        // How much of the text the reveal animation shows, in characters or words.
         let budget = Infinity;
         if (anim.unit === 'chars') budget = Math.ceil(lines.join('').length * anim.reveal);
         else if (anim.unit === 'words') {
@@ -731,22 +765,38 @@
         lines.forEach(function (line, i) {
             const w = widths[i];
             const left = clip.align === 'left' ? cx - blockW / 2 : clip.align === 'right' ? cx + blockW / 2 - w : cx - w / 2;
-            let shown = line;
+            const mid = left + w / 2;
+            const y = top + lineH * (i + 0.5);
+            if (budget === Infinity) {
+                c.fillText(line, mid, y);
+                return;
+            }
+            // The part revealed so far, as a prefix of the line in reading order.
+            let prefix = line;
             if (anim.unit === 'chars') {
-                shown = line.slice(0, Math.max(0, budget));
+                prefix = line.slice(0, Math.max(0, budget));
                 budget -= line.length;
-            } else if (anim.unit === 'words') {
+            } else {
                 let out = '';
                 line.split(/(\s+)/).forEach(function (part) {
                     if (!part.trim()) { if (budget > 0) out += part; return; }
                     if (budget > 0) out += part;
                     budget -= 1;
                 });
-                shown = out;
+                prefix = out.trimEnd();
             }
-            if (!shown) return;
-            c.textAlign = rtl ? 'right' : 'left';
-            c.fillText(shown, rtl ? left + w : left, top + lineH * (i + 0.5));
+            if (!prefix) return;
+            if (prefix.length >= line.length) { c.fillText(line, mid, y); return; }
+            // Show that much of the full line, measured from its reading start.
+            const shown = Math.min(w, lineWidth(c, prefix));
+            const pad = size * 0.6;
+            c.save();
+            c.beginPath();
+            if (rtl) c.rect(left + w - shown - 1, y - lineH, shown + pad + 1, lineH * 2);
+            else c.rect(left - pad, y - lineH, shown + pad + 1, lineH * 2);
+            c.clip();
+            c.fillText(line, mid, y);
+            c.restore();
         });
         c.shadowColor = 'transparent';
         c.shadowBlur = 0;
