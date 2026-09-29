@@ -356,6 +356,10 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .field-pair .field.wide { grid-template-columns: 70px minmax(0, 1fr); }
 .dialog-status { min-height: 1.4em; color: var(--text) !important; }
+.about p { margin: 0 0 8px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.about strong { color: var(--text); }
+.about a { color: var(--accent); }
+.dialog-body > p { margin: 0 0 8px; color: var(--muted); line-height: 1.55; }
 .dialog-status:empty { display: none; }
 
 /* ----------------------------------------- purpose reminder (consent.js) */
@@ -475,7 +479,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
         <button id="tools" class="ghost" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="Tools"><svg class="show-narrow" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="hide-narrow">Tools</span> <svg class="hide-narrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
     </div>
     <span class="spacer"></span>
-    <a id="help-link" class="hide-narrow" href="help.html" target="_blank" rel="noopener" style="color: var(--muted); text-decoration: none; padding: 5px 8px">Help</a>
+    <button id="help" class="ghost hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="help-menu">Help <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
     <button id="toggle-bin" class="show-narrow icon" title="Media" aria-label="Show media"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
     <button id="toggle-inspector" class="show-narrow icon" title="Details" aria-label="Show details"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
     <button id="new-project" class="ghost hide-narrow" title="Start a new project">New</button>
@@ -576,6 +580,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
 </div>
 
 <div id="tools-menu" class="menu" role="menu" aria-label="Tools" hidden></div>
+<div id="help-menu" class="menu" role="menu" aria-label="Help" hidden></div>
 <div id="drop-overlay" class="drop-overlay" hidden>Drop to import</div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <div id="media-host" class="media-host" aria-hidden="true"></div>

@@ -731,6 +731,150 @@ async function probeFile(page, bytes) {
         const subs = onTrack(p, p.tracks.find((t) => t.name === 'Subtitles').id);
         check('subtitle files import as titles', subs.length === 1 && subs[0].text === 'Imported line' && approx(subs[0].start, 5));
 
+        /* ------------------------------------------------------------ effects */
+        const splitPng = Buffer.from(await page.evaluate(function () {
+            // Left half red, right half blue, with a black-and-white checkerboard in the top-right quarter.
+            const c = document.createElement('canvas');
+            c.width = 400;
+            c.height = 200;
+            const x = c.getContext('2d');
+            x.fillStyle = '#ff0000'; x.fillRect(0, 0, 200, 200);
+            x.fillStyle = '#0000ff'; x.fillRect(200, 0, 200, 200);
+            for (let yy = 0; yy < 100; yy += 2) for (let xx = 200; xx < 400; xx += 2) {
+                x.fillStyle = ((xx + yy) / 2) % 2 ? '#ffffff' : '#000000';
+                x.fillRect(xx, yy, 2, 2);
+            }
+            return c.toDataURL('image/png').split(',')[1];
+        }), 'base64');
+        await page.setInputFiles('#import-input', [{ name: 'split.png', mimeType: 'image/png', buffer: splitPng }]);
+        await page.waitForFunction(() => window.Reel.project.media.some((m) => m.name === 'split.png'));
+        const fxAt = await page.evaluate(function () {
+            const app = window.ReelApp;
+            const T = app.T;
+            let p = app.state.project;
+            const id = T.nextTrackId(p, 'video');
+            p = T.addTrack(p, 'video');
+            const at = T.projectDuration(p) + 1;
+            const clip = Object.assign(T.clipFromMedia(p.media.find((m) => m.name === 'split.png'), id, at), { duration: 3 });
+            app.state.project = T.addClip(p, clip);
+            app.commit();
+            app.selectOnly(clip.id);
+            return { at: at + 1, id: clip.id };
+        });
+        const fxClip = () => page.evaluate((id) => window.TimelineCore.fxOf(window.Reel.project.clips.find((c) => c.id === id)), fxAt.id);
+        px = await pixel(page, fxAt.at, 0.25, 0.5);
+        check('the test picture shows red on the left', px[0] > 200 && px[2] < 60, px.join(','));
+        await page.locator('.inspector-body label.check', { hasText: 'Mirror' }).click();
+        px = await pixel(page, fxAt.at, 0.25, 0.75);
+        check('Mirror flips it left to right', px[2] > 200 && px[0] < 60 && (await fxClip()).flipH, px.join(','));
+        await page.locator('#timeline').focus();
+        await page.keyboard.press('Control+z');
+        check('undo takes the mirror off', !(await fxClip()).flipH);
+
+        await page.getByRole('slider', { name: 'Crop left', exact: true }).fill('45');
+        px = await pixel(page, fxAt.at, 0.5, 0.75);
+        check('cropping keeps the chosen part, filling the frame again', px[2] > 200 && Math.abs((await fxClip()).crop.l - 0.45) < 1e-6, px.join(','));
+        await page.locator('#timeline').focus();
+        await page.keyboard.press('Control+z');
+        check('undo puts the crop back', (await fxClip()).crop.l === 0);
+
+        await page.getByRole('combobox', { name: 'Look', exact: true }).selectOption('bw');
+        px = await pixel(page, fxAt.at, 0.25, 0.75);
+        check('a Black & white look takes the colour out', Math.abs(px[0] - px[1]) < 12 && Math.abs(px[1] - px[2]) < 12 && (await fxClip()).look === 'bw', px.join(','));
+        await page.getByRole('combobox', { name: 'Look', exact: true }).selectOption('vintage');
+        const vintage = (await fxClip());
+        check('a Vintage look adds vignette and grain', vintage.vignette > 0 && vintage.grain > 0);
+        await page.getByRole('combobox', { name: 'Look', exact: true }).selectOption('none');
+
+        const spread = () => page.evaluate(function () {
+            window.Reel.drawFrame();
+            const c = document.getElementById('preview');
+            const d = c.getContext('2d').getImageData(720, 80, 480, 250).data;
+            let sum = 0;
+            let sq = 0;
+            let n = 0;
+            for (let i = 0; i < d.length; i += 4) { const l = (d[i] + d[i + 1] + d[i + 2]) / 3; sum += l; sq += l * l; n += 1; }
+            return Math.sqrt(sq / n - (sum / n) * (sum / n));
+        });
+        await page.evaluate((t) => window.Reel.seek(t), fxAt.at);
+        await page.waitForTimeout(300);
+        const sharp = await spread();
+        await page.locator('.inspector-body label.check', { hasText: 'Hide an area' }).click();
+        await page.getByRole('combobox', { name: 'Shape', exact: true }).selectOption('rect');
+        await page.getByRole('combobox', { name: 'Cover with', exact: true }).selectOption('pixelate');
+        for (const [name, v] of [['Across', '75'], ['Down', '25'], ['Width', '50'], ['Height', '50']]) {
+            await page.getByRole('slider', { name: name, exact: true }).fill(v);
+        }
+        await page.locator('#timeline').focus();
+        await page.keyboard.press('Escape'); // deselect, so the dashed guide is not drawn
+        await page.waitForTimeout(200);
+        const hidden = await spread();
+        check('Hide an area pixelates the chosen part of the picture', sharp > 60 && hidden < sharp / 3,
+            'contrast ' + sharp.toFixed(0) + ' → ' + hidden.toFixed(0));
+        await page.evaluate((id) => window.Reel.select(id), fxAt.id);
+
+        await page.getByRole('slider', { name: 'Corners', exact: true }).fill('60');
+        px = await pixel(page, fxAt.at, 3 / 1280, 44 / 720);
+        check('rounded corners cut the picture’s corners away', px[0] < 40 && px[1] < 40 && px[2] < 40, px.join(','));
+        await page.getByRole('slider', { name: 'Border', exact: true }).fill('12');
+        px = await pixel(page, fxAt.at, 0.5, 44 / 720);
+        check('a border frames the picture', px[0] > 200 && px[1] > 200 && px[2] > 200, px.join(','));
+        check('the clip shows an fx badge', /fx/.test(await page.locator('.clip[data-id="' + fxAt.id + '"] .clip-badge').textContent()));
+
+        // Titles: outline and a ready-made style.
+        await page.evaluate((t) => window.Reel.seek(t), fxAt.at - 1);
+        await page.click('#add-text');
+        await page.keyboard.type('Outline');
+        await page.keyboard.press('Tab');
+        await page.getByRole('slider', { name: 'Outline', exact: true }).fill('6');
+        const outlineColour = page.getByLabel('Outline colour');
+        await outlineColour.evaluate((i) => { i.value = '#ff0000'; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); });
+        const reds = await page.evaluate(async function (t) {
+            window.Reel.seek(t);
+            await new Promise((r) => setTimeout(r, 300));
+            window.Reel.drawFrame();
+            const c = document.getElementById('preview');
+            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+            let n = 0;
+            for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] < 50 && d[i + 2] < 50) n += 1;
+            return n;
+        }, fxAt.at);
+        check('a title outline is drawn in its colour', reds > 1500, reds + ' red pixels');
+        await page.getByRole('button', { name: 'Lower-third bar', exact: true }).click();
+        const styled = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'Outline');
+        check('a title style places and boxes the title', styled.y === 0.84 && styled.box === true && styled.anim === 'slide');
+
+        // Colour card.
+        await page.evaluate((t) => window.Reel.seek(t), fxAt.at + 5);
+        await page.click('#tools');
+        await page.getByRole('menuitem', { name: /Colour or gradient card/ }).click();
+        await page.locator('.modal.generic').getByRole('combobox', { name: 'Style' }).selectOption('solid');
+        await page.locator('.modal.generic').getByLabel('Colour', { exact: true }).evaluate((i) => { i.value = '#00ff00'; });
+        await page.locator('.modal.generic').getByRole('button', { name: 'Add card' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached' });
+        p = await project(page);
+        const card = p.clips.find((c) => { const m = p.media.find((x) => x.id === c.mediaId); return m && /^Card/.test(m.name); });
+        px = card ? await pixel(page, card.start + 1, 0.5, 0.5) : [0, 0, 0];
+        check('a colour card is added at the playhead in its colour', card && px[1] > 200 && px[0] < 60, px.join(','));
+
+        // Normalise loudness.
+        const toneNow = p.clips.find((c) => c.id === toneClip.id);
+        await page.evaluate((id) => window.Reel.select(id), toneNow.id);
+        await page.getByRole('button', { name: 'Normalise loudness' }).click();
+        const louder = (await project(page)).clips.find((c) => c.id === toneNow.id);
+        check('Normalise loudness raises a quiet clip', louder.volume > toneNow.volume, toneNow.volume + ' → ' + louder.volume);
+
+        // Help ▸ About.
+        await page.click('#help');
+        check('the Help menu has the guide and About', (await page.locator('#help-menu .menu-item').allTextContents()).join('|') === 'User guide|Keyboard shortcuts|About');
+        await page.getByRole('menuitem', { name: 'About' }).click();
+        const about = page.locator('.modal.generic');
+        const aboutText = await about.innerText();
+        check('About shows the name, author, version and contact', /Video Editor — Diin Islaam/.test(aboutText) && /Feysel Reshid/.test(aboutText) &&
+            /Version/.test(aboutText) && /fesbackups@gmail\.com/.test(aboutText) && /never uploaded/.test(aboutText));
+        await about.getByRole('button', { name: 'Close' }).click();
+        check('and closes', await page.locator('.modal.generic').count() === 0);
+
         /* ------------------------------------------------------------ offline */
         const sw = await context.newPage();
         await sw.goto(base + '/video-editing/');

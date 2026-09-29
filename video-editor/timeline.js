@@ -30,7 +30,46 @@
     const MIN_SPEED = 0.25;
     const MAX_SPEED = 4;
 
-    const DEFAULT_FILTERS = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, blur: 0 };
+    const DEFAULT_FILTERS = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, blur: 0, sepia: 0, hue: 0 };
+
+    /** A clip's effects, beyond colour: looks, transform, frame, hidden area. */
+    const DEFAULT_FX = {
+        look: 'none',
+        tint: null,              // { color, amount 0–1 }
+        vignette: 0,             // 0–1
+        grain: 0,                // 0–1
+        flipH: false,
+        flipV: false,
+        rotate: 0,               // degrees
+        crop: { l: 0, r: 0, t: 0, b: 0 },   // fractions of the picture
+        radius: 0,               // rounded corners, 0–1 of half the shorter side
+        border: { width: 0, color: '#ffffff' },
+        shadow: false,
+        hide: null               // { shape: 'rect'|'oval', mode: 'blur'|'pixelate'|'solid', x, y, w, h, strength, color }
+    };
+
+    /** One-click looks: colour settings plus tint, vignette and grain. */
+    const LOOKS = {
+        none: { label: 'Natural', filters: {}, fx: {} },
+        warm: { label: 'Warm', filters: { saturate: 115, sepia: 12, brightness: 103 }, fx: { tint: { color: '#ff9a3c', amount: 0.25 } } },
+        cool: { label: 'Cool', filters: { saturate: 105, hue: -8 }, fx: { tint: { color: '#3c8cff', amount: 0.25 } } },
+        golden: { label: 'Golden hour', filters: { sepia: 25, saturate: 120, brightness: 105 }, fx: { tint: { color: '#ffc04d', amount: 0.3 }, vignette: 0.25 } },
+        vintage: { label: 'Vintage', filters: { sepia: 45, contrast: 90, saturate: 80, brightness: 105 }, fx: { vignette: 0.45, grain: 0.25 } },
+        bw: { label: 'Black & white', filters: { grayscale: 100, contrast: 115 }, fx: {} },
+        vivid: { label: 'Vivid', filters: { saturate: 150, contrast: 112 }, fx: {} },
+        faded: { label: 'Faded', filters: { contrast: 80, saturate: 70, brightness: 110 }, fx: { grain: 0.1 } },
+        dramatic: { label: 'Dramatic', filters: { contrast: 135, saturate: 85, brightness: 92 }, fx: { vignette: 0.6 } },
+        night: { label: 'Night', filters: { brightness: 80, saturate: 70, hue: 15 }, fx: { tint: { color: '#1a3a8a', amount: 0.45 }, vignette: 0.4 } }
+    };
+
+    /** Ready-made title styles: position, size, box and entrance. */
+    const TITLE_STYLES = {
+        big: { label: 'Big title', patch: { fontSize: 96, bold: true, box: false, shadow: true, x: 0.5, y: 0.45, anim: 'rise', font: 'marcellus', color: '#ffffff' } },
+        lower: { label: 'Lower-third bar', patch: { fontSize: 40, bold: true, box: true, boxColor: '#0f3d33', shadow: false, x: 0.5, y: 0.84, anim: 'slide', font: 'sans', color: '#ffffff' } },
+        subtitle: { label: 'Subtitle', patch: { fontSize: 36, bold: true, box: true, boxColor: '#000000', shadow: false, x: 0.5, y: 0.88, anim: 'none', font: 'sans', color: '#ffffff' } },
+        quote: { label: 'Quote card', patch: { fontSize: 54, bold: false, italic: true, box: false, shadow: true, x: 0.5, y: 0.5, anim: 'fade', font: 'cormorant', color: '#f3ead3' } },
+        verse: { label: 'Arabic verse', patch: { fontSize: 64, bold: false, box: false, shadow: true, x: 0.5, y: 0.42, anim: 'fade', font: 'amiri', color: '#ffffff' } }
+    };
 
     const TRANSITIONS = ['crossfade', 'dip', 'slide', 'push', 'wipe', 'zoom'];
     const MOTIONS = ['zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'pan-up', 'pan-down'];
@@ -342,6 +381,7 @@
         if (!c) return project;
         Object.keys(patch).forEach(function (k) {
             if (k === 'filters') c.filters = Object.assign({}, c.filters || DEFAULT_FILTERS, patch.filters);
+            else if (k === 'fx') c.fx = mergeFx(c.fx, patch.fx);
             else if (k !== 'id') c[k] = patch[k];
         });
         return p;
@@ -914,6 +954,70 @@
         return out;
     }
 
+    /** A clip's effects with every default filled in. */
+    function fxOf(clip) {
+        return mergeFx(null, clip && clip.fx);
+    }
+
+    /** Merges an effects patch into effects, one level deep for crop, border and hide. */
+    function mergeFx(base, patch) {
+        const out = clone(DEFAULT_FX);
+        [base, patch].forEach(function (src) {
+            if (!src) return;
+            Object.keys(src).forEach(function (k) {
+                const v = src[k];
+                if ((k === 'crop' || k === 'border') && v) out[k] = Object.assign({}, out[k], v);
+                else if (k === 'hide' || k === 'tint') out[k] = v ? Object.assign({}, out[k] || {}, v) : null;
+                else out[k] = v;
+            });
+        });
+        return out;
+    }
+
+    /** Applies a look: its colour settings, tint, vignette and grain; transform and frame are kept. */
+    function applyLook(project, id, name) {
+        const look = LOOKS[name] || LOOKS.none;
+        const clip = getClip(project, id);
+        if (!clip) return project;
+        const keep = fxOf(clip);
+        const fx = Object.assign(keep, { look: name, tint: null, vignette: 0, grain: 0 }, clone(look.fx));
+        return updateClip(project, id, { filters: Object.assign(clone(DEFAULT_FILTERS), look.filters), fx: fx });
+    }
+
+    /** The part of a source kept by a crop, in source pixels. */
+    function cropRect(srcW, srcH, crop) {
+        const c = Object.assign({ l: 0, r: 0, t: 0, b: 0 }, crop);
+        const l = clamp(c.l, 0, 0.9);
+        const t = clamp(c.t, 0, 0.9);
+        const w = Math.max(0.05, 1 - l - clamp(c.r, 0, 0.9));
+        const h = Math.max(0.05, 1 - t - clamp(c.b, 0, 0.9));
+        return { sx: srcW * l, sy: srcH * t, sw: srcW * w, sh: srcH * h };
+    }
+
+    /** True when a clip has any effect a badge should show. */
+    function hasFx(clip) {
+        const fx = fxOf(clip);
+        return fx.look !== 'none' || !!fx.tint || fx.vignette > 0 || fx.grain > 0 || fx.flipH || fx.flipV ||
+            !!fx.rotate || fx.crop.l + fx.crop.r + fx.crop.t + fx.crop.b > 0 || fx.radius > 0 ||
+            fx.border.width > 0 || fx.shadow || !!fx.hide;
+    }
+
+    /** Peak loudness 0–1 of a clip's source span, from its waveform peaks. */
+    function clipPeak(clip, peaks, rate) {
+        if (!peaks || !rate) return null;
+        const from = Math.max(0, Math.floor((clip.in || 0) * rate));
+        const to = Math.min(peaks.length, Math.ceil(((clip.in || 0) + clip.duration * speedOf(clip)) * rate));
+        let m = 0;
+        for (let i = from; i < to; i += 1) if (peaks[i] > m) m = peaks[i];
+        return m;
+    }
+
+    /** The volume that brings a clip's loudest moment to about −1 dB, within 0–200%. */
+    function normalisedVolume(peak) {
+        if (!(peak > 0)) return 1;
+        return clamp(Math.round(0.89 / peak * 100) / 100, 0.05, 2);
+    }
+
     /** A canvas `filter` string for a clip's colour settings. */
     function filterString(filters) {
         const f = Object.assign({}, DEFAULT_FILTERS, filters || {});
@@ -922,6 +1026,8 @@
         if (f.contrast !== 100) parts.push('contrast(' + f.contrast + '%)');
         if (f.saturate !== 100) parts.push('saturate(' + f.saturate + '%)');
         if (f.grayscale) parts.push('grayscale(' + f.grayscale + '%)');
+        if (f.sepia) parts.push('sepia(' + f.sepia + '%)');
+        if (f.hue) parts.push('hue-rotate(' + f.hue + 'deg)');
         if (f.blur) parts.push('blur(' + f.blur + 'px)');
         return parts.length ? parts.join(' ') : 'none';
     }
@@ -1249,7 +1355,8 @@
 
     return {
         FORMAT, VERSION, MIN_DURATION, DEFAULT_STILL, DEFAULT_FILTERS, MIN_SPEED, MAX_SPEED,
-        TRANSITIONS, MOTIONS, TEXT_ANIMS,
+        TRANSITIONS, MOTIONS, TEXT_ANIMS, DEFAULT_FX, LOOKS, TITLE_STYLES,
+        fxOf, mergeFx, applyLook, cropRect, hasFx, clipPeak, normalisedVolume,
         newId, clone, clamp,
         createProject, addMedia, getMedia, getClip, getTrack, addTrack, nextTrackId, updateTrack, removeTrack,
         clipKind, trackKindFor, isTimed, speedOf, clipEnd, trackClips, trackEnd, projectDuration, lowestTrack,

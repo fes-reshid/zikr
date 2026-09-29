@@ -619,22 +619,175 @@
         }
     }
 
+    /** A rounded-rectangle path, built with arcs so it works where Path2D.roundRect does not. */
+    function roundedPath(x, y, w, h, r) {
+        const p = new Path2D();
+        const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+        if (!rr) { p.rect(x, y, w, h); return p; }
+        p.moveTo(x + rr, y);
+        p.arcTo(x + w, y, x + w, y + h, rr);
+        p.arcTo(x + w, y + h, x, y + h, rr);
+        p.arcTo(x, y + h, x, y, rr);
+        p.arcTo(x, y, x + w, y, rr);
+        p.closePath();
+        return p;
+    }
+
+    // Film grain: one fixed tile of noise, shifted each frame (the same shift for the same
+    // frame, so preview and export match).
+    let noiseCanvas = null;
+    const noisePatterns = new WeakMap();
+    function noisePattern(c) {
+        if (!noiseCanvas) {
+            noiseCanvas = document.createElement('canvas');
+            noiseCanvas.width = noiseCanvas.height = 160;
+            const x = noiseCanvas.getContext('2d');
+            const img = x.createImageData(160, 160);
+            let seed = 1234567;
+            for (let i = 0; i < img.data.length; i += 4) {
+                seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+                img.data[i] = img.data[i + 1] = img.data[i + 2] = seed % 256;
+                img.data[i + 3] = 255;
+            }
+            x.putImageData(img, 0, 0);
+        }
+        let pattern = noisePatterns.get(c);
+        if (!pattern) { pattern = c.createPattern(noiseCanvas, 'repeat'); noisePatterns.set(c, pattern); }
+        return pattern;
+    }
+
+    let pixelCanvas = null;
+
+    /**
+     * Blurs, pixelates or covers an area of a picture — for faces, number
+     * plates or logos. The area is in the picture's own coordinates, so it
+     * moves, scales, flips and rotates with it.
+     */
+    function drawHidden(c, s, cr, hide, x, y, w, h, outline) {
+        const aw = hide.w * w;
+        const ah = hide.h * h;
+        const ax = x + hide.x * w - aw / 2;
+        const ay = y + hide.y * h - ah / 2;
+        const shape = new Path2D();
+        if (hide.shape === 'rect') shape.rect(ax, ay, aw, ah);
+        else shape.ellipse(ax + aw / 2, ay + ah / 2, Math.abs(aw / 2), Math.abs(ah / 2), 0, 0, Math.PI * 2);
+        const strength = hide.strength === undefined ? 0.6 : hide.strength;
+        c.save();
+        c.clip(shape);
+        if (hide.mode === 'solid') {
+            c.fillStyle = hide.color || '#000000';
+            c.fillRect(ax, ay, aw, ah);
+        } else if (hide.mode === 'pixelate') {
+            const block = Math.max(3, Math.min(aw, ah) * (0.04 + strength * 0.16));
+            const tw = Math.max(1, Math.round(aw / block));
+            const th = Math.max(1, Math.round(ah / block));
+            if (!pixelCanvas) pixelCanvas = document.createElement('canvas');
+            pixelCanvas.width = tw;
+            pixelCanvas.height = th;
+            const px = pixelCanvas.getContext('2d');
+            px.drawImage(s.src, cr.sx + (ax - x) / w * cr.sw, cr.sy + (ay - y) / h * cr.sh, aw / w * cr.sw, ah / h * cr.sh, 0, 0, tw, th);
+            const smooth = c.imageSmoothingEnabled;
+            c.imageSmoothingEnabled = false;
+            c.drawImage(pixelCanvas, ax, ay, aw, ah);
+            c.imageSmoothingEnabled = smooth;
+        } else {
+            c.filter = 'blur(' + Math.max(3, Math.min(aw, ah) * (0.03 + strength * 0.12)).toFixed(1) + 'px)';
+            c.drawImage(s.src, cr.sx, cr.sy, cr.sw, cr.sh, x, y, w, h);
+            c.filter = 'none';
+        }
+        c.restore();
+        if (outline) {
+            c.save();
+            c.setLineDash([8, 6]);
+            c.lineWidth = 2;
+            c.strokeStyle = '#f2b84b';
+            c.stroke(shape);
+            c.restore();
+        }
+    }
+
+    /**
+     * Draws a picture with its effects: crop, pan and zoom, rotation, mirror,
+     * colour, hidden area, tint, vignette, grain, rounded corners, border and
+     * shadow. Everything past the colour filter is clipped to the picture's
+     * frame, so effects never spill onto the layers below.
+     */
     function drawVisual(c, clip, kind, t, W, H, source) {
         if (!files.has(clip.mediaId)) { drawOffline(c, clip, W, H); return; }
         const s = source(clip, kind);
         if (!s) return;
+        const fx = T.fxOf(clip);
+        const cr = T.cropRect(s.w, s.h, fx.crop);
         const m = T.motionAt(clip, t);
         if (clip.bgFill === 'blur' && clip.fit !== 'cover') {
             // A blurred, darkened copy filling the frame behind the picture.
-            const b = T.placeRect(s.w, s.h, W, H, 'cover', 1.1, 0.5, 0.5);
+            const b = T.placeRect(cr.sw, cr.sh, W, H, 'cover', 1.1, 0.5, 0.5);
             c.filter = 'blur(' + Math.round(H * 0.035) + 'px) brightness(0.62)';
-            c.drawImage(s.src, b.x, b.y, b.w, b.h);
+            c.drawImage(s.src, cr.sx, cr.sy, cr.sw, cr.sh, b.x, b.y, b.w, b.h);
+            c.filter = 'none';
         }
-        const r = T.placeRect(s.w, s.h, W, H, clip.fit, (clip.scale || 1) * m.scale,
+        const r = T.placeRect(cr.sw, cr.sh, W, H, clip.fit, (clip.scale || 1) * m.scale,
             (clip.x === undefined ? 0.5 : clip.x) + m.dx, (clip.y === undefined ? 0.5 : clip.y) + m.dy);
+        const hw = r.w / 2;
+        const hh = r.h / 2;
+        const unit = Math.min(W, H);
+        c.save();
+        c.translate(r.x + hw, r.y + hh);
+        if (fx.rotate) c.rotate(fx.rotate * Math.PI / 180);
+        const corner = fx.radius * Math.min(hw, hh);
+        const frame = roundedPath(-hw, -hh, r.w, r.h, corner);
+        if (fx.shadow) {
+            c.save();
+            c.shadowColor = 'rgba(0,0,0,.6)';
+            c.shadowBlur = unit * 0.035;
+            c.shadowOffsetY = unit * 0.012;
+            c.fillStyle = '#000';
+            c.fill(frame);
+            c.restore();
+        }
+        c.save();
+        c.clip(frame);
+        c.save();
+        c.scale(fx.flipH ? -1 : 1, fx.flipV ? -1 : 1);
         c.filter = T.filterString(clip.filters);
-        c.drawImage(s.src, r.x, r.y, r.w, r.h);
+        c.drawImage(s.src, cr.sx, cr.sy, cr.sw, cr.sh, -hw, -hh, r.w, r.h);
         c.filter = 'none';
+        if (fx.hide) drawHidden(c, s, cr, fx.hide, -hw, -hh, r.w, r.h, source === liveSource && clip.id === state.selected);
+        c.restore();
+        if (fx.tint && fx.tint.amount > 0) {
+            c.save();
+            c.globalCompositeOperation = 'soft-light';
+            c.globalAlpha *= Math.min(1, fx.tint.amount * 1.6);
+            c.fillStyle = fx.tint.color || '#ff9a3c';
+            c.fillRect(-hw, -hh, r.w, r.h);
+            c.restore();
+        }
+        if (fx.vignette > 0) {
+            const g = c.createRadialGradient(0, 0, Math.min(hw, hh) * 0.45, 0, 0, Math.hypot(hw, hh));
+            g.addColorStop(0, 'rgba(0,0,0,0)');
+            g.addColorStop(1, 'rgba(0,0,0,' + Math.min(1, fx.vignette) + ')');
+            c.fillStyle = g;
+            c.fillRect(-hw, -hh, r.w, r.h);
+        }
+        if (fx.grain > 0) {
+            const ox = (Math.floor(t * state.project.fps) * 53) % 160;
+            const oy = (ox * 7) % 160;
+            c.save();
+            c.globalCompositeOperation = 'overlay';
+            c.globalAlpha *= Math.min(1, fx.grain * 0.8);
+            c.translate(-ox, -oy);
+            c.fillStyle = noisePattern(c);
+            c.fillRect(-hw + ox, -hh + oy, r.w, r.h);
+            c.restore();
+        }
+        c.restore();
+        if (fx.border.width > 0) {
+            const bw = fx.border.width * H / 720;
+            c.lineWidth = bw;
+            c.strokeStyle = fx.border.color || '#ffffff';
+            c.stroke(roundedPath(-hw + bw / 2, -hh + bw / 2, r.w - bw, r.h - bw, Math.max(0, corner - bw / 2)));
+        }
+        c.restore();
     }
 
     function drawOffline(c, clip, W, H) {
@@ -754,6 +907,17 @@
             c.shadowOffsetY = size * 0.04;
         }
         c.fillStyle = clip.color || '#fff';
+        const outline = clip.outline && clip.outline.width > 0 ? clip.outline : null;
+        if (outline) {
+            c.lineJoin = 'round';
+            c.lineWidth = outline.width * 2 * H / 720;
+            c.strokeStyle = outline.color || '#000000';
+        }
+        // An outline is stroked first; the fill covers its inner half.
+        const paint = function (line, x, y) {
+            if (outline) c.strokeText(line, x, y);
+            c.fillText(line, x, y);
+        };
 
         // How much of the text the reveal animation shows, in characters or words.
         let budget = Infinity;
@@ -768,7 +932,7 @@
             const mid = left + w / 2;
             const y = top + lineH * (i + 0.5);
             if (budget === Infinity) {
-                c.fillText(line, mid, y);
+                paint(line, mid, y);
                 return;
             }
             // The part revealed so far, as a prefix of the line in reading order.
@@ -786,7 +950,7 @@
                 prefix = out.trimEnd();
             }
             if (!prefix) return;
-            if (prefix.length >= line.length) { c.fillText(line, mid, y); return; }
+            if (prefix.length >= line.length) { paint(line, mid, y); return; }
             // Show that much of the full line, measured from its reading start.
             const shown = Math.min(w, lineWidth(c, prefix));
             const pad = size * 0.6;
@@ -795,7 +959,7 @@
             if (rtl) c.rect(left + w - shown - 1, y - lineH, shown + pad + 1, lineH * 2);
             else c.rect(left - pad, y - lineH, shown + pad + 1, lineH * 2);
             c.clip();
-            c.fillText(line, mid, y);
+            paint(line, mid, y);
             c.restore();
         });
         c.shadowColor = 'transparent';
@@ -1375,7 +1539,10 @@
                 style: { width: Math.max(10, w.duration / 2 * pps) + 'px' }
             }));
         }
-        if (clip.motion && clip.motion.type && clip.motion.type !== 'none') node.append(el('span', { className: 'clip-badge', text: '⤢', title: MOTION_LABELS[clip.motion.type] }));
+        const badges = [];
+        if (clip.motion && clip.motion.type && clip.motion.type !== 'none') badges.push('⤢');
+        if (clip.type !== 'text' && T.hasFx(clip)) badges.push('fx');
+        if (badges.length) node.append(el('span', { className: 'clip-badge', text: badges.join(' '), title: 'Has pan & zoom or effects' }));
         node.append(el('div', { className: 'handle l', 'data-edge': 'start' }));
         node.append(el('div', { className: 'handle r', 'data-edge': 'end' }));
         return node;
@@ -1762,46 +1929,176 @@
         return el('div', { className: 'field wide' }, [el('label', { for: id, text: label }), input, hint ? el('small', { className: 'hint', text: hint }) : null]);
     }
 
-    function renderToolsMenu() {
-        const menu = $('tools-menu');
-        menu.textContent = '';
-        const items = tools.concat([
+    /** What each drop-down menu holds. Modules add to Tools with ReelApp.addTool. */
+    function menuItems(which) {
+        if (which === 'help') {
+            return [
+                { section: 'Help', label: 'User guide', run: openGuide },
+                { section: 'Help', label: 'Keyboard shortcuts', run: function () { window.open('help.html#keys', '_blank', 'noopener'); } },
+                { section: 'Help', label: 'About', run: showAbout }
+            ];
+        }
+        return tools.concat([
             { section: 'Timeline', label: 'Add marker at playhead (M)', run: addMarkerHere },
             { section: 'Timeline', label: 'Copy chapters for YouTube', run: copyChapters },
             { section: 'Timeline', label: 'Transition on every cut…', run: transitionEveryCut },
-            { section: 'Timeline', label: 'Select all clips (Ctrl+A)', run: selectAll }
+            { section: 'Timeline', label: 'Select all clips (Ctrl+A)', run: selectAll },
+            // Help is its own menu on wide screens; on phones its button is hidden, so it lives here too.
+            { section: 'Help', label: 'User guide', run: openGuide, narrow: true },
+            { section: 'Help', label: 'About', run: showAbout, narrow: true }
         ]);
+    }
+
+    const MENUS = ['tools', 'help'];
+
+    function openMenu(which) {
+        closeMenus();
+        const menu = $(which + '-menu');
+        const button = $(which);
+        const narrow = window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
+        menu.textContent = '';
         let last = null;
-        items.forEach(function (it) {
+        menuItems(which).filter((it) => !it.narrow || narrow).forEach(function (it) {
             if (it.section !== last) {
                 menu.append(el('div', { className: 'menu-section', text: it.section }));
                 last = it.section;
             }
             menu.append(el('button', {
                 role: 'menuitem', className: 'menu-item', text: it.label,
-                onclick: function () { closeToolsMenu(); it.run(); }
+                onclick: function () { closeMenus(); it.run(); }
             }));
         });
-    }
-
-    function openToolsMenu() {
-        renderToolsMenu();
-        const menu = $('tools-menu');
-        const r = $('tools').getBoundingClientRect();
+        const r = button.getBoundingClientRect();
         menu.style.top = Math.round(r.bottom + 6) + 'px';
         menu.style.left = '8px';
         menu.hidden = false;
         // Keep it on screen, measured now that it has a size.
         menu.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8))) + 'px';
-        $('tools').setAttribute('aria-expanded', 'true');
-        const first = $('tools-menu').querySelector('.menu-item');
+        button.setAttribute('aria-expanded', 'true');
+        const first = menu.querySelector('.menu-item');
         if (first) first.focus();
     }
 
-    function closeToolsMenu() {
-        $('tools-menu').hidden = true;
-        $('tools').setAttribute('aria-expanded', 'false');
+    function closeMenus() {
+        MENUS.forEach(function (which) {
+            const menu = $(which + '-menu');
+            if (!menu) return;
+            menu.hidden = true;
+            $(which).setAttribute('aria-expanded', 'false');
+        });
     }
+
+    function openMenuName() {
+        return MENUS.find((which) => $(which + '-menu') && !$(which + '-menu').hidden) || null;
+    }
+
+    function openGuide() {
+        window.open('help.html', '_blank', 'noopener');
+    }
+
+    /** The release this page is, from the version stamped on its script links. */
+    const VERSION = (function () {
+        const tag = document.querySelector('script[src*="editor.js"]');
+        const v = tag ? (tag.getAttribute('src').split('v=')[1] || '') : '';
+        if (/^\d{12}$/.test(v)) return v.slice(0, 4) + '-' + v.slice(4, 6) + '-' + v.slice(6, 8) + ' ' + v.slice(8, 10) + ':' + v.slice(10) + ' UTC';
+        return v && v !== 'dev' ? v : 'development copy';
+    }());
+
+    /** Help ▸ About — the same details as the audio editor's About. */
+    function showAbout() {
+        const p = (text, children) => el('p', { text: text }, children);
+        openDialog({
+            title: 'Video Editor — Diin Islaam',
+            body: [
+                el('div', { className: 'about' }, [
+                    el('p', null, ['Built by ', el('strong', { text: 'Feysel Reshid' }), '.']),
+                    el('p', null, ['Version ', el('span', { id: 'about-version', text: VERSION })]),
+                    p('Everything happens on your device. Your videos are never uploaded.'),
+                    el('p', null, ['Questions, or something to report? ', el('a', { href: 'mailto:fesbackups@gmail.com', text: 'fesbackups@gmail.com' })]),
+                    el('p', { className: 'hint' }, ['Qur’an text, translations and recitations from ', el('a', { href: 'https://quran.com', target: '_blank', rel: 'noopener', text: 'Quran.com' }),
+                        '. Export uses ', el('a', { href: 'vendor/mediabunny.LICENSE', target: '_blank', rel: 'noopener', text: 'mediabunny' }),
+                        ' (MPL-2.0); captions and voice clean-up use Whisper and RNNoise, downloaded when first used.'])
+                ])
+            ],
+            actions: [{ label: 'Close', primary: true }]
+        });
+    }
+
+    /** Once, on a phone: this works best on a computer (never blocks). */
+    const MOBILE_NOTICE_KEY = 've-mobile-notice-v1';
+    function maybeShowMobileNotice() {
+        if (storage((s) => s.getItem(MOBILE_NOTICE_KEY)) === 'yes') return;
+        if (!(window.matchMedia && window.matchMedia('(pointer: coarse) and (max-width: 820px)').matches)) return;
+        openDialog({
+            title: 'This works best on a computer',
+            body: [
+                el('p', { text: 'This is a full video editor with a lot of tools, and it was built for a mouse, a keyboard and a bigger screen. For the easiest experience, open this page on a computer instead.' }),
+                el('p', { text: 'You can still use it here — trimming, titles, Qur’an verse videos and export all work on a phone — but some panels are smaller and a few tools are easier to miss.' })
+            ],
+            actions: [{ label: 'Continue on This Phone', primary: true }],
+            onClose: function () { storage((s) => s.setItem(MOBILE_NOTICE_KEY, 'yes')); }
+        });
+    }
+
+    /** A plain or gradient picture the size of the frame, for intros and backgrounds. */
+    async function makeCard(W, H, style, c1, c2) {
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const x = c.getContext('2d');
+        if (style === 'solid') {
+            x.fillStyle = c1;
+        } else if (style === 'radial') {
+            const g = x.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, Math.hypot(W, H) * 0.6);
+            g.addColorStop(0, c2);
+            g.addColorStop(1, c1);
+            x.fillStyle = g;
+        } else {
+            const g = x.createLinearGradient(0, 0, W * 0.4, H);
+            g.addColorStop(0, c1);
+            g.addColorStop(1, c2);
+            x.fillStyle = g;
+        }
+        x.fillRect(0, 0, W, H);
+        const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/png'));
+        const label = style === 'solid' ? c1 : c1 + '-' + c2;
+        return new File([blob], 'Card ' + label.replace(/#/g, '') + ' ' + W + 'x' + H + '.png', { type: 'image/png', lastModified: Date.now() });
+    }
+
+    function colourCardDialog() {
+        const style = el('select', null, [['linear', 'Gradient'], ['radial', 'Soft glow'], ['solid', 'Solid colour']].map((o) => el('option', { value: o[0], text: o[1] })));
+        const c1 = el('input', { type: 'color', value: '#0f3d33' });
+        const c2 = el('input', { type: 'color', value: '#c99a3a' });
+        const len = el('input', { type: 'number', min: 0.5, max: 600, step: 0.5, value: 5 });
+        openDialog({
+            title: 'Colour or gradient card',
+            intro: 'A plain or gradient picture the size of your frame — for an intro, a pause, or behind a title. It goes on the main video track at the playhead.',
+            body: [dialogField('Style', style), dialogField('Colour', c1), dialogField('Second colour', c2), dialogField('Length (s)', len)],
+            actions: [
+                { label: 'Cancel' },
+                {
+                    label: 'Add card', primary: true,
+                    run: async function () {
+                        const p = state.project;
+                        const file = await makeCard(p.width, p.height, style.value, c1.value, c2.value);
+                        const ids = await importFiles([file], { fresh: true, origin: 'card', noCommit: true });
+                        const media = ids[0] && T.getMedia(state.project, ids[0]);
+                        const track = T.lowestTrack(state.project, 'video');
+                        if (!media || !track) return;
+                        const clip = Object.assign(T.clipFromMedia(media, track.id, state.time), { duration: Math.max(0.5, Number(len.value) || 5), fit: 'cover' });
+                        const next = T.addClip(state.project, clip);
+                        if (next !== state.project) {
+                            state.project = next;
+                            state.selection = [clip.id];
+                            state.selected = clip.id;
+                        }
+                        commit();
+                    }
+                }
+            ]
+        });
+    }
+    tools.push({ section: 'Create', label: 'Colour or gradient card…', run: colourCardDialog });
 
     /* -------------------------------------------------------------- inspector */
 
@@ -1895,6 +2192,36 @@
     const pct = (v) => Math.round(v) + '%';
     const secs = (v) => Number(v).toFixed(1) + 's';
 
+    /** A clip's effects as they are now (not as they were when the inspector was drawn). */
+    function fxNow(id) {
+        return T.fxOf(T.getClip(state.project, id));
+    }
+
+    /** A slider over an effect: `get` reads the effects, `set` returns an effects patch. */
+    function fxSlider(clip, label, get, set, opts) {
+        return slider(clip, label, (c) => get(T.fxOf(c)), (v) => ({ fx: set(v) }), opts);
+    }
+
+    function fxCheck(clip, label, key) {
+        const input = el('input', { type: 'checkbox' });
+        input.checked = !!T.fxOf(clip)[key];
+        input.addEventListener('change', function () {
+            const patch = {};
+            patch[key] = input.checked;
+            apply(T.updateClip(state.project, clip.id, { fx: patch }));
+        });
+        return el('label', { className: 'check' }, [input, label]);
+    }
+
+    function fxColour(clip, label, get, set) {
+        const input = el('input', { type: 'color', value: get() });
+        input.addEventListener('input', function () { liveEdit(clip.id, { fx: set(input.value) }); });
+        input.addEventListener('change', commitQuiet);
+        return control(label, input);
+    }
+
+    const HIDE_DEFAULT = { shape: 'oval', mode: 'blur', x: 0.5, y: 0.35, w: 0.3, h: 0.4, strength: 0.6, color: '#000000' };
+
     function fontSelect(clip) {
         const latin = [];
         const arabic = [];
@@ -1960,6 +2287,9 @@
             area.addEventListener('input', function () { liveEdit(clip.id, { text: area.value }); });
             area.addEventListener('change', commitQuiet);
             box.append(group('Text', [
+                el('div', { className: 'row-buttons' }, Object.keys(T.TITLE_STYLES).map(function (k) {
+                    return button(T.TITLE_STYLES[k].label, function () { apply(T.updateClip(state.project, clip.id, T.TITLE_STYLES[k].patch)); });
+                })),
                 control('Text', area),
                 fontSelect(clip),
                 slider(clip, 'Size', (c) => c.fontSize, (v) => ({ fontSize: v }), { min: 12, max: 240, show: (v) => v + 'px' }),
@@ -1967,7 +2297,18 @@
                 select_(clip, 'Align', 'align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']]),
                 el('div', { className: 'row-buttons' }, [checkbox(clip, 'Bold', 'bold'), checkbox(clip, 'Italic', 'italic'), checkbox(clip, 'Shadow', 'shadow')]),
                 el('div', { className: 'row-buttons' }, [checkbox(clip, 'Background box', 'box')]),
-                clip.box ? colour(clip, 'Box colour', 'boxColor') : null
+                clip.box ? colour(clip, 'Box colour', 'boxColor') : null,
+                slider(clip, 'Outline', (c) => (c.outline && c.outline.width) || 0,
+                    (v) => ({ outline: { width: v, color: (T.getClip(state.project, clip.id).outline || {}).color || '#000000' } }), { max: 12, show: (v) => v + 'px' }),
+                (function () {
+                    const input = el('input', { type: 'color', value: (clip.outline && clip.outline.color) || '#000000' });
+                    input.addEventListener('input', function () {
+                        const width = (T.getClip(state.project, clip.id).outline || {}).width || 0;
+                        liveEdit(clip.id, { outline: { width: width, color: input.value } });
+                    });
+                    input.addEventListener('change', commitQuiet);
+                    return control('Outline colour', input);
+                }())
             ]));
             box.append(group('Animation', [
                 select_(clip, 'Entrance', 'anim', Object.keys(ANIM_LABELS).map((k) => [k, ANIM_LABELS[k]])),
@@ -2007,11 +2348,63 @@
                         (v) => ({ motion: { type: clip.motion.type, amount: v / 100 } }), { min: 5, max: 50, show: pct })
                     : null
             ]));
+            const fx = T.fxOf(clip);
+            box.append(group('Look', [
+                chooser('Look', fx.look || 'none', Object.keys(T.LOOKS).map((k) => [k, T.LOOKS[k].label]), (v) => T.applyLook(state.project, clip.id, v)),
+                fxColour(clip, 'Tint', () => (fx.tint && fx.tint.color) || '#ff9a3c',
+                    (v) => ({ tint: { color: v, amount: (fxNow(clip.id).tint || {}).amount || 0.3 } })),
+                fxSlider(clip, 'Tint amount', (f) => Math.round(((f.tint && f.tint.amount) || 0) * 100),
+                    (v) => ({ tint: v ? { color: (fxNow(clip.id).tint || {}).color || '#ff9a3c', amount: v / 100 } : null }), { show: pct }),
+                fxSlider(clip, 'Vignette', (f) => Math.round(f.vignette * 100), (v) => ({ vignette: v / 100 }), { show: pct }),
+                fxSlider(clip, 'Film grain', (f) => Math.round(f.grain * 100), (v) => ({ grain: v / 100 }), { show: pct })
+            ]));
+            const turn = (d) => function () { apply(T.updateClip(state.project, clip.id, { fx: { rotate: ((fxNow(clip.id).rotate + d + 540) % 360) - 180 } })); };
+            box.append(group('Transform', [
+                el('div', { className: 'row-buttons' }, [fxCheck(clip, 'Mirror', 'flipH'), fxCheck(clip, 'Upside down', 'flipV')]),
+                fxSlider(clip, 'Rotate', (f) => f.rotate, (v) => ({ rotate: v }), { min: -180, max: 180, show: (v) => v + '°' }),
+                el('div', { className: 'row-buttons' }, [button('↺ 90°', turn(-90)), button('↻ 90°', turn(90)),
+                    button('Straight', function () { apply(T.updateClip(state.project, clip.id, { fx: { rotate: 0 } })); })]),
+                fxSlider(clip, 'Crop left', (f) => Math.round(f.crop.l * 100), (v) => ({ crop: { l: v / 100 } }), { max: 45, show: pct }),
+                fxSlider(clip, 'Crop right', (f) => Math.round(f.crop.r * 100), (v) => ({ crop: { r: v / 100 } }), { max: 45, show: pct }),
+                fxSlider(clip, 'Crop top', (f) => Math.round(f.crop.t * 100), (v) => ({ crop: { t: v / 100 } }), { max: 45, show: pct }),
+                fxSlider(clip, 'Crop bottom', (f) => Math.round(f.crop.b * 100), (v) => ({ crop: { b: v / 100 } }), { max: 45, show: pct })
+            ]));
+            box.append(group('Frame', [
+                fxSlider(clip, 'Corners', (f) => Math.round(f.radius * 100), (v) => ({ radius: v / 100 }), { show: pct }),
+                fxSlider(clip, 'Border', (f) => f.border.width, (v) => ({ border: { width: v } }), { max: 30, show: (v) => v + 'px' }),
+                fxColour(clip, 'Border colour', () => fx.border.color, (v) => ({ border: { color: v } })),
+                fxCheck(clip, 'Drop shadow', 'shadow'),
+                el('p', { className: 'hint', text: 'For picture-in-picture: scale the clip down in Layout, then round it, frame it and give it a shadow.' })
+            ]));
+            const hideOn = el('input', { type: 'checkbox' });
+            hideOn.checked = !!fx.hide;
+            hideOn.addEventListener('change', function () {
+                apply(T.updateClip(state.project, clip.id, { fx: { hide: hideOn.checked ? Object.assign({}, HIDE_DEFAULT) : null } }));
+            });
+            const hideRows = [el('label', { className: 'check' }, [hideOn, 'Hide an area — a face, a number plate, a logo'])];
+            if (fx.hide) {
+                const h = fx.hide;
+                hideRows.push(
+                    chooser('Shape', h.shape, [['oval', 'Oval'], ['rect', 'Rectangle']], (v) => T.updateClip(state.project, clip.id, { fx: { hide: { shape: v } } })),
+                    chooser('Cover with', h.mode, [['blur', 'Blur'], ['pixelate', 'Pixelate'], ['solid', 'Solid colour']], (v) => T.updateClip(state.project, clip.id, { fx: { hide: { mode: v } } })),
+                    h.mode === 'solid'
+                        ? fxColour(clip, 'Colour', () => h.color || '#000000', (v) => ({ hide: { color: v } }))
+                        : fxSlider(clip, 'Strength', (f) => Math.round(f.hide.strength * 100), (v) => ({ hide: { strength: v / 100 } }), { min: 10, show: pct }),
+                    fxSlider(clip, 'Across', (f) => Math.round(f.hide.x * 100), (v) => ({ hide: { x: v / 100 } }), { show: pct }),
+                    fxSlider(clip, 'Down', (f) => Math.round(f.hide.y * 100), (v) => ({ hide: { y: v / 100 } }), { show: pct }),
+                    fxSlider(clip, 'Width', (f) => Math.round(f.hide.w * 100), (v) => ({ hide: { w: v / 100 } }), { min: 2, show: pct }),
+                    fxSlider(clip, 'Height', (f) => Math.round(f.hide.h * 100), (v) => ({ hide: { h: v / 100 } }), { min: 2, show: pct }),
+                    el('p', { className: 'hint', text: 'The dashed outline shows the area while the clip is selected; it is not in the exported video. The area moves with the picture.' })
+                );
+            }
+            box.append(group('Hide an area', hideRows));
             box.append(group('Colour', [
                 slider(clip, 'Brightness', (c) => c.filters.brightness, (v) => ({ filters: { brightness: v } }), { max: 200, show: pct }),
                 slider(clip, 'Contrast', (c) => c.filters.contrast, (v) => ({ filters: { contrast: v } }), { max: 200, show: pct }),
                 slider(clip, 'Saturation', (c) => c.filters.saturate, (v) => ({ filters: { saturate: v } }), { max: 200, show: pct }),
                 slider(clip, 'Greyscale', (c) => c.filters.grayscale, (v) => ({ filters: { grayscale: v } }), { show: pct }),
+                slider(clip, 'Sepia', (c) => c.filters.sepia || 0, (v) => ({ filters: { sepia: v } }), { show: pct }),
+                slider(clip, 'Hue', (c) => c.filters.hue || 0, (v) => ({ filters: { hue: v } }), { min: -180, max: 180, show: (v) => v + '°' }),
                 slider(clip, 'Blur', (c) => c.filters.blur || 0, (v) => ({ filters: { blur: v } }), { max: 20, step: 0.5, show: (v) => v + 'px' }),
                 el('div', { className: 'row-buttons' }, [button('Reset colour', function () {
                     apply(T.updateClip(state.project, clip.id, { filters: T.clone(T.DEFAULT_FILTERS) }));
@@ -2025,6 +2418,15 @@
                 slider(clip, 'Volume', (c) => Math.round(c.volume * 100), (v) => ({ volume: v / 100 }), { max: 200, show: pct }),
                 checkbox(clip, 'Mute this clip', 'muted')
             ];
+            const levels = files.get(clip.mediaId);
+            if (levels && levels.peaks) {
+                sound.push(el('div', { className: 'row-buttons' }, [button('Normalise loudness', function () {
+                    const peak = T.clipPeak(T.getClip(state.project, clip.id), levels.peaks, levels.peakRate);
+                    const vol = T.normalisedVolume(peak);
+                    apply(T.updateClip(state.project, clip.id, { volume: vol }));
+                    toast('Volume set to ' + Math.round(vol * 100) + '% — the loudest moment now peaks just under full scale.');
+                }, { title: 'Set the volume so the loudest moment of this clip is just under full scale' })]));
+            }
             if (track && track.kind === 'audio') {
                 const duck = el('input', { type: 'checkbox' });
                 duck.checked = !!track.duck;
@@ -2089,6 +2491,13 @@
                 }));
         }
         if (visual.length) {
+            rows.push(chooser('Look', 'keep', [['keep', 'Set look…']].concat(Object.keys(T.LOOKS).map((k) => [k, T.LOOKS[k].label])),
+                function (v) {
+                    if (v === 'keep') return state.project;
+                    let p = state.project;
+                    visual.forEach(function (c) { p = T.applyLook(p, c.id, v); });
+                    return p;
+                }));
             rows.push(chooser('Pan & zoom', 'keep', [['keep', 'Set motion…']].concat(Object.keys(MOTION_LABELS).map((k) => [k, MOTION_LABELS[k]])),
                 (v) => v === 'keep' ? state.project : T.updateClips(state.project, visual.map((c) => c.id), { motion: v === 'none' ? null : { type: v, amount: 0.15 } })));
         }
@@ -2733,12 +3142,14 @@
         if (e.target.files[0]) openProjectFile(e.target.files[0]);
         e.target.value = '';
     });
-    $('tools').addEventListener('click', function (e) {
-        e.stopPropagation();
-        if ($('tools-menu').hidden) openToolsMenu(); else closeToolsMenu();
+    MENUS.forEach(function (which) {
+        $(which).addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (openMenuName() === which) closeMenus(); else openMenu(which);
+        });
     });
     document.addEventListener('click', function (e) {
-        if (!$('tools-menu').hidden && !e.target.closest('#tools-menu')) closeToolsMenu();
+        if (openMenuName() && !e.target.closest('.menu')) closeMenus();
     });
 
     $('project-name').addEventListener('change', function () {
@@ -2826,8 +3237,9 @@
             if (e.key === 'Escape') closeExport();
             return;
         }
-        if (!$('tools-menu').hidden) {
-            if (e.key === 'Escape') { closeToolsMenu(); $('tools').focus(); }
+        const openName = openMenuName();
+        if (openName) {
+            if (e.key === 'Escape') { closeMenus(); $(openName).focus(); }
             return;
         }
         const target = e.target;
@@ -2911,6 +3323,7 @@
         duckFn: duckFn,
         waitFor: waitFor,
         imageFor: imageFor,
+        showAbout: showAbout,
         /** Adds a command to the Tools menu: { section, label, run }. */
         addTool: function (tool) { tools.push(tool); }
     };
@@ -2934,6 +3347,9 @@
         await takeHandoff();
         checkAudioEditor();
         renderInspector();
+        const gate = $('consentGate');
+        if (gate && gate.open) gate.addEventListener('close', maybeShowMobileNotice, { once: true });
+        else maybeShowMobileNotice();
         document.documentElement.dataset.ready = 'true';
     }
     if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', afterModules);

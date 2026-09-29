@@ -28,17 +28,19 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **Editing** | Move clips (singly or as a group), trim, split, duplicate, delete, or delete and close the gap. Copy and paste works at the playhead. Clips snap to edges, markers and the playhead. Undo and redo cover every edit. |
 | **Speed & freeze** | Speed from ¼× to 4×, with voices keeping their pitch in both preview and export. A freeze frame holds any frame for as long as you like. |
 | **Transitions** | Crossfade, dip to black, slide, push, wipe and zoom between touching clips, one cut at a time or on every cut at once. The sound crossfades too. |
-| **Layers & look** | Upper tracks draw over lower ones. Scale and position give picture-in-picture, with presets. Also: slow pan-and-zoom (Ken Burns), a blurred-copy fill for vertical frames, colour controls, opacity and fades. |
-| **Titles** | Multi-line titles in Latin or Arabic fonts (Amiri, Scheherazade New, Noto Naskh Arabic, Reem Kufi, Cairo, plus the site's Cormorant and Marcellus). Arabic is laid out right to left. Entrance animations: fade, rise, pop, slide, typewriter and word by word. |
+| **Layers & look** | Upper tracks draw over lower ones. Scale and position give picture-in-picture, with presets. Also: slow pan-and-zoom (Ken Burns), a blurred-copy fill for vertical frames, colour controls (including sepia and hue), opacity and fades. |
+| **Effects** | One-click looks (Warm, Cool, Golden hour, Vintage, Black & white, Vivid, Faded, Dramatic, Night) with tint, vignette and grain; mirror, flip, rotate and crop; rounded corners, border and drop shadow; hide an area by blur, pixelate or a solid cover; colour and gradient cards. Clips with effects show an fx badge. |
+| **Titles** | Multi-line titles in Latin or Arabic fonts (Amiri, Scheherazade New, Noto Naskh Arabic, Reem Kufi, Cairo, plus the site's Cormorant and Marcellus). Arabic is laid out right to left. Entrance animations: fade, rise, pop, slide, typewriter and word by word. Ready-made title styles and a coloured outline. |
 | **Qur'ān verse videos** | Pick a surah, ayat, reciter and translation. The editor adds each ayah's recitation, the Arabic and translation timed ayah by ayah, a title card, the Bismillah and a background, as one undo step. |
-| **Sound** | Per-clip volume up to 200%, fades, mute and detached audio. **Ducking** lowers a background-sound track (a nasheed, say) whenever anything else is speaking. **Clean up voice** is AI noise removal. Audio clips show waveforms. |
+| **Sound** | Per-clip volume up to 200%, fades, mute and detached audio. **Ducking** lowers a background-sound track (a nasheed, say) whenever anything else is speaking. **Clean up voice** is AI noise removal. **Normalise loudness** brings a clip's peak to about −1 dB. Audio clips show waveforms. |
 | **Captions** | Speech to text with Whisper on the device. It also imports .srt/.vtt files and saves any titles track as subtitles. |
 | **Markers** | Drop them with M, drag them, rename them, and copy them as YouTube chapters. |
 | **Audio editor** | "Edit in audio editor" opens a clip's sound in the site's `/audio-editor/`, and its "Send to Video Editor" brings audio back. |
 | **Export** | **Fast** export decodes and encodes frame by frame with WebCodecs. It is frame-exact, faster than real time, and works in a background tab. **Real-time** export (MediaRecorder) is the fallback. A single frame can also be saved as PNG. |
 | **Projects** | Autosaved in the browser **with the media files**, so the project reopens as you left it. Save and open `.reel.json` files. Once opened, the editor works offline. |
 | **Purpose reminder** | On the first visit, the same halal-use reminder as the audio editor. The editor opens only after **I Agree & Continue**, which stays disabled until the box is ticked. The answer is remembered per browser (`consent.js`). |
-| **Phones** | One-finger pan, tap to seek, pinch to zoom, bigger handles, and a compact layout. |
+| **Phones** | One-finger pan, tap to seek, pinch to zoom, bigger handles, and a compact layout. A one-time notice suggests a computer for long projects, as in the audio editor. |
+| **Help ▸ About** | A pop-up like the audio editor's: name, author, version, privacy note, contact and credits. |
 
 Keyboard shortcuts and a user guide are in [help.html](help.html).
 
