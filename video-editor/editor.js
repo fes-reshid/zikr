@@ -2766,6 +2766,8 @@
     });
 
     document.addEventListener('keydown', function (e) {
+        const gate = $('consentGate');
+        if (gate && gate.open) return;
         if (dialogStack.length) {
             if (e.key === 'Escape') dialogStack[dialogStack.length - 1].close();
             return;

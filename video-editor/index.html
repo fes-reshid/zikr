@@ -358,6 +358,30 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .dialog-status { min-height: 1.4em; color: var(--text) !important; }
 .dialog-status:empty { display: none; }
 
+/* ----------------------------------------- purpose reminder (consent.js) */
+dialog#consentGate {
+    width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line-2); border-radius: 12px;
+    padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+dialog#consentGate::backdrop { background: rgba(5, 7, 10, .8); }
+dialog#consentGate h1 { font-family: "Marcellus", Georgia, serif; font-weight: 400; font-size: 21px; margin: 0 0 10px; }
+dialog#consentGate h1:focus-visible { outline: none; }
+.consent-bismillah { margin: 0 0 14px; text-align: center; font-family: "Amiri", serif; font-size: 26px; font-weight: 700; color: #f2d27a; }
+#consentBody, #consentCancelled p { font-size: 14px; line-height: 1.55; color: var(--muted); }
+#consentBody p { margin: 0 0 10px; }
+#consentBody strong { color: var(--text); }
+#consentBody blockquote { margin: 0 0 10px; padding: 8px 12px; border-inline-start: 3px solid #c99a3a; background: var(--panel-2); border-radius: 0 8px 8px 0; }
+#consentBody blockquote p { margin: 0 0 4px; font-style: italic; }
+#consentBody blockquote p:last-child { margin-bottom: 0; font-style: normal; color: var(--faint); font-size: 13px; }
+#consentBody blockquote p[lang=ar] { font-family: "Amiri", serif; font-size: 17px; font-style: normal; color: var(--text); margin-bottom: 6px; }
+#consentBody cite { font-style: normal; }
+.consent-check-row { display: flex; margin-top: 14px; }
+.consent-check-row label { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; font-weight: 600; color: var(--text); }
+.consent-check-row input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.consent-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+@media (max-width: 480px) { .consent-actions { flex-direction: column-reverse; } .consent-actions button { width: 100%; justify-content: center; } }
+
 /* ------------------------------------------------------------ touch */
 @media (pointer: coarse) {
     :root { --row-h: 64px; }
@@ -384,6 +408,47 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 </style>
 </head>
 <body>
+
+<!-- Purpose reminder, shown once per browser (consent.js), as in the site's audio editor. -->
+<dialog id="consentGate" aria-labelledby="consentTitle">
+    <p class="consent-bismillah" lang="ar" dir="rtl">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
+    <div id="consentView">
+        <h1 id="consentTitle" tabindex="-1">Before you begin — please read</h1>
+        <div id="consentBody">
+            <blockquote>
+                <p lang="ar" dir="rtl">إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى</p>
+                <p>"Actions are judged by intentions, and every person will have only what they intended." — <cite>Hadith of 'Umar ibn al-Khattab, agreed upon (Bukhari &amp; Muslim)</cite></p>
+            </blockquote>
+            <blockquote>
+                <p lang="ar" dir="rtl">فَمَن يَعْمَلْ مِثْقَالَ ذَرَّةٍ خَيْرًا يَرَهُ ﴿٧﴾ وَمَن يَعْمَلْ مِثْقَالَ ذَرَّةٍ شَرًّا يَرَهُ ﴿٨﴾</p>
+                <p>"So whoever does an atom's weight of good will see it, and whoever does an atom's weight of evil will see it." — <cite>Surah Az-Zalzalah 99:7–8</cite></p>
+            </blockquote>
+            <p>This video editor was built for <strong>halal use</strong> — Qur'an verse videos, dawah and lessons, lectures, family videos, and other permissible, work-related purposes.</p>
+            <p><strong>It is not for music or any haram use.</strong> If you use it for music or anything unlawful, that is between you and Allah — the one who made it is not responsible for it before Allah.</p>
+            <blockquote>
+                <p>"The halal is clear and the haram is clear, and between them are doubtful matters that many people do not know…" — <cite>Hadith of Nu'man ibn Bashir, agreed upon (Bukhari &amp; Muslim)</cite></p>
+            </blockquote>
+            <blockquote>
+                <p>"Fear Allah wherever you are…" — <cite>Hadith narrated by Abu Dharr (Tirmidhi)</cite></p>
+            </blockquote>
+            <p class="consent-check-row">
+                <label><input type="checkbox" id="consentCheck"> I have read this, and I agree to use this tool only for halal purposes. I understand I am responsible before Allah for how I use it.</label>
+            </p>
+        </div>
+        <div class="consent-actions">
+            <button type="button" id="consentDecline">I Do Not Agree — Cancel</button>
+            <button type="button" id="consentAgree" class="primary" disabled>I Agree &amp; Continue</button>
+        </div>
+    </div>
+    <div id="consentCancelled" hidden>
+        <h1 tabindex="-1">You have not agreed</h1>
+        <p>This tool is only for halal use, so it stays closed for you unless you agree to that. You may close this tab or browser window now.</p>
+        <div class="consent-actions">
+            <button type="button" id="consentReconsider">I Changed My Mind — Show It Again</button>
+        </div>
+    </div>
+</dialog>
+<script src="consent.js?v=dev"></script>
 
 <header class="topbar">
     <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg></span><span class="hide-narrow">Reel</span></div>

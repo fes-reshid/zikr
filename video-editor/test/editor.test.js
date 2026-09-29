@@ -299,6 +299,25 @@ async function probeFile(page, bytes) {
     try {
         await page.goto(URL_);
         await page.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+
+        /* ------------------------------------------------ purpose reminder */
+        const gate = page.locator('#consentGate');
+        check('the purpose reminder opens on the first visit', await gate.evaluate((d) => d.open));
+        check('I Agree stays disabled until the box is ticked', await page.locator('#consentAgree').isDisabled());
+        await page.keyboard.press('Escape');
+        await page.keyboard.press(' ');
+        check('Escape does not close it, and shortcuts do not reach the editor behind it',
+            await gate.evaluate((d) => d.open) && !(await page.evaluate(() => window.Reel.playing)));
+        await page.click('#consentDecline');
+        check('not agreeing keeps the editor closed', await gate.evaluate((d) => d.open) && await page.locator('#consentCancelled').isVisible());
+        await page.click('#consentReconsider');
+        await page.check('#consentCheck');
+        await page.click('#consentAgree');
+        check('agreeing opens the editor', !(await gate.evaluate((d) => d.open)));
+        await page.reload();
+        await page.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+        check('and it is not asked again in this browser', !(await gate.evaluate((d) => d.open)));
+
         check('page loads with an empty project and every module', (await project(page)).clips.length === 0 &&
             await page.evaluate(() => ['ReelStore', 'ReelMix', 'ReelFastExport', 'ReelQuran', 'ReelCaptions'].every((k) => !!window[k])));
 

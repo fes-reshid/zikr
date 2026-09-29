@@ -37,6 +37,7 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **Audio editor** | "Edit in audio editor" opens a clip's sound in the site's `/audio-editor/`, and its "Send to Video Editor" brings audio back. |
 | **Export** | **Fast** export decodes and encodes frame by frame with WebCodecs. It is frame-exact, faster than real time, and works in a background tab. **Real-time** export (MediaRecorder) is the fallback. A single frame can also be saved as PNG. |
 | **Projects** | Autosaved in the browser **with the media files**, so the project reopens as you left it. Save and open `.reel.json` files. Once opened, the editor works offline. |
+| **Purpose reminder** | On the first visit, the same halal-use reminder as the audio editor. The editor opens only after **I Agree & Continue**, which stays disabled until the box is ticked. The answer is remembered per browser (`consent.js`). |
 | **Phones** | One-finger pan, tap to seek, pinch to zoom, bigger handles, and a compact layout. |
 
 Keyboard shortcuts and a user guide are in [help.html](help.html).
