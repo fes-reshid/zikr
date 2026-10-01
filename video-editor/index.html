@@ -184,6 +184,27 @@ input[type="range"] { accent-color: var(--accent); min-width: 0; }
 /* viewer */
 .viewer { background: #0a0c0f; }
 .stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 12px; position: relative; }
+#preview, .draw-layer { grid-area: 1 / 1; }
+.draw-layer { touch-action: none; cursor: crosshair; z-index: 2; }
+.draw-layer.erasing { cursor: cell; }
+.stage.drawing #preview { box-shadow: 0 0 0 2px var(--accent), 0 10px 40px rgba(0,0,0,.5); }
+.stage.drawing .stage-hint { display: none; }
+.draw-bar {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3;
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center;
+    max-width: calc(100% - 16px); padding: 6px 8px; border-radius: 10px;
+    background: var(--panel); border: 1px solid var(--line-2); box-shadow: 0 6px 24px rgba(0,0,0,.45);
+}
+.draw-bar .draw-tools { display: flex; gap: 2px; }
+.draw-bar .draw-tool { padding: 5px; }
+.draw-bar .draw-tool[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.draw-bar input[type=color] { width: 32px; height: 28px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: none; }
+.draw-bar select { width: auto; }
+.draw-swatches { display: flex; gap: 3px; }
+.swatch { width: 18px; height: 18px; min-width: 0; padding: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,.45); }
+.draw-sep { width: 1px; align-self: stretch; background: var(--line-2); margin: 0 2px; }
+.draw-bar .spacer { flex: 1; }
+@media (max-width: 700px) { .draw-swatches { display: none; } }
 #preview { background: #000; box-shadow: 0 0 0 1px var(--line), 0 10px 40px rgba(0,0,0,.5); display: block; }
 .stage-hint {
     position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
@@ -536,6 +557,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
         <button id="tool-delete" class="ghost" title="Delete (Del) — Shift+Del closes the gap"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><span class="hide-narrow">Delete</span></button>
         <button id="tool-duplicate" class="ghost" title="Duplicate (Ctrl+D)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg><span class="hide-narrow">Duplicate</span></button>
         <button id="add-text" class="ghost" title="Add a title at the playhead (T)"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="hide-narrow">Title</span></button>
+        <button id="add-draw" class="ghost" title="Draw on the video (D) — it is drawn on with a hand holding a pencil"><svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 7l3 3"/></svg><span class="hide-narrow">Draw</span></button>
         <button id="add-marker" class="ghost" title="Add a marker at the playhead (M) — markers become YouTube chapters"><svg viewBox="0 0 24 24"><path d="M6 21V4h12l-3 4 3 4H6"/></svg><span class="hide-narrow">Marker</span></button>
         <span class="sep"></span>
         <button id="add-video-track" class="ghost hide-narrow" title="Add a video track">+ Video</button>
@@ -589,6 +611,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
 <script src="timeline.js?v=dev"></script>
 <script src="audio-core.js?v=dev"></script>
 <script src="webm.js?v=dev"></script>
+<script src="hands.js?v=dev"></script>
 <script src="editor.js?v=dev"></script>
 <script src="media-store.js?v=dev"></script>
 <script src="audio-mix.js?v=dev"></script>

@@ -11,7 +11,8 @@
  * paste, pan-and-zoom, blurred fill, animated and Arabic titles, ducking,
  * both exporters (whose files are checked), reopening with stored media, the
  * audio-editor hand-over both ways, voice clean-up, a Qur'an verse video,
- * captions and subtitles, and working offline.
+ * captions and subtitles, effects, drawing and the writing hand, and
+ * working offline.
  *
  *   npm run test:video-editor
  */
@@ -874,6 +875,120 @@ async function probeFile(page, bytes) {
             /Version/.test(aboutText) && /fesbackups@gmail\.com/.test(aboutText) && /never uploaded/.test(aboutText));
         await about.getByRole('button', { name: 'Close' }).click();
         check('and closes', await page.locator('.modal.generic').count() === 0);
+
+        /* ------------------------------------------------ drawing and hands */
+        // Counts pixels near a colour in the whole preview frame at time t.
+        const countColour = (t, rgb, tol) => page.evaluate(async function (a) {
+            window.Reel.seek(a.t);
+            await new Promise((r) => setTimeout(r, 150));
+            window.Reel.drawFrame();
+            const c = document.getElementById('preview');
+            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+            let n = 0;
+            for (let i = 0; i < d.length; i += 4) {
+                if (Math.abs(d[i] - a.rgb[0]) <= a.tol && Math.abs(d[i + 1] - a.rgb[1]) <= a.tol && Math.abs(d[i + 2] - a.rgb[2]) <= a.tol) n += 1;
+            }
+            return n;
+        }, { t: t, rgb: rgb, tol: tol || 12 });
+        const SKIN = [0xf3, 0xcf, 0xb0];
+        const RED = [0xe5, 0x48, 0x4d];
+        const shot = (name) => process.env.SHOTS ? page.screenshot({ path: path.join(process.env.SHOTS, name + '.png') }) : null;
+        const drawAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 2;
+        await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); }, drawAt);
+        await page.locator('#timeline').focus();
+        await page.keyboard.press('d');
+        check('D opens the drawing board', await page.locator('#draw-bar').isVisible() && await page.locator('#draw-layer').isVisible());
+        await page.keyboard.press('Escape');
+        check('Escape closes it without adding anything', await page.locator('#draw-bar').count() === 0 &&
+            !(await project(page)).clips.some((c) => c.type === 'draw'));
+
+        await page.click('#add-draw');
+        const board = await page.locator('#draw-layer').boundingBox();
+        const at = (fx, fy) => [board.x + board.width * fx, board.y + board.height * fy];
+        const stroke = async function (from, to, steps) {
+            await page.mouse.move(...at(from[0], from[1]));
+            await page.mouse.down();
+            for (let i = 1; i <= steps; i += 1) {
+                await page.mouse.move(...at(from[0] + (to[0] - from[0]) * i / steps, from[1] + (to[1] - from[1]) * i / steps));
+            }
+            await page.mouse.up();
+        };
+        await page.getByRole('button', { name: 'Colour #e5484d' }).click();
+        await page.locator('#draw-bar select[aria-label="Thickness"]').selectOption('22');
+        await stroke([0.2, 0.3], [0.6, 0.3], 12);
+        await page.getByRole('button', { name: 'Arrow', exact: true }).click();
+        await stroke([0.3, 0.6], [0.6, 0.7], 4);
+        await page.keyboard.press('Control+z');
+        await page.getByRole('button', { name: 'Box', exact: true }).click();
+        await stroke([0.25, 0.5], [0.45, 0.8], 4);
+        await shot('draw-board');
+        await page.getByRole('button', { name: 'Done', exact: true }).click();
+        p = await project(page);
+        const drawing = p.clips.find((c) => c.type === 'draw');
+        check('Done adds the drawing at the playhead on a titles track', drawing && Math.abs(drawing.start - drawAt) < 0.01 &&
+            p.tracks.find((t) => t.id === drawing.track).kind === 'text', drawing && drawing.start);
+        check('the pen line and box are kept, and undo took the arrow off', drawing && drawing.strokes.length === 2 &&
+            drawing.strokes[0].color === '#e5484d' && drawing.strokes[0].width === 22 && drawing.strokes[1].straight, drawing && drawing.strokes.length);
+        check('a drawing is drawn on, with a hand holding a pencil', drawing && drawing.anim === 'draw' && drawing.hand === 'pencil');
+        const half = await countColour(drawing.start + drawing.animDuration * 0.3, RED, 30);
+        const full = await countColour(drawing.start + drawing.animDuration + 1, RED, 30);
+        check('it appears stroke by stroke', half > 500 && full > half * 1.5, half + ' → ' + full + ' red pixels');
+        const handMid = await countColour(drawing.start + drawing.animDuration * 0.3, SKIN);
+        await shot('draw-hand');
+        const handGone = await countColour(drawing.start + drawing.animDuration + 1, SKIN);
+        check('the hand draws, then leaves', handMid > 2000 && handGone === 0, handMid + ' → ' + handGone + ' skin pixels');
+        check('a drawing with a hand shows ✍ on the timeline', /✍/.test(await page.locator('.clip[data-id="' + drawing.id + '"] .clip-badge').textContent()));
+        await page.evaluate((id) => window.Reel.select(id), drawing.id);
+        await page.getByRole('combobox', { name: 'Hand', exact: true }).selectOption('none');
+        check('the hand can be turned off', await countColour(drawing.start + drawing.animDuration * 0.3, SKIN) === 0);
+        await page.keyboard.press('Control+z');
+
+        await page.locator('.clip[data-id="' + drawing.id + '"]').dblclick();
+        check('double-clicking a drawing opens it for editing', await page.locator('#draw-bar').isVisible());
+        await page.getByRole('button', { name: 'Eraser', exact: true }).click();
+        await stroke([0.25, 0.65], [0.25, 0.7], 3);
+        await page.getByRole('button', { name: 'Done', exact: true }).click();
+        check('the eraser rubs out a stroke', (await project(page)).clips.find((c) => c.id === drawing.id).strokes.length === 1);
+        await page.keyboard.press('Control+z');
+        check('and editing a drawing is one undo step', (await project(page)).clips.find((c) => c.id === drawing.id).strokes.length === 2);
+
+        // Titles written or typed by hand.
+        const handAt = drawAt + 8;
+        await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); }, handAt);
+        await page.click('#add-text');
+        await page.keyboard.type('Bismillah');
+        await page.keyboard.press('Tab');
+        await page.getByRole('button', { name: '✍ Write by hand' }).click();
+        p = await project(page);
+        const written = p.clips.find((c) => c.type === 'text' && c.text === 'Bismillah');
+        check('Write by hand sets handwriting with a pen', written.anim === 'handwrite' && written.hand === 'pen');
+        const WHITE = [255, 255, 255];
+        const span = Math.max(written.animDuration, written.duration * 0.75);
+        const inkHalf = await countColour(handAt + span * 0.45, WHITE, 8);
+        const handWriting = await countColour(handAt + span * 0.45, SKIN);
+        await shot('write-hand');
+        const inkFull = await countColour(handAt + span + 0.7, WHITE, 8);
+        const handAfter = await countColour(handAt + span + 0.7, SKIN);
+        check('the title is written out from the start', inkHalf > 200 && inkFull > inkHalf * 1.4, inkHalf + ' → ' + inkFull);
+        check('a hand holds the pen while it writes, then leaves', handWriting > 1500 && handAfter === 0, handWriting + ' → ' + handAfter);
+        const arabicOk = await page.evaluate(function (id) {
+            const app = window.ReelApp;
+            app.state.project = app.T.updateClip(app.state.project, id, { text: 'بسم الله' });
+            app.commit();
+            return true;
+        }, written.id);
+        const arabicHand = await countColour(handAt + span * 0.45, SKIN);
+        check('Arabic titles are written by hand too', arabicOk && arabicHand > 1500, arabicHand);
+        await page.keyboard.press('Control+z');
+        await page.evaluate((id) => window.Reel.select(id), written.id);
+        await page.getByRole('button', { name: '⌨ Type with hand' }).click();
+        const typed = (await project(page)).clips.find((c) => c.id === written.id);
+        const tapping = await countColour(handAt + span * 0.45, SKIN);
+        await shot('type-hand');
+        check('Type with hand types it with a tapping finger', typed.anim === 'typewriter' && typed.hand === 'finger' && tapping > 800, tapping);
+        await page.getByRole('combobox', { name: 'Skin', exact: true }).selectOption('dark');
+        const dark = await countColour(handAt + span * 0.45, [0x7d, 0x4f, 0x30]);
+        check('the hand’s skin colour can be changed', dark > 800, dark);
 
         /* ------------------------------------------------------------ offline */
         const sw = await context.newPage();

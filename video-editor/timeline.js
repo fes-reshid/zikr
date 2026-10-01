@@ -73,7 +73,12 @@
 
     const TRANSITIONS = ['crossfade', 'dip', 'slide', 'push', 'wipe', 'zoom'];
     const MOTIONS = ['zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'pan-up', 'pan-down'];
-    const TEXT_ANIMS = ['fade', 'rise', 'pop', 'slide', 'typewriter', 'words'];
+    const TEXT_ANIMS = ['fade', 'rise', 'pop', 'slide', 'typewriter', 'words', 'handwrite'];
+    /** Entrances that reveal a title bit by bit, and so can show a hand doing it. */
+    const REVEAL_ANIMS = ['typewriter', 'words', 'handwrite'];
+    const HAND_TOOLS = ['pen', 'pencil', 'finger'];
+    /** How long a hand takes to leave once it has finished, in seconds. */
+    const HAND_EXIT = 0.6;
 
     let idCounter = 0;
     function newId(prefix) {
@@ -201,9 +206,14 @@
 
     /* ------------------------------------------------------------------ clips */
 
-    /** What a clip is: 'video', 'image', 'audio' or 'text'. */
+    /** True for clips made in the editor — titles and drawings — that have no media file. */
+    function isGenerated(clip) {
+        return clip.type === 'text' || clip.type === 'draw';
+    }
+
+    /** What a clip is: 'video', 'image', 'audio' or 'text' (titles and drawings). */
     function clipKind(project, clip) {
-        if (clip.type === 'text') return 'text';
+        if (isGenerated(clip)) return 'text';
         if (clip.audioOnly) return 'audio';
         const m = getMedia(project, clip.mediaId);
         return m ? m.type : 'video';
@@ -218,7 +228,7 @@
 
     /** True for clips whose source plays through time: video and audio, not freeze frames. */
     function isTimed(project, clip) {
-        if (clip.type === 'text' || clip.freeze) return false;
+        if (isGenerated(clip) || clip.freeze) return false;
         const k = clipKind(project, clip);
         return k === 'video' || k === 'audio';
     }
@@ -337,7 +347,38 @@
             fadeIn: 0.3,
             fadeOut: 0.3,
             anim: 'none',
-            animDuration: 0.6
+            animDuration: 0.6,
+            hand: 'none',
+            handSkin: 'light',
+            handSize: 1
+        };
+    }
+
+    /**
+     * A drawing: freehand strokes and shapes, drawn on over time by default
+     * with a hand holding a pencil. Each stroke is
+     * `{ color, width, alpha, points: [x0, y0, x1, y1, …] }`, with points as
+     * shares of the frame and widths in pixels of a 720-line frame.
+     */
+    function drawClip(trackId, start, strokes) {
+        return {
+            id: newId('c'),
+            type: 'draw',
+            track: trackId,
+            start: start || 0,
+            duration: 6,
+            strokes: clone(strokes || []),
+            x: 0.5,
+            y: 0.5,
+            scale: 1,
+            opacity: 1,
+            fadeIn: 0,
+            fadeOut: 0.3,
+            anim: 'draw',
+            animDuration: 3,
+            hand: 'pencil',
+            handSkin: 'light',
+            handSize: 1
         };
     }
 
@@ -468,7 +509,7 @@
             const delta = s - clip.start;
             c.start = s;
             c.duration = round(end - s);
-            if (clip.type !== 'text' && !clip.freeze) c.in = round(Math.max(0, (clip.in || 0) + delta * speed));
+            if (!isGenerated(clip) && !clip.freeze) c.in = round(Math.max(0, (clip.in || 0) + delta * speed));
         } else if (edge === 'end') {
             const nextStart = others.filter((o) => o.start >= end - EPS)
                 .reduce((m, o) => Math.min(m, o.start), Infinity);
@@ -507,7 +548,7 @@
         right.fadeIn = 0;
         right.fadeOut = Math.min(right.fadeOut || 0, right.duration);
         right.transition = null;
-        if (right.type !== 'text' && !right.freeze) right.in = round((clip.in || 0) + offset * speedOf(clip));
+        if (!isGenerated(right) && !right.freeze) right.in = round((clip.in || 0) + offset * speedOf(clip));
         p.clips.splice(p.clips.indexOf(left) + 1, 0, right);
         return p;
     }
@@ -570,7 +611,7 @@
         const ids = [];
         if (!clipboard) return { project: p, ids: ids };
         clipboard.clips.forEach(function (src) {
-            if (src.type !== 'text' && !getMedia(p, src.mediaId)) return;
+            if (!isGenerated(src) && !getMedia(p, src.mediaId)) return;
             const copy = Object.assign(clone(src), { id: newId('c'), transition: null });
             copy.start = round(time + (src.start - clipboard.base));
             const kind = trackKindFor(clipKind(p, copy));
@@ -798,7 +839,7 @@
         const seen = new Set();
         const out = [];
         function add(c) {
-            if (seen.has(c.id) || c.type === 'text') return;
+            if (seen.has(c.id) || isGenerated(c)) return;
             const kind = clipKind(project, c);
             if (kind === 'image') return;
             seen.add(c.id);
@@ -945,13 +986,150 @@
             const back = 1 + 2.7 * Math.pow(u - 1, 3) + 1.7 * Math.pow(u - 1, 2);
             out.alpha = clamp(u * 3, 0, 1);
             out.scale = 0.6 + 0.4 * back;
-        } else if (type === 'typewriter' || type === 'words') {
+        } else if (REVEAL_ANIMS.indexOf(type) !== -1) {
             // Spread across most of the clip, so the last word lands before it ends.
             const span = Math.max(d, clip.duration * 0.75);
             out.reveal = clamp(local / span, 0, 1);
-            out.unit = type === 'typewriter' ? 'chars' : 'words';
+            out.unit = type === 'typewriter' ? 'chars' : type === 'words' ? 'words' : 'width';
+            out.exit = handExit(local - span);
         }
         return out;
+    }
+
+    /** 0 while a hand is still working, rising to 1 as it leaves. */
+    function handExit(sinceDone) {
+        return clamp(sinceDone / HAND_EXIT, 0, 1);
+    }
+
+    /** The hand a clip shows while it reveals itself, or null. */
+    function handOf(clip) {
+        if (!clip || HAND_TOOLS.indexOf(clip.hand) === -1) return null;
+        if (clip.type === 'draw' ? clip.anim !== 'draw' : REVEAL_ANIMS.indexOf(clip.anim) === -1) return null;
+        return { tool: clip.hand, skin: clip.handSkin || 'light', size: clip.handSize > 0 ? clip.handSize : 1 };
+    }
+
+    /** How far a drawing has been drawn at `time`: `reveal` 0..1, and the hand's `exit`. */
+    function drawAnimAt(clip, time) {
+        const local = Math.max(0, time - clip.start);
+        if (clip.anim !== 'draw') return { reveal: 1, exit: 1, alpha: clip.anim === 'fade' ? clamp(local / 0.6, 0, 1) : 1 };
+        const span = Math.max(0.1, Math.min(clip.animDuration > 0 ? clip.animDuration : 3, clip.duration * 0.95));
+        return { reveal: clamp(local / span, 0, 1), exit: handExit(local - span), alpha: 1 };
+    }
+
+    /** The length of each stroke, measured on a frame `aspect` times as wide as it is high. */
+    function strokeLengths(strokes, aspect) {
+        return strokes.map(function (s) {
+            const pts = s.points || [];
+            let len = 0;
+            for (let i = 2; i < pts.length; i += 2) len += Math.hypot((pts[i] - pts[i - 2]) * aspect, pts[i + 1] - pts[i - 1]);
+            return len;
+        });
+    }
+
+    /**
+     * The part of a drawing shown when `reveal` of it has been drawn, at an
+     * even speed in the order it was drawn: whole strokes, then part of the
+     * stroke being drawn, and `tip`, the point where the pen is.
+     */
+    function revealStrokes(strokes, reveal, aspect) {
+        const a = aspect || 16 / 9;
+        const lengths = strokeLengths(strokes, a);
+        // A dot has no length but still takes a moment to draw.
+        const dot = 0.004;
+        const cost = lengths.map((l) => Math.max(l, dot));
+        const total = cost.reduce((x, y) => x + y, 0);
+        if (reveal >= 1 || !total) {
+            const last = strokes[strokes.length - 1];
+            const pts = last ? last.points : [];
+            return { strokes: strokes, tip: pts.length ? { x: pts[pts.length - 2], y: pts[pts.length - 1] } : null, done: true };
+        }
+        let budget = Math.max(0, reveal) * total;
+        const out = [];
+        let lastTip = null;
+        for (let i = 0; i < strokes.length; i += 1) {
+            const s = strokes[i];
+            const pts = s.points || [];
+            if (budget >= cost[i]) {
+                out.push(s);
+                budget -= cost[i];
+                if (pts.length) lastTip = { x: pts[pts.length - 2], y: pts[pts.length - 1] };
+                continue;
+            }
+            // The pen has only just reached the end of the last stroke.
+            if (budget <= 0 && out.length) return { strokes: out, tip: lastTip, done: false };
+            if (lengths[i] === 0 || pts.length < 4) {
+                if (budget > 0) out.push(s);
+                return { strokes: out, tip: pts.length ? { x: pts[0], y: pts[1] } : null, done: false };
+            }
+            const part = [pts[0], pts[1]];
+            let left = budget / cost[i] * lengths[i];
+            let tip = { x: pts[0], y: pts[1] };
+            for (let j = 2; j < pts.length; j += 2) {
+                const seg = Math.hypot((pts[j] - pts[j - 2]) * a, pts[j + 1] - pts[j - 1]);
+                if (left >= seg) {
+                    part.push(pts[j], pts[j + 1]);
+                    left -= seg;
+                    tip = { x: pts[j], y: pts[j + 1] };
+                    continue;
+                }
+                const u = seg ? left / seg : 0;
+                tip = { x: pts[j - 2] + (pts[j] - pts[j - 2]) * u, y: pts[j - 1] + (pts[j + 1] - pts[j - 1]) * u };
+                part.push(tip.x, tip.y);
+                break;
+            }
+            out.push(Object.assign({}, s, { points: part }));
+            return { strokes: out, tip: tip, done: false };
+        }
+        return { strokes: out, tip: null, done: true };
+    }
+
+    /**
+     * Thins a freehand stroke as it is recorded: drops points closer than
+     * `minGap` to the last one kept and rounds the rest, so a drawing stays
+     * small in the project file.
+     */
+    function simplifyPoints(points, minGap) {
+        const gap = minGap === undefined ? 0.002 : minGap;
+        const r = (v) => Math.round(v * 10000) / 10000;
+        const out = [];
+        for (let i = 0; i < points.length; i += 2) {
+            const x = r(points[i]);
+            const y = r(points[i + 1]);
+            const n = out.length;
+            const last = i + 2 >= points.length;
+            if (n && !last && Math.hypot(x - out[n - 2], y - out[n - 1]) < gap) continue;
+            if (n && last && x === out[n - 2] && y === out[n - 1]) continue;
+            out.push(x, y);
+        }
+        return out;
+    }
+
+    /** The points of a shape dragged from (x0, y0) to (x1, y1): a line, an arrow, a box or an oval. */
+    function shapeStrokes(shape, x0, y0, x1, y1, aspect) {
+        const a = aspect || 16 / 9;
+        const r = (v) => Math.round(v * 10000) / 10000;
+        const pts = (list) => list.map(r);
+        if (shape === 'rect') return [pts([x0, y0, x1, y0, x1, y1, x0, y1, x0, y0])];
+        if (shape === 'oval') {
+            const out = [];
+            const cx = (x0 + x1) / 2;
+            const cy = (y0 + y1) / 2;
+            for (let i = 0; i <= 48; i += 1) {
+                const t = -Math.PI / 2 + i / 48 * Math.PI * 2;
+                out.push(cx + Math.cos(t) * Math.abs(x1 - x0) / 2, cy + Math.sin(t) * Math.abs(y1 - y0) / 2);
+            }
+            return [pts(out)];
+        }
+        const line = pts([x0, y0, x1, y1]);
+        if (shape !== 'arrow') return [line];
+        // The head: two short strokes back from the point, at ±28°.
+        const dx = (x1 - x0) * a;
+        const dy = y1 - y0;
+        const len = Math.hypot(dx, dy) || 1;
+        const head = Math.min(0.05, len * 0.35);
+        const ang = Math.atan2(dy, dx);
+        const wing = (s) => pts([x1, y1, x1 - Math.cos(ang + s) * head / a, y1 - Math.sin(ang + s) * head]);
+        return [line, wing(0.5), wing(-0.5)];
     }
 
     /** A clip's effects with every default filled in. */
@@ -1342,7 +1520,7 @@
         const mediaIds = new Set(p.media.map((m) => m.id));
         p.clips = p.clips.filter(function (c) {
             if (!trackIds.has(c.track) || !(c.duration > 0) || !(c.start >= 0)) return false;
-            return c.type === 'text' || mediaIds.has(c.mediaId);
+            return isGenerated(c) || mediaIds.has(c.mediaId);
         });
         return p;
     }
@@ -1355,18 +1533,18 @@
 
     return {
         FORMAT, VERSION, MIN_DURATION, DEFAULT_STILL, DEFAULT_FILTERS, MIN_SPEED, MAX_SPEED,
-        TRANSITIONS, MOTIONS, TEXT_ANIMS, DEFAULT_FX, LOOKS, TITLE_STYLES,
+        TRANSITIONS, MOTIONS, TEXT_ANIMS, REVEAL_ANIMS, HAND_TOOLS, DEFAULT_FX, LOOKS, TITLE_STYLES,
         fxOf, mergeFx, applyLook, cropRect, hasFx, clipPeak, normalisedVolume,
         newId, clone, clamp,
         createProject, addMedia, getMedia, getClip, getTrack, addTrack, nextTrackId, updateTrack, removeTrack,
-        clipKind, trackKindFor, isTimed, speedOf, clipEnd, trackClips, trackEnd, projectDuration, lowestTrack,
-        isFree, findFreeStart, clipFromMedia, textClip, addClip, appendMedia, updateClip, updateClips,
+        isGenerated, clipKind, trackKindFor, isTimed, speedOf, clipEnd, trackClips, trackEnd, projectDuration, lowestTrack,
+        isFree, findFreeStart, clipFromMedia, textClip, drawClip, addClip, appendMedia, updateClip, updateClips,
         moveClip, moveClips, trimClip, splitClip, splitAt, deleteClips, duplicateClip, copyClips, pasteClips,
         sourceLength, setSpeed, freezeFrame, detachAudio,
         previousAdjacent, transitionWindow, transitionAt, setTransition, transitionAllCuts, transitionMix,
         activeClips, sourceTime, fadeAt, edgeFade, renderLayers, mediaAt, audibleClips, placeRect,
         nextAdjacent, soundWindow, clipGainAt,
-        motionAt, textAnimAt, filterString, duckEnvelope, envelopeAt,
+        motionAt, textAnimAt, handOf, drawAnimAt, strokeLengths, revealStrokes, simplifyPoints, shapeStrokes, filterString, duckEnvelope, envelopeAt,
         addMarker, updateMarker, removeMarker, chaptersText,
         snapTime, rulerStep, formatTime, parseTime, toFrame,
         isArabic, arabicDigits, wordsToCaptions, toSRT, toVTT, parseSubtitles, trackCues,

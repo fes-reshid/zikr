@@ -6,7 +6,7 @@ const CACHE = 'video-editor-' + V;
 const RUNTIME = 'video-editor-runtime';
 const q = (f) => f + '?v=' + V;
 const PRECACHE = ['./', 'index.html', 'help.html', 'manifest.webmanifest',
-    q('consent.js'), q('timeline.js'), q('audio-core.js'), q('webm.js'), q('editor.js'), q('media-store.js'), q('audio-mix.js'),
+    q('consent.js'), q('timeline.js'), q('hands.js'), q('audio-core.js'), q('webm.js'), q('editor.js'), q('media-store.js'), q('audio-mix.js'),
     q('export-fast.js'), q('quran.js'), q('captions.js'), q('transcribe-worker.js'), q('vendor/mediabunny.min.mjs'),
     'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
 
