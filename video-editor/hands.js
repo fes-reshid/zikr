@@ -31,7 +31,7 @@
         medium: { label: 'Medium', fill: '#d39b6a', shade: '#b97f50', line: '#7a4b2a', ink: '#2e1b0e' },
         tan: { label: 'Tan', fill: '#b0764a', shade: '#935f37', line: '#5e3a1f', ink: '#24150a' },
         dark: { label: 'Dark', fill: '#7d4f30', shade: '#653d24', line: '#3b2212', ink: '#170c05' },
-        outline: { label: 'Line art', fill: '#ffffff', shade: '#c8c8c8', line: '#1a1a1a', ink: '#141414', sleeve: '#ffffff' }
+        outline: { label: 'Line art', fill: '#ffffff', shade: '#c8c8c8', line: '#1a1a1a', ink: '#141414' }
     };
     const TOOLS = { pen: 'Hand with pen', pencil: 'Hand with pencil', finger: 'Hand typing' };
 
@@ -40,8 +40,26 @@
     // little so the tool slopes gently down to the right. The typing hand is
     // drawn in units where it is about 230 tall.
     const HOLD_UNIT = 610;
-    const HOLD_TILT = 0.05;
+    const HOLD_TILT = 0.055;
     const TAP_UNIT = 230;
+    // The writing hand's extent in its units, and where its arm fades away.
+    const HOLD_BOX = { x: -12, y: -140, w: 644, h: 560 };
+    const FADE_FROM = 240;
+    const FADE_TO = 410;
+
+    // Two scratch canvases: one for the hand, one for the hand with its shadow.
+    const scratch = [null, null];
+    function scratchCanvas(i, w, h) {
+        if (!scratch[i]) scratch[i] = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
+        const cv = scratch[i];
+        if (cv.width < w) cv.width = w;
+        if (cv.height < h) cv.height = h;
+        const g = cv.getContext('2d');
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalCompositeOperation = 'source-over';
+        g.clearRect(0, 0, cv.width, cv.height);
+        return g;
+    }
 
     function skinOf(name) {
         return SKINS[name] || SKINS.light;
@@ -121,45 +139,81 @@
         c.restore();
     }
 
-    /** A right hand holding a pencil or pen whose tip is at (0, 0), in sketch style. */
+    // The outline of the hand and arm, behind the tool.
+    const SIL = 'M 100 -12 C 94 -18 95 -27 103 -31 C 113 -41 126 -54 142 -68 C 158 -82 172 -91 192 -98 ' +
+        'C 220 -107 250 -117 280 -118 C 302 -118 320 -107 342 -93 C 374 -73 412 -53 436 -38 C 452 -27 458 -13 458 4 ' +
+        'C 462 60 460 140 466 200 C 472 260 490 300 512 340 ' +
+        'L 524 470 L 244 470 L 238 340 C 224 280 206 230 183 183 C 150 150 120 120 106 79 C 100 56 92 30 90 12 C 89 0 92 -8 100 -12 Z';
+    // The curled middle, ring and little fingers, top to bottom.
+    const FINGERS = [
+        'M 132 30 C 100 22 70 26 63 46 C 58 66 72 80 98 78 C 118 76 132 70 134 60 Z',
+        'M 138 76 C 104 70 70 74 65 92 C 61 108 80 117 106 115 C 126 113 140 106 142 98 Z',
+        'M 160 112 C 130 106 100 110 93 124 C 88 137 106 143 128 141 C 146 139 160 132 162 124 Z'
+    ];
+    // The thumb, in front of the tool; its far side melts into the palm.
+    const THUMB_FILL = 'M 100 -12 C 108 -18 124 -16 140 -8 C 162 4 182 24 198 48 C 214 76 236 110 240 140 ' +
+        'L 200 200 L 183 183 C 150 150 120 120 106 79 C 100 56 92 30 90 12 C 89 0 92 -8 100 -12 Z';
+
+    /**
+     * A right hand holding a pencil or pen whose tip is at (0, 0). The thumb
+     * points up to the tip from the front, and its lower edge is the hand's
+     * lower outline; the index finger runs along the top and pinches the tool
+     * from above; the other fingers curl under, peeping out past the thumb.
+     */
     function holding(c, s, tool, ink) {
-        const LW = 6;
-        const fill = (d, colour) => { c.fillStyle = colour; c.fill(new Path2D(d)); };
-        const line = (d, w) => { c.lineWidth = w || LW; c.lineJoin = 'round'; c.lineCap = 'round'; c.strokeStyle = s.ink; c.stroke(new Path2D(d)); };
-        const outline = (d, colour) => { fill(d, colour); line(d); };
-        // Hand and arm behind the pencil; the outline leaves the cut end of the arm open.
-        const contour = 'M 540 380 C 500 310 470 230 464 150 C 458 90 464 30 452 -16 C 436 -66 392 -102 336 -120 ' +
-            'C 292 -134 240 -128 204 -104 C 158 -96 120 -66 112 -22 C 96 -6 78 6 70 30 C 60 60 70 100 96 120 ' +
-            'C 126 140 160 156 186 196 C 214 248 236 300 258 380';
-        const arm = contour + ' L 258 700 L 560 700 Z';
-        shadow(c, arm);
-        fill(arm, s.fill);
-        line(contour);
-        // Knuckles and back-of-hand lines.
-        line('M 236 -112 C 262 -96 274 -78 276 -58', LW * 0.7);
-        line('M 318 -122 C 330 -104 336 -86 332 -66', LW * 0.7);
-        line('M 398 -92 C 404 -76 404 -60 398 -44', LW * 0.7);
-        line('M 300 210 C 330 196 370 192 404 200', LW * 0.6);
-        // A shirt cuff over the wrist.
-        outline('M 236 350 C 330 364 450 366 552 348 L 600 720 L 250 720 Z', s.sleeve || '#e8ecf1');
-        line('M 244 384 C 330 398 450 400 556 382', LW * 0.6);
-        // Middle, ring and little fingers tucked under, the little one lowest.
-        outline('M 124 118 C 100 126 80 122 78 106 C 76 90 94 82 120 84 C 140 86 150 100 148 112 C 146 120 136 122 124 118 Z', s.fill);
-        outline('M 104 88 C 78 94 58 88 58 70 C 58 52 80 46 108 50 C 132 54 142 70 136 82 C 130 92 118 92 104 88 Z', s.fill);
-        outline('M 98 50 C 72 54 52 46 54 28 C 56 12 78 6 104 12 C 128 18 138 34 130 46 C 124 54 112 54 98 50 Z', s.fill);
+        const LW = 4.2;
+        c.lineJoin = 'round';
+        c.lineCap = 'round';
+        c.strokeStyle = s.ink;
+        const line = function (d, w) {
+            c.lineWidth = w || LW * 0.7;
+            c.stroke(new Path2D(d));
+        };
+        // Behind the tool: the hand's outline and the curled fingers as one
+        // shape — every part stroked thickly, then all filled, so only the
+        // outline around the whole is left.
+        const back = [SIL].concat(FINGERS).map((d) => new Path2D(d));
+        c.lineWidth = LW * 2;
+        back.forEach((p) => c.stroke(p));
+        c.fillStyle = s.fill;
+        back.forEach((p) => c.fill(p));
+        // Lines between the curled fingers: each one's edge where it lies over the next.
+        c.lineWidth = LW;
+        for (let i = 0; i < FINGERS.length - 1; i += 1) {
+            c.save();
+            c.clip(new Path2D(FINGERS[i + 1]));
+            c.stroke(new Path2D(FINGERS[i]));
+            c.restore();
+        }
+        // The index finger's joints and underside, the knuckles, and the hollow of the palm under the pencil.
+        line('M 176 -74 C 186 -56 192 -40 196 -24');
+        line('M 196 -24 C 216 -30 238 -34 258 -34');
+        line('M 250 -104 C 254 -84 256 -60 258 -34');
+        line('M 258 -34 C 274 -24 288 -14 300 -4');
+        line('M 322 -36 C 316 -24 312 -16 306 -8', LW * 0.6);
+        line('M 356 -22 C 350 -14 344 -8 338 -2', LW * 0.6);
+        line('M 200 52 C 224 68 252 74 282 70 C 304 66 322 56 336 42');
+        line('M 284 70 C 292 62 300 56 310 52', LW * 0.6);
+        line('M 258 88 C 284 94 312 98 338 98', LW * 0.6);
         writingTool(c, tool, ink);
-        // The index finger curls over the top of the pencil.
-        outline('M 112 -22 C 106 -46 124 -70 158 -78 C 190 -84 218 -72 224 -50 C 228 -32 214 -14 196 -12 ' +
-            'L 124 -12 C 117 -13 113 -17 112 -22 Z', s.fill);
-        line('M 190 -76 C 182 -58 182 -36 190 -16', LW * 0.6);
-        // The thumb presses in front near the point; its base blends into the palm.
-        fill('M 96 -14 C 92 -30 104 -42 124 -40 C 160 -34 205 -8 246 22 L 268 64 L 222 100 C 196 80 160 52 128 30 C 108 16 98 2 96 -14 Z', s.fill);
-        line('M 96 -14 C 92 -30 104 -42 124 -40 C 160 -34 205 -8 246 22');
-        line('M 96 -14 C 98 2 108 16 128 30 C 160 52 196 80 222 100');
-        c.save(); c.translate(116, -20); c.rotate(0.42);
-        c.beginPath(); c.ellipse(0, 0, 17, 12, 0, 0, Math.PI * 2);
-        c.fillStyle = 'rgba(255,255,255,.45)'; c.fill(); c.lineWidth = LW * 0.6; c.strokeStyle = s.ink; c.stroke(); c.restore();
-        line('M 176 24 C 190 34 198 48 198 62', LW * 0.6);
+        // The thumb, in front: its lower edge is the hand's lower-left outline.
+        c.strokeStyle = s.ink;
+        c.fillStyle = s.fill;
+        c.fill(new Path2D(THUMB_FILL));
+        line('M 100 -12 C 108 -18 124 -16 140 -8 C 162 4 182 24 198 48 C 204 56 208 62 210 68', LW);
+        line('M 100 -12 C 92 -8 89 0 90 12 C 92 30 100 56 106 79 C 120 120 150 150 183 183 C 192 192 198 200 202 210', LW);
+        // Thumbnail and the thumb's joint.
+        c.save();
+        c.translate(122, 10);
+        c.rotate(0.95);
+        c.beginPath();
+        c.ellipse(0, 0, 17, 10.5, 0, 0, Math.PI * 2);
+        c.fillStyle = 'rgba(255,255,255,.55)';
+        c.fill();
+        c.lineWidth = LW * 0.6;
+        c.stroke();
+        c.restore();
+        line('M 146 66 C 156 54 166 42 176 32', LW * 0.6);
     }
 
     /** True for colours too pale to paint a pencil with: it would vanish. */
@@ -218,6 +272,37 @@
         limb(c, [[96, 112], [62, 106], [46, 88]], 22, s);
     }
 
+    /**
+     * The writing hand is drawn on a scratch canvas first, with one soft
+     * shadow under the whole hand, and then its arm is faded out towards the
+     * bottom — shadow and all, so no shadow shows through the fading arm.
+     */
+    function drawHolding(c, s, o, size) {
+        const k = size / HOLD_UNIT;
+        const pad = Math.ceil(60 * k) + 2;
+        const w = Math.ceil(HOLD_BOX.w * k) + pad;
+        const h = Math.ceil(HOLD_BOX.h * k) + pad;
+        const hand = scratchCanvas(0, w, h);
+        hand.setTransform(k, 0, 0, k, -HOLD_BOX.x * k, -HOLD_BOX.y * k);
+        holding(hand, s, o.tool === 'pen' ? 'pen' : 'pencil', o.ink);
+        const g = scratchCanvas(1, w, h);
+        g.shadowColor = 'rgba(0,0,0,.3)';
+        g.shadowBlur = Math.max(2, 40 * k);
+        g.shadowOffsetX = 18 * k;
+        g.shadowOffsetY = 26 * k;
+        g.drawImage(hand.canvas, 0, 0, w, h, 0, 0, w, h);
+        g.shadowColor = 'transparent';
+        const top = (FADE_FROM - HOLD_BOX.y) * k;
+        const fade = g.createLinearGradient(0, top, 0, (FADE_TO - HOLD_BOX.y) * k);
+        fade.addColorStop(0, 'rgba(0,0,0,0)');
+        fade.addColorStop(1, 'rgba(0,0,0,1)');
+        g.globalCompositeOperation = 'destination-out';
+        g.fillStyle = fade;
+        g.fillRect(0, top, w, h - top);
+        c.rotate(HOLD_TILT + (o.angle || 0));
+        c.drawImage(g.canvas, 0, 0, w, h, HOLD_BOX.x * k, HOLD_BOX.y * k, w, h);
+    }
+
     function draw(c, o) {
         const s = skinOf(o.skin);
         const size = Math.max(10, o.size || 200);
@@ -228,9 +313,7 @@
             c.rotate((o.angle || 0) - 0.15);
             tapping(c, s, o.press === undefined ? 1 : o.press);
         } else {
-            c.scale(size / HOLD_UNIT, size / HOLD_UNIT);
-            c.rotate(HOLD_TILT + (o.angle || 0));
-            holding(c, s, o.tool === 'pen' ? 'pen' : 'pencil', o.ink);
+            drawHolding(c, s, o, size);
         }
         c.restore();
     }
