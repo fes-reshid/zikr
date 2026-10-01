@@ -98,5 +98,14 @@ test('freehand points are thinned and rounded', () => {
 
 test('the hand module knows its tools and skins', () => {
     assert.deepEqual(Object.keys(Hands.TOOLS), T.HAND_TOOLS);
-    assert.ok(Object.keys(Hands.SKINS).length >= 4);
+    assert.ok(Object.keys(Hands.SKINS).length >= 5);
+    assert.ok(Hands.SKINS.outline, 'a black-and-white line-art hand');
+});
+
+test('the pencil takes the ink colour unless it is too pale to see', () => {
+    assert.equal(Hands.pale('#ffffff'), true);
+    assert.equal(Hands.pale('#f3ead3'), true);
+    assert.equal(Hands.pale('#e5484d'), false);
+    assert.equal(Hands.pale('#111111'), false);
+    assert.equal(Hands.pale(undefined), true);
 });

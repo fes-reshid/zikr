@@ -988,8 +988,8 @@
         const hand = T.handOf(clip);
         if (hand && tip && anim.exit < 1) {
             const local = Math.max(0, t - clip.start);
-            const px = Math.min(H * 0.7, Math.max(H * 0.14, size * 3.2)) * hand.size;
             if (hand.tool === 'finger') {
+                const px = Math.min(H * 0.55, Math.max(H * 0.12, size * 2.6)) * hand.size;
                 // A tap as each letter or word appears, then the finger lifts.
                 const frac = (units * anim.reveal) % 1;
                 const press = anim.reveal >= 1 ? 0 : Math.max(0, 1 - frac * 2.5);
@@ -998,8 +998,10 @@
                 // The pen moves up and down through the letters as it writes.
                 const writing = anim.reveal < 1;
                 const bob = writing ? Math.sin(local * 23) * size * 0.22 : 0;
+                // `px` is the pencil's length: about two and a half letters tall.
+                const px = Math.min(H * 0.45, Math.max(H * 0.1, size * 2.6)) * hand.size;
                 drawHand(c, hand, tip.x, tip.y + size * 0.1 + bob, px, anim.exit, W, H,
-                    { angle: writing ? Math.sin(local * 9) * 0.04 : 0 });
+                    { angle: writing ? Math.sin(local * 9) * 0.03 : 0, ink: clip.color });
             }
         }
     }
@@ -1016,7 +1018,7 @@
         c.globalAlpha *= 1 - exit;
         window.ReelHands.draw(c, {
             x: x + e * W * 0.45, y: y + e * H * 0.55, size: px,
-            tool: hand.tool, skin: hand.skin, press: o && o.press, angle: (o && o.angle) || 0
+            tool: hand.tool, skin: hand.skin, ink: o && o.ink, press: o && o.press, angle: (o && o.angle) || 0
         });
         c.restore();
     }
@@ -1082,8 +1084,9 @@
         if (hand && r.tip && anim.exit < 1) {
             const at = drawingToFrame(clip, r.tip.x, r.tip.y, W, H);
             const local = Math.max(0, t - clip.start);
-            drawHand(c, hand, at.x, at.y, H * 0.42 * hand.size, anim.exit, W, H,
-                { angle: anim.reveal < 1 ? Math.sin(local * 7) * 0.05 : 0 });
+            const inking = r.strokes[r.strokes.length - 1];
+            drawHand(c, hand, at.x, at.y, H * 0.3 * hand.size, anim.exit, W, H,
+                { angle: anim.reveal < 1 ? Math.sin(local * 7) * 0.04 : 0, ink: inking && inking.color });
         }
     }
 
