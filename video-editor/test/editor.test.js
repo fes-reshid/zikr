@@ -890,7 +890,7 @@ async function probeFile(page, bytes) {
             }
             return n;
         }, { t: t, rgb: rgb, tol: tol || 12 });
-        const SKIN = [0xf3, 0xcf, 0xb0];
+        const SKIN = [0xff, 0xc8, 0x3d]; // the emoji yellow, the hand's default skin
         const RED = [0xe5, 0x48, 0x4d];
         const shot = (name) => process.env.SHOTS ? page.screenshot({ path: path.join(process.env.SHOTS, name + '.png') }) : null;
         const drawAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 2;
@@ -933,14 +933,14 @@ async function probeFile(page, bytes) {
         const half = await countColour(drawing.start + drawing.animDuration * 0.3, RED, 30);
         const full = await countColour(drawing.start + drawing.animDuration + 1, RED, 30);
         check('it appears stroke by stroke', half > 500 && full > half * 1.5, half + ' → ' + full + ' red pixels');
-        const handMid = await countColour(drawing.start + drawing.animDuration * 0.3, SKIN);
+        const handMid = await countColour(drawing.start + drawing.animDuration * 0.3, SKIN, 30);
         await shot('draw-hand');
-        const handGone = await countColour(drawing.start + drawing.animDuration + 1, SKIN);
+        const handGone = await countColour(drawing.start + drawing.animDuration + 1, SKIN, 30);
         check('the hand draws, then leaves', handMid > 2000 && handGone === 0, handMid + ' → ' + handGone + ' skin pixels');
         check('a drawing with a hand shows ✍ on the timeline', /✍/.test(await page.locator('.clip[data-id="' + drawing.id + '"] .clip-badge').textContent()));
         await page.evaluate((id) => window.Reel.select(id), drawing.id);
         await page.getByRole('combobox', { name: 'Hand', exact: true }).selectOption('none');
-        check('the hand can be turned off', await countColour(drawing.start + drawing.animDuration * 0.3, SKIN) === 0);
+        check('the hand can be turned off', await countColour(drawing.start + drawing.animDuration * 0.3, SKIN, 30) === 0);
         await page.keyboard.press('Control+z');
 
         await page.locator('.clip[data-id="' + drawing.id + '"]').dblclick();
@@ -965,10 +965,10 @@ async function probeFile(page, bytes) {
         const WHITE = [255, 255, 255];
         const span = Math.max(written.animDuration, written.duration * 0.75);
         const inkHalf = await countColour(handAt + span * 0.45, WHITE, 8);
-        const handWriting = await countColour(handAt + span * 0.45, SKIN);
+        const handWriting = await countColour(handAt + span * 0.45, SKIN, 30);
         await shot('write-hand');
         const inkFull = await countColour(handAt + span + 0.7, WHITE, 8);
-        const handAfter = await countColour(handAt + span + 0.7, SKIN);
+        const handAfter = await countColour(handAt + span + 0.7, SKIN, 30);
         check('the title is written out from the start', inkHalf > 200 && inkFull > inkHalf * 1.4, inkHalf + ' → ' + inkFull);
         check('a hand holds the pen while it writes, then leaves', handWriting > 1500 && handAfter === 0, handWriting + ' → ' + handAfter);
         const arabicOk = await page.evaluate(function (id) {
@@ -977,13 +977,28 @@ async function probeFile(page, bytes) {
             app.commit();
             return true;
         }, written.id);
-        const arabicHand = await countColour(handAt + span * 0.45, SKIN);
+        const arabicHand = await countColour(handAt + span * 0.45, SKIN, 30);
         check('Arabic titles are written by hand too', arabicOk && arabicHand > 1500, arabicHand);
         await page.keyboard.press('Control+z');
         await page.evaluate((id) => window.Reel.select(id), written.id);
+        // The pen's own colour, the sketch style, and the size.
+        const GREEN = [0x2e, 0x7d, 0x32];
+        const greenBefore = await countColour(handAt + span * 0.45, GREEN, 40);
+        await page.getByRole('combobox', { name: 'Pen colour', exact: true }).selectOption('own');
+        await page.getByLabel('Colour of the pen').evaluate((i) => { i.value = '#2e7d32'; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); });
+        const greenPen = await countColour(handAt + span * 0.45, GREEN, 40);
+        check('the pen can be any colour', (await project(page)).clips.find((c) => c.id === written.id).penColor === '#2e7d32' && greenPen > greenBefore + 300,
+            greenBefore + ' → ' + greenPen);
+        const bigBefore = await countColour(handAt + span * 0.45, SKIN, 30);
+        await page.getByRole('slider', { name: 'Hand size', exact: true }).fill('200');
+        const bigAfter = await countColour(handAt + span * 0.45, SKIN, 30);
+        check('the hand can be made bigger', bigAfter > bigBefore * 2.5, bigBefore + ' → ' + bigAfter);
+        await page.getByRole('combobox', { name: 'Hand style', exact: true }).selectOption('sketch');
+        check('and drawn in the sketch style instead', (await project(page)).clips.find((c) => c.id === written.id).handStyle === 'sketch');
+        await shot('hand-options');
         await page.getByRole('button', { name: '⌨ Type with hand' }).click();
         const typed = (await project(page)).clips.find((c) => c.id === written.id);
-        const tapping = await countColour(handAt + span * 0.45, SKIN);
+        const tapping = await countColour(handAt + span * 0.45, SKIN, 30);
         await shot('type-hand');
         check('Type with hand types it with a tapping finger', typed.anim === 'typewriter' && typed.hand === 'finger' && tapping > 800, tapping);
         await page.getByRole('combobox', { name: 'Skin', exact: true }).selectOption('dark');

@@ -1,21 +1,26 @@
 /*
  * Reel: a drawn hand that writes, draws or types.
  *
- * A right hand holding a pencil or a pen, drawn in an outlined sketch style
- * with the tool lying almost flat and its point to the left — thumb in
- * front, index finger curled over the top, the other fingers tucked under
- * — or a hand tapping with one finger. It is all canvas paths, so it needs
- * no image files and stays sharp at any size. Its point — the tool's tip
- * or the fingertip — is placed exactly at (x, y), and the arm runs down
- * and to the right, out of the way of what it writes.
+ * A right hand holding a pen or a pencil, in one of two styles:
+ *   'emoji'   like the ✍️ emoji — a rounded, softly shaded hand with no
+ *             outline, the pen held diagonally with its point down to the
+ *             left and the hand above it to the right;
+ *   'sketch'  an outlined drawing with the tool lying almost flat and its
+ *             point to the left, thumb in front, index finger along the top
+ *             and the other fingers curled under, the arm fading away below.
+ * There is also a hand tapping with one finger, for typing. It is all
+ * canvas paths, so it needs no image files and stays sharp at any size.
+ * Its point — the tool's tip or the fingertip — is placed exactly at (x, y).
  *
- * `ReelHands.draw(ctx, { x, y, size, tool, skin, ink, press, angle })`
+ * `ReelHands.draw(ctx, { x, y, size, tool, style, skin, ink, press, angle })`
  *   tool   'pen', 'pencil' or 'finger'
- *   size   how long the pencil or pen is, in pixels (the hand is a little
+ *   style  'emoji' (the default) or 'sketch'
+ *   size   how long the pen or pencil is, in pixels (the hand is a little
  *          smaller); for 'finger', about how tall the hand is
- *   skin   a skin colour, or 'outline' for black-and-white line art
- *   ink    the colour being written in: the pencil's lead, and its paint
- *          (or the pen's barrel) unless that colour is too pale to see
+ *   skin   a skin colour, 'yellow' for the emoji yellow, or 'outline' for
+ *          black-and-white line art
+ *   ink    the pen's colour (and a pencil's lead); a colour too pale to see
+ *          leaves the pen black and the pencil yellow
  *   press  0..1, how far the finger is pressed (for typing)
  *   angle  extra tilt in radians, for a little movement while writing
  */
@@ -26,14 +31,17 @@
     'use strict';
 
     // `line` outlines the typing hand; `ink` is the sketch outline of the writing hand.
+    // `hi` and `lo` shade the emoji hand from its lit top to its shadowed underside.
     const SKINS = {
-        light: { label: 'Light', fill: '#f3cfb0', shade: '#dfae8a', line: '#9c6b4e', ink: '#3a2416' },
-        medium: { label: 'Medium', fill: '#d39b6a', shade: '#b97f50', line: '#7a4b2a', ink: '#2e1b0e' },
-        tan: { label: 'Tan', fill: '#b0764a', shade: '#935f37', line: '#5e3a1f', ink: '#24150a' },
-        dark: { label: 'Dark', fill: '#7d4f30', shade: '#653d24', line: '#3b2212', ink: '#170c05' },
-        outline: { label: 'Line art', fill: '#ffffff', shade: '#c8c8c8', line: '#1a1a1a', ink: '#141414' }
+        yellow: { label: 'Emoji yellow', fill: '#ffc83d', hi: '#ffe38a', lo: '#e59600', shade: '#e8a400', line: '#a86a00', ink: '#3d2600' },
+        light: { label: 'Light', fill: '#f3cfb0', hi: '#fde6d6', lo: '#d6a585', shade: '#dfae8a', line: '#9c6b4e', ink: '#3a2416' },
+        medium: { label: 'Medium', fill: '#d39b6a', hi: '#e8bd94', lo: '#a8743f', shade: '#b97f50', line: '#7a4b2a', ink: '#2e1b0e' },
+        tan: { label: 'Tan', fill: '#b0764a', hi: '#c99063', lo: '#835228', shade: '#935f37', line: '#5e3a1f', ink: '#24150a' },
+        dark: { label: 'Dark', fill: '#7d4f30', hi: '#96654a', lo: '#56321c', shade: '#653d24', line: '#3b2212', ink: '#170c05' },
+        outline: { label: 'Line art', fill: '#ffffff', hi: '#ffffff', lo: '#e4e4e4', shade: '#c8c8c8', line: '#1a1a1a', ink: '#141414', outlined: true }
     };
     const TOOLS = { pen: 'Hand with pen', pencil: 'Hand with pencil', finger: 'Hand typing' };
+    const STYLES = { emoji: 'Emoji ✍️', sketch: 'Sketch' };
 
     // The writing hand is drawn with its tool lying flat to the right of its
     // tip at (0, 0), in units where the pencil is 610 long, then tipped a
@@ -42,10 +50,16 @@
     const HOLD_UNIT = 610;
     const HOLD_TILT = 0.055;
     const TAP_UNIT = 230;
-    // The writing hand's extent in its units, and where its arm fades away.
+    // Each writing hand's extent in its units, and where the sketch hand's arm fades away.
     const HOLD_BOX = { x: -12, y: -140, w: 644, h: 560 };
     const FADE_FROM = 240;
     const FADE_TO = 410;
+    // The emoji hand is drawn in a frame where its pen runs from (245, 655)
+    // to (596, 168), about 600 long; (0, 0) is then moved to the tip.
+    const EMOJI_TIP = [245, 655];
+    const EMOJI_END = [596, 168];
+    const EMOJI_UNIT = Math.hypot(EMOJI_END[0] - EMOJI_TIP[0], EMOJI_END[1] - EMOJI_TIP[1]);
+    const EMOJI_BOX = { x: -8, y: -512, w: 540, h: 524 };
 
     // Two scratch canvases: one for the hand, one for the hand with its shadow.
     const scratch = [null, null];
@@ -250,6 +264,145 @@
         c.fillStyle = '#f08a9b'; c.beginPath(); c.moveTo(578, -14); c.lineTo(596, -14); c.quadraticCurveTo(606, -14, 606, 0); c.quadraticCurveTo(606, 14, 596, 14); c.lineTo(578, 14); c.closePath(); c.fill(); c.stroke();
     }
 
+    const EMOJI_BODY = 'M 275 395 C 290 350 330 315 380 305 C 430 295 480 310 530 330 C 600 355 680 390 745 408 ' +
+        'C 760 412 766 430 764 460 L 760 560 C 758 585 740 592 715 592 C 650 596 590 600 540 604 ' +
+        'C 534 616 506 620 490 610 C 478 622 448 622 434 610 C 420 622 390 620 378 606 ' +
+        'C 356 606 338 598 325 585 C 300 565 285 545 275 520 C 262 480 262 430 275 395 Z';
+    const EMOJI_THUMB = 'M 340 566 C 336 554 340 546 350 538 C 390 486 440 420 486 366 C 510 368 528 392 524 420 ' +
+        'C 516 446 470 480 420 524 C 396 546 378 566 366 578 C 356 586 344 578 340 566 Z';
+
+    /** A colour mixed towards white (amt > 0) or black (amt < 0). */
+    function shade(hex, amt) {
+        const n = parseInt(hex.slice(1), 16);
+        const f = (v) => Math.round(amt > 0 ? v + (255 - v) * amt : v * (1 + amt));
+        return 'rgb(' + f(n >> 16) + ',' + f((n >> 8) & 255) + ',' + f(n & 255) + ')';
+    }
+
+    /**
+     * A hand like the ✍️ emoji, holding a pen or pencil whose tip is at (0, 0):
+     * the back of the hand, softly lit from above, with the fingers curled
+     * under along the bottom and the thumb lying along the pen.
+     */
+    function emojiHand(c, s, tool, ink) {
+        c.save();
+        c.translate(-EMOJI_TIP[0], -EMOJI_TIP[1]);
+        const body = new Path2D(EMOJI_BODY);
+        let g = c.createLinearGradient(0, 300, 0, 612);
+        g.addColorStop(0, s.hi);
+        g.addColorStop(0.45, s.fill);
+        g.addColorStop(1, s.lo);
+        c.fillStyle = g;
+        c.fill(body);
+        c.save();
+        c.clip(body);
+        // A soft highlight on the back of the hand.
+        g = c.createRadialGradient(470, 380, 10, 470, 380, 200);
+        g.addColorStop(0, 'rgba(255,255,255,.35)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        c.fillStyle = g;
+        c.fillRect(260, 290, 520, 330);
+        // The cut end of the wrist, a little darker.
+        g = c.createLinearGradient(712, 0, 766, 0);
+        g.addColorStop(0, 'rgba(0,0,0,0)');
+        g.addColorStop(1, 'rgba(0,0,0,.16)');
+        c.fillStyle = g;
+        c.fillRect(700, 400, 70, 200);
+        // Shadow along the bottom, where the fingers curl under, and the creases between them.
+        g = c.createLinearGradient(0, 540, 0, 612);
+        g.addColorStop(0, 'rgba(0,0,0,0)');
+        g.addColorStop(1, 'rgba(90,40,0,.32)');
+        c.fillStyle = g;
+        c.fillRect(260, 520, 520, 100);
+        c.strokeStyle = 'rgba(110,50,0,.35)';
+        c.lineWidth = 9;
+        c.lineCap = 'round';
+        c.filter = 'blur(2px)';
+        [[388, 560, 380, 604], [446, 568, 434, 608], [502, 572, 490, 608]].forEach(function (l) {
+            c.beginPath();
+            c.moveTo(l[0], l[1]);
+            c.quadraticCurveTo(l[0] + 14, l[1] + 26, l[2], l[3]);
+            c.stroke();
+        });
+        c.filter = 'none';
+        c.restore();
+        if (s.outlined) outlineEmoji(c, body, s);
+        // The thumb lies along the pen, with a soft shadow under it.
+        const thumb = new Path2D(EMOJI_THUMB);
+        c.save();
+        c.shadowColor = 'rgba(110,50,0,.4)';
+        c.shadowBlur = 16;
+        c.shadowOffsetX = 4;
+        c.shadowOffsetY = 10;
+        g = c.createLinearGradient(420, 400, 470, 520);
+        g.addColorStop(0, s.hi);
+        g.addColorStop(1, s.fill);
+        c.globalAlpha *= 0.9;
+        c.fillStyle = g;
+        c.fill(thumb);
+        c.restore();
+        if (s.outlined) outlineEmoji(c, thumb, s);
+        // The pen, held between the thumb and the curled index finger.
+        c.translate(EMOJI_TIP[0], EMOJI_TIP[1]);
+        c.rotate(Math.atan2(EMOJI_END[1] - EMOJI_TIP[1], EMOJI_END[0] - EMOJI_TIP[0]));
+        emojiTool(c, tool, ink);
+        c.restore();
+    }
+
+    function outlineEmoji(c, path, s) {
+        c.lineWidth = 7;
+        c.lineJoin = 'round';
+        c.strokeStyle = s.ink;
+        c.stroke(path);
+    }
+
+    /** The emoji hand's pen or pencil, lying along +x from its tip at (0, 0). */
+    function emojiTool(c, tool, ink) {
+        const len = EMOJI_UNIT;
+        const r = 19;
+        const across = function (colour) {
+            const g = c.createLinearGradient(0, -r, 0, r);
+            g.addColorStop(0, shade(colour, 0.35));
+            g.addColorStop(0.35, colour);
+            g.addColorStop(1, shade(colour, -0.35));
+            return g;
+        };
+        const paint = ink && !pale(ink) ? ink : null;
+        if (tool === 'pencil') {
+            // Lead, sharpened wood, painted body, ferrule and eraser.
+            c.fillStyle = across(paint || '#f4c430');
+            c.fillRect(78, -r, len - 140, r * 2);
+            c.fillStyle = across('#e9c08a');
+            c.beginPath();
+            c.moveTo(22, -5); c.lineTo(78, -r); c.lineTo(78, r); c.lineTo(22, 5);
+            c.closePath();
+            c.fill();
+            c.fillStyle = /^#[0-9a-f]{6}$/i.test(ink || '') ? ink : '#333333';
+            c.beginPath();
+            c.moveTo(0, 0); c.lineTo(22, -5); c.lineTo(22, 5);
+            c.closePath();
+            c.fill();
+            c.fillStyle = across('#c9ccd1');
+            c.fillRect(len - 62, -r - 1, 30, r * 2 + 2);
+            c.fillStyle = across('#f08a9b');
+            c.beginPath();
+            c.moveTo(len - 32, -r); c.lineTo(len - 14, -r);
+            c.arc(len - 14, 0, r, -Math.PI / 2, Math.PI / 2);
+            c.lineTo(len - 32, r);
+            c.closePath();
+            c.fill();
+            return;
+        }
+        const p = new Path2D();
+        p.moveTo(0, 0);
+        p.lineTo(70, -r);
+        p.lineTo(len - r, -r);
+        p.arc(len - r, 0, r, -Math.PI / 2, Math.PI / 2);
+        p.lineTo(70, r);
+        p.closePath();
+        c.fillStyle = across(paint || '#1b1b1d');
+        c.fill(p);
+    }
+
     const TAP_ARM = 'M 40 70 C 60 30 120 20 160 40 C 210 64 260 100 310 140 L 240 230 ' +
         'C 190 196 150 186 110 170 C 70 150 30 110 40 70 Z';
     const TAP_SLEEVE = 'M 282 112 L 380 190 L 310 290 L 214 214 Z';
@@ -274,17 +427,21 @@
 
     /**
      * The writing hand is drawn on a scratch canvas first, with one soft
-     * shadow under the whole hand, and then its arm is faded out towards the
-     * bottom — shadow and all, so no shadow shows through the fading arm.
+     * shadow under the whole hand. The sketch hand's arm is then faded out
+     * towards the bottom — shadow and all, so no shadow shows through it.
      */
     function drawHolding(c, s, o, size) {
-        const k = size / HOLD_UNIT;
+        const emoji = o.style !== 'sketch';
+        const box = emoji ? EMOJI_BOX : HOLD_BOX;
+        const k = size / (emoji ? EMOJI_UNIT : HOLD_UNIT);
         const pad = Math.ceil(60 * k) + 2;
-        const w = Math.ceil(HOLD_BOX.w * k) + pad;
-        const h = Math.ceil(HOLD_BOX.h * k) + pad;
+        const w = Math.ceil(box.w * k) + pad;
+        const h = Math.ceil(box.h * k) + pad;
+        const tool = o.tool === 'pen' ? 'pen' : 'pencil';
         const hand = scratchCanvas(0, w, h);
-        hand.setTransform(k, 0, 0, k, -HOLD_BOX.x * k, -HOLD_BOX.y * k);
-        holding(hand, s, o.tool === 'pen' ? 'pen' : 'pencil', o.ink);
+        hand.setTransform(k, 0, 0, k, -box.x * k, -box.y * k);
+        if (emoji) emojiHand(hand, s, tool, o.ink);
+        else holding(hand, s, tool, o.ink);
         const g = scratchCanvas(1, w, h);
         g.shadowColor = 'rgba(0,0,0,.3)';
         g.shadowBlur = Math.max(2, 40 * k);
@@ -292,6 +449,11 @@
         g.shadowOffsetY = 26 * k;
         g.drawImage(hand.canvas, 0, 0, w, h, 0, 0, w, h);
         g.shadowColor = 'transparent';
+        c.rotate(emoji ? o.angle || 0 : HOLD_TILT + (o.angle || 0));
+        if (emoji) {
+            c.drawImage(g.canvas, 0, 0, w, h, box.x * k, box.y * k, w, h);
+            return;
+        }
         const top = (FADE_FROM - HOLD_BOX.y) * k;
         const fade = g.createLinearGradient(0, top, 0, (FADE_TO - HOLD_BOX.y) * k);
         fade.addColorStop(0, 'rgba(0,0,0,0)');
@@ -299,7 +461,6 @@
         g.globalCompositeOperation = 'destination-out';
         g.fillStyle = fade;
         g.fillRect(0, top, w, h - top);
-        c.rotate(HOLD_TILT + (o.angle || 0));
         c.drawImage(g.canvas, 0, 0, w, h, HOLD_BOX.x * k, HOLD_BOX.y * k, w, h);
     }
 
@@ -318,5 +479,5 @@
         c.restore();
     }
 
-    return { draw: draw, pale: pale, SKINS: SKINS, TOOLS: TOOLS };
+    return { draw: draw, pale: pale, SKINS: SKINS, TOOLS: TOOLS, STYLES: STYLES };
 }));

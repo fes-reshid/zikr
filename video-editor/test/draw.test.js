@@ -63,7 +63,11 @@ test('only revealing entrances show a hand', () => {
     const title = T.textClip('T1', 0, 'Bismillah');
     assert.equal(T.handOf(title), null, 'titles have no hand by default');
     assert.equal(T.handOf(Object.assign({}, title, { hand: 'pen', anim: 'fade' })), null);
-    assert.deepEqual(T.handOf(Object.assign({}, title, { hand: 'pen', anim: 'handwrite' })), { tool: 'pen', skin: 'light', size: 1 });
+    assert.deepEqual(T.handOf(Object.assign({}, title, { hand: 'pen', anim: 'handwrite' })),
+        { tool: 'pen', style: 'emoji', skin: 'yellow', size: 1, pen: null }, 'like the ✍️ emoji by default');
+    const own = T.handOf(Object.assign({}, title, { hand: 'pencil', anim: 'handwrite', handStyle: 'sketch', penColor: '#c62828', handSkin: 'dark', handSize: 1.5 }));
+    assert.deepEqual(own, { tool: 'pencil', style: 'sketch', skin: 'dark', size: 1.5, pen: '#c62828' });
+    assert.equal(T.handOf(Object.assign({}, title, { hand: 'pen', anim: 'handwrite', penColor: 'red' })).pen, null, 'only real colours');
     assert.equal(T.handOf(Object.assign({}, title, { hand: 'finger', anim: 'typewriter', handSkin: 'dark' })).skin, 'dark');
     const drawing = T.drawClip('T1', 0, []);
     assert.equal(T.handOf(drawing).tool, 'pencil');
@@ -96,8 +100,10 @@ test('freehand points are thinned and rounded', () => {
     assert.deepEqual(T.simplifyPoints(raw), [0.1, 0.1, 0.2, 0.2, 0.3, 0.3]);
 });
 
-test('the hand module knows its tools and skins', () => {
+test('the hand module knows its tools, styles and skins', () => {
     assert.deepEqual(Object.keys(Hands.TOOLS), T.HAND_TOOLS);
+    assert.deepEqual(Object.keys(Hands.STYLES), ['emoji', 'sketch']);
+    assert.ok(Hands.SKINS.yellow, 'the emoji yellow');
     assert.ok(Object.keys(Hands.SKINS).length >= 5);
     assert.ok(Hands.SKINS.outline, 'a black-and-white line-art hand');
 });

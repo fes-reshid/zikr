@@ -349,8 +349,10 @@
             anim: 'none',
             animDuration: 0.6,
             hand: 'none',
-            handSkin: 'light',
-            handSize: 1
+            handStyle: 'emoji',
+            handSkin: 'yellow',
+            handSize: 1,
+            penColor: null
         };
     }
 
@@ -377,8 +379,10 @@
             anim: 'draw',
             animDuration: 3,
             hand: 'pencil',
-            handSkin: 'light',
-            handSize: 1
+            handStyle: 'emoji',
+            handSkin: 'yellow',
+            handSize: 1,
+            penColor: null
         };
     }
 
@@ -1001,11 +1005,21 @@
         return clamp(sinceDone / HAND_EXIT, 0, 1);
     }
 
-    /** The hand a clip shows while it reveals itself, or null. */
+    /**
+     * The hand a clip shows while it reveals itself, or null: its tool, style
+     * ('emoji' or 'sketch'), skin, size, and `pen`, the pen's own colour —
+     * null to take the colour being written in.
+     */
     function handOf(clip) {
         if (!clip || HAND_TOOLS.indexOf(clip.hand) === -1) return null;
         if (clip.type === 'draw' ? clip.anim !== 'draw' : REVEAL_ANIMS.indexOf(clip.anim) === -1) return null;
-        return { tool: clip.hand, skin: clip.handSkin || 'light', size: clip.handSize > 0 ? clip.handSize : 1 };
+        return {
+            tool: clip.hand,
+            style: clip.handStyle === 'sketch' ? 'sketch' : 'emoji',
+            skin: clip.handSkin || 'yellow',
+            size: clip.handSize > 0 ? clip.handSize : 1,
+            pen: /^#[0-9a-f]{6}$/i.test(clip.penColor || '') ? clip.penColor : null
+        };
     }
 
     /** How far a drawing has been drawn at `time`: `reveal` 0..1, and the hand's `exit`. */

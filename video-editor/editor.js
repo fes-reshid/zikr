@@ -1018,7 +1018,8 @@
         c.globalAlpha *= 1 - exit;
         window.ReelHands.draw(c, {
             x: x + e * W * 0.45, y: y + e * H * 0.55, size: px,
-            tool: hand.tool, skin: hand.skin, ink: o && o.ink, press: o && o.press, angle: (o && o.angle) || 0
+            tool: hand.tool, style: hand.style, skin: hand.skin, ink: hand.pen || (o && o.ink),
+            press: o && o.press, angle: (o && o.angle) || 0
         });
         c.restore();
     }
@@ -2372,10 +2373,28 @@
         const hand = tools.indexOf(clip.hand) !== -1 ? clip.hand : 'none';
         const out = [chooser('Hand', hand, [['none', 'No hand']].concat(tools.map((k) => [k, H.TOOLS[k]])),
             (v) => T.updateClip(state.project, clip.id, { hand: v }))];
-        if (hand !== 'none') {
-            out.push(chooser('Skin', H.SKINS[clip.handSkin] ? clip.handSkin : 'light', Object.keys(H.SKINS).map((k) => [k, H.SKINS[k].label]),
-                (v) => T.updateClip(state.project, clip.id, { handSkin: v })));
-            out.push(slider(clip, 'Hand size', (c) => Math.round((c.handSize || 1) * 100), (v) => ({ handSize: v / 100 }), { min: 40, max: 200, step: 5, show: pct }));
+        if (hand === 'none') return out;
+        if (hand !== 'finger') {
+            out.push(chooser('Hand style', clip.handStyle === 'sketch' ? 'sketch' : 'emoji', Object.keys(H.STYLES).map((k) => [k, H.STYLES[k]]),
+                (v) => T.updateClip(state.project, clip.id, { handStyle: v })));
+        }
+        out.push(chooser('Skin', H.SKINS[clip.handSkin] ? clip.handSkin : 'yellow', Object.keys(H.SKINS).map((k) => [k, H.SKINS[k].label]),
+            (v) => T.updateClip(state.project, clip.id, { handSkin: v })));
+        out.push(slider(clip, 'Hand size', (c) => Math.round((c.handSize || 1) * 100), (v) => ({ handSize: v / 100 }), { min: 30, max: 300, step: 5, show: pct }));
+        if (hand !== 'finger') {
+            const toolName = hand === 'pencil' ? 'Pencil' : 'Pen';
+            const own = /^#[0-9a-f]{6}$/i.test(clip.penColor || '');
+            const sameAs = clip.type === 'draw' ? 'Same as the drawing' : 'Same as the text';
+            out.push(chooser(toolName + ' colour', own ? 'own' : 'ink', [['ink', sameAs], ['own', 'Choose a colour']], function (v) {
+                const ink = clip.type === 'draw' ? ((clip.strokes || [])[0] || {}).color : clip.color;
+                return T.updateClip(state.project, clip.id, { penColor: v === 'own' ? (ink && !H.pale(ink) ? ink : '#1b1b1d') : null });
+            }));
+            if (own) {
+                const input = el('input', { type: 'color', value: clip.penColor });
+                input.addEventListener('input', function () { liveEdit(clip.id, { penColor: input.value }); });
+                input.addEventListener('change', commitQuiet);
+                out.push(control('Colour of the ' + toolName.toLowerCase(), input));
+            }
         }
         return out;
     }
@@ -2494,7 +2513,7 @@
                 clip.anim === 'draw'
                     ? slider(clip, 'Drawing time', (c) => c.animDuration || 3, (v) => ({ animDuration: v }), { min: 0.5, max: 30, step: 0.5, show: secs })
                     : null
-            ].concat(clip.anim === 'draw' ? handControls(clip, ['pencil', 'pen']) : [])));
+            ].concat(clip.anim === 'draw' ? handControls(clip, ['pen', 'pencil']) : [])));
         }
 
         if (kind !== 'audio') {
