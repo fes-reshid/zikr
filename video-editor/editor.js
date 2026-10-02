@@ -1937,6 +1937,7 @@
     /** Double-clicking a clip: a title's text is ready to type into; a drawing opens on the board. */
     function openClip(clip) {
         if (clip.type === 'text') {
+            showDetails();
             const box = $('inspector').querySelector('textarea');
             if (box) { box.focus(); box.select(); }
         } else if (clip.type === 'draw') {
@@ -2470,6 +2471,13 @@
                     return button(T.TITLE_STYLES[k].label, function () { apply(T.updateClip(state.project, clip.id, T.TITLE_STYLES[k].patch)); });
                 })),
                 control('Text', area),
+                // Right under the text, where it is easy to find on a phone too.
+                el('div', { className: 'row-buttons' }, [
+                    button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: clip.hand === 'pencil' ? 'pencil' : 'pen' })); },
+                        { title: 'The title is written out by a hand holding a pen' }),
+                    button('⌨ Type with hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger' })); },
+                        { title: 'The title is typed letter by letter by a tapping finger' })
+                ]),
                 fontSelect(clip),
                 slider(clip, 'Size', (c) => c.fontSize, (v) => ({ fontSize: v }), { min: 12, max: 240, show: (v) => v + 'px' }),
                 colour(clip, 'Colour', 'color'),
@@ -2490,12 +2498,6 @@
                 }())
             ]));
             box.append(group('Animation', [
-                el('div', { className: 'row-buttons' }, [
-                    button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: clip.hand === 'pencil' ? 'pencil' : 'pen' })); },
-                        { title: 'The title is written out by a hand holding a pen' }),
-                    button('⌨ Type with hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger' })); },
-                        { title: 'The title is typed letter by letter by a tapping finger' })
-                ]),
                 select_(clip, 'Entrance', 'anim', Object.keys(ANIM_LABELS).map((k) => [k, ANIM_LABELS[k]])),
                 clip.anim && ['fade', 'rise', 'pop', 'slide'].indexOf(clip.anim) !== -1
                     ? slider(clip, 'Duration', (c) => c.animDuration || 0.6, (v) => ({ animDuration: v }), { min: 0.1, max: 3, step: 0.1, show: secs })
@@ -2874,6 +2876,21 @@
         apply(r.project);
     }
 
+    /**
+     * On a narrow screen the details panel is hidden until asked for; this
+     * opens it, so a new title's text box and options are in view.
+     */
+    function showDetails() {
+        if (!window.matchMedia || !window.matchMedia('(max-width: 900px)').matches) return;
+        $('workspace').classList.add('show-inspector');
+        syncDetailsButton();
+    }
+
+    function syncDetailsButton() {
+        const on = $('workspace').classList.contains('show-inspector');
+        $('toggle-inspector').setAttribute('aria-pressed', String(on));
+    }
+
     function addTitle() {
         const track = T.lowestTrack(state.project, 'text');
         if (!track) return;
@@ -2883,8 +2900,13 @@
         state.selection = [clip.id];
         state.selected = clip.id;
         apply(next);
+        showDetails();
         const box = $('inspector').querySelector('textarea');
-        if (box) { box.focus(); box.select(); }
+        if (box) {
+            box.focus();
+            box.select();
+            box.scrollIntoView({ block: 'nearest' });
+        }
     }
 
     /* ---------------------------------------------------------------- drawing */
@@ -3122,6 +3144,7 @@
         state.selection = [clip.id];
         state.selected = clip.id;
         apply(next);
+        showDetails();
     }
 
     function addMarkerHere() {
@@ -3615,7 +3638,7 @@
     $('export-cancel').addEventListener('click', closeExport);
 
     $('toggle-bin').addEventListener('click', function () { $('workspace').classList.toggle('show-bin'); });
-    $('toggle-inspector').addEventListener('click', function () { $('workspace').classList.toggle('show-inspector'); });
+    $('toggle-inspector').addEventListener('click', function () { $('workspace').classList.toggle('show-inspector'); syncDetailsButton(); });
 
     // Timeline height: drag the bar between the workspace and the timeline.
     (function () {

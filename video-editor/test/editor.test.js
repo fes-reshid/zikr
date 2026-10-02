@@ -1005,6 +1005,23 @@ async function probeFile(page, bytes) {
         const dark = await countColour(handAt + span * 0.45, [0x7d, 0x4f, 0x30]);
         check('the hand’s skin colour can be changed', dark > 800, dark);
 
+        /* ---------------------------------------------------------- on a phone */
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.waitForTimeout(200);
+        const phoneAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
+        await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); document.getElementById('workspace').classList.remove('show-inspector'); }, phoneAt);
+        check('on a phone the details panel starts hidden', !(await page.locator('#inspector').isVisible()));
+        await page.click('#add-text');
+        await page.keyboard.type('On a phone');
+        const phoneTitle = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'On a phone');
+        check('adding a title on a phone opens its details, ready to type', !!phoneTitle && await page.locator('#inspector textarea').isVisible());
+        const writeBtn = page.getByRole('button', { name: '✍ Write by hand' });
+        await writeBtn.scrollIntoViewIfNeeded();
+        await writeBtn.click();
+        check('and Write by hand is right there', (await project(page)).clips.find((c) => c.id === phoneTitle.id).anim === 'handwrite');
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.waitForTimeout(200);
+
         /* ------------------------------------------------------------ offline */
         const sw = await context.newPage();
         await sw.goto(base + '/video-editing/');
