@@ -2246,6 +2246,8 @@
         });
     }
     tools.push({ section: 'Create', label: 'Colour or gradient card…', run: colourCardDialog });
+    tools.push({ section: 'Create', label: '✍ Title written by hand (W)', run: addHandwrittenTitle });
+    tools.push({ section: 'Create', label: '✎ Drawing (D)', run: function () { openDrawMode(); } });
 
     /* -------------------------------------------------------------- inspector */
 
@@ -2760,7 +2762,7 @@
         const shortcuts = [
             ['Space', 'Play / pause'], ['S', 'Split at playhead'], ['Del', 'Delete'],
             ['Shift+Del', 'Delete and close gap'], ['Ctrl+C / X / V', 'Copy, cut, paste'], ['Ctrl+D', 'Duplicate'],
-            ['Ctrl+A', 'Select all'], ['Shift+click', 'Add to selection'], ['T', 'Add title'], ['D', 'Draw'], ['M', 'Add marker'],
+            ['Ctrl+A', 'Select all'], ['Shift+click', 'Add to selection'], ['T', 'Add title'], ['W', 'Title written by hand'], ['D', 'Draw'], ['M', 'Add marker'],
             ['F', 'Freeze frame'], ['← →', 'Step a frame'], ['Shift+← →', 'Step a second'], ['Alt+← →', 'Nudge clip'],
             ['Home / End', 'Start / end'], ['Ctrl+Z', 'Undo'], ['Ctrl+Shift+Z', 'Redo'], ['+ / −', 'Zoom'],
             ['Ctrl+wheel', 'Zoom at pointer'], ['Pinch', 'Zoom (touch)']
@@ -2891,10 +2893,17 @@
         $('toggle-inspector').setAttribute('aria-pressed', String(on));
     }
 
-    function addTitle() {
+    /** A title that a hand holding a pen writes out. */
+    function addHandwrittenTitle() {
+        addTitle({ anim: 'handwrite', hand: 'pen' });
+        toast('Type your words, then press Play to watch the hand write them.');
+    }
+
+    /** Adds a title at the playhead; `patch` sets its look, such as writing it by hand. */
+    function addTitle(patch) {
         const track = T.lowestTrack(state.project, 'text');
         if (!track) return;
-        const clip = T.textClip(track.id, state.time);
+        const clip = Object.assign(T.textClip(track.id, state.time), patch && patch.anim ? patch : null);
         const next = T.addClip(state.project, clip);
         if (next === state.project) return;
         state.selection = [clip.id];
@@ -3574,7 +3583,8 @@
     $('tool-split').addEventListener('click', splitSelected);
     $('tool-delete').addEventListener('click', function (e) { deleteSelected(e.shiftKey); });
     $('tool-duplicate').addEventListener('click', duplicateSelected);
-    $('add-text').addEventListener('click', addTitle);
+    $('add-text').addEventListener('click', function () { addTitle(); });
+    $('add-handwrite').addEventListener('click', addHandwrittenTitle);
     $('add-draw').addEventListener('click', function () { openDrawMode(); });
     $('add-marker').addEventListener('click', addMarkerHere);
     $('add-video-track').addEventListener('click', function () { apply(T.addTrack(state.project, 'video')); });
@@ -3732,6 +3742,7 @@
         else if (e.key === ' ') togglePlay();
         else if (key === 's') splitSelected();
         else if (key === 't') addTitle();
+        else if (key === 'w') addHandwrittenTitle();
         else if (key === 'd') openDrawMode();
         else if (key === 'm') addMarkerHere();
         else if (key === 'f') freezeSelected();

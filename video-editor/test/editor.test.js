@@ -1005,6 +1005,15 @@ async function probeFile(page, bytes) {
         const dark = await countColour(handAt + span * 0.45, [0x7d, 0x4f, 0x30]);
         check('the hand’s skin colour can be changed', dark > 800, dark);
 
+        // The Write button adds a title that is written by hand in one go.
+        const writeAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
+        await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); }, writeAt);
+        await page.click('#add-handwrite');
+        await page.keyboard.type('Written');
+        const quick = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'Written');
+        check('the Write button adds a title written by a hand with a pen', !!quick && quick.anim === 'handwrite' && quick.hand === 'pen' &&
+            await page.getByRole('combobox', { name: 'Hand', exact: true }).isVisible());
+
         /* ---------------------------------------------------------- on a phone */
         await page.setViewportSize({ width: 390, height: 844 });
         await page.waitForTimeout(200);
