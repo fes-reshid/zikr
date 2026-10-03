@@ -238,5 +238,11 @@
     app.addTool({ section: 'Subtitles', label: 'Import subtitles (.srt, .vtt)…', run: importSubtitles });
     app.addTool({ section: 'Subtitles', label: 'Save a titles track as subtitles…', run: exportSubtitles });
 
-    window.ReelCaptions = { open: openAutoCaptions, autoCaption: autoCaption, placeCues: placeCues };
+    function cancelTranscription() {
+        if (worker) worker.terminate();
+        worker = null;
+        Array.from(pending.values()).forEach(p => p({ error: 'Transcription cancelled.' }));
+        pending.clear();
+    }
+    window.ReelCaptions = { open: openAutoCaptions, autoCaption: autoCaption, placeCues: placeCues, transcribe, progressText, cancelTranscription };
 }());

@@ -37,7 +37,7 @@
         serif: { label: 'Serif', css: 'Georgia, "Times New Roman", serif' },
         display: { label: 'Display', css: 'Impact, "Arial Black", "Helvetica Neue", sans-serif' },
         mono: { label: 'Mono', css: 'ui-monospace, Menlo, Consolas, monospace' },
-        hand: { label: 'Handwritten', css: '"Comic Sans MS", "Marker Felt", "Segoe Print", cursive' },
+        hand: { label: 'Handwritten', css: '"Caveat", "Comic Sans MS", "Marker Felt", "Segoe Print", cursive' },
         cormorant: { label: 'Cormorant Garamond', css: '"Cormorant Garamond", Georgia, serif' },
         marcellus: { label: 'Marcellus', css: '"Marcellus", Georgia, serif' },
         amiri: { label: 'Amiri', css: '"Amiri", "Scheherazade New", serif', arabic: true },
@@ -49,7 +49,8 @@
 
     const TRANSITION_LABELS = {
         none: 'None', crossfade: 'Crossfade', dip: 'Dip to black', slide: 'Slide in',
-        push: 'Push', wipe: 'Wipe', zoom: 'Zoom'
+        push: 'Push', wipe: 'Wipe', zoom: 'Zoom', 'slide-up': 'Slide up',
+        'wipe-right': 'Wipe from right', iris: 'Circle reveal', blur: 'Soft dissolve'
     };
     const MOTION_LABELS = {
         none: 'None', 'zoom-in': 'Slow zoom in', 'zoom-out': 'Slow zoom out', 'pan-left': 'Pan left',
@@ -615,6 +616,16 @@
             c.beginPath();
             c.rect(0, 0, e * W, H);
             c.clip();
+        } else if (tr.type === 'wipe-right' && tr.role === 'to') {
+            c.beginPath(); c.rect((1-e)*W, 0, e*W, H); c.clip();
+        } else if (tr.type === 'slide-up' && tr.role === 'to') {
+            c.translate(0, (1-e)*H);
+        } else if (tr.type === 'iris' && tr.role === 'to') {
+            c.beginPath(); c.arc(W/2, H/2, e*Math.hypot(W,H)/2, 0, Math.PI*2); c.clip();
+        } else if (tr.type === 'blur') {
+            // A gentle scale dissolve also works on browsers without canvas filters.
+            const scale = tr.role === 'to' ? 1.06-.06*e : 1+.06*e;
+            c.translate(W/2,H/2); c.scale(scale,scale); c.translate(-W/2,-H/2);
         } else if (tr.type === 'zoom') {
             const s = tr.role === 'to' ? 1.25 - 0.25 * e : 1 + 0.25 * e;
             c.translate(W / 2, H / 2);
@@ -917,10 +928,25 @@
             c.lineWidth = outline.width * 2 * H / 720;
             c.strokeStyle = outline.color || '#000000';
         }
+        // Karaoke timing is deterministic, so seeking and export agree.
+        const lyricWords = clip.lyricStyle === 'karaoke' ? text.trim().split(/\s+/).length : 0;
+        const syncedTimes = Array.isArray(clip.lyricWordTimes) && clip.lyricSourceText === text ? clip.lyricWordTimes : null;
+        let lyricBudget = lyricWords ? (syncedTimes ? syncedTimes.filter(at => at <= t-clip.start).length : Math.min(lyricWords, Math.floor(Math.max(0,t-clip.start) / clip.duration * lyricWords) + 1)) : 0;
         // An outline is stroked first; the fill covers its inner half.
         const paint = function (line, x, y) {
             if (outline) c.strokeText(line, x, y);
             c.fillText(line, x, y);
+            if (lyricWords) {
+                const words = line.trim().split(/\s+/);
+                const count = Math.max(0, Math.min(words.length, lyricBudget));
+                lyricBudget -= words.length;
+                if (count) {
+                    const width = lineWidth(c,line), shown = count === words.length ? width : lineWidth(c,words.slice(0,count).join(' '));
+                    c.save(); c.beginPath();
+                    c.rect(rtl ? x+width/2-shown : x-width/2, y-lineH/2, shown+1, lineH);
+                    c.clip(); c.fillStyle=clip.lyricHighlight || '#f2d27a'; c.fillText(line,x,y); c.restore();
+                }
+            }
         };
 
         // How much of the text the reveal animation shows, in characters, words or width.
@@ -945,6 +971,17 @@
             const lineEnd = { x: rtl ? left : left + w, y: y };
             if (anim.unit === 'width') {
                 if (budget <= 0) return;
+                if (clip.handStyle === 'realistic' && window.ReelInk) {
+                    const shown = Math.min(1, budget / Math.max(1,w));
+                    const traced = window.ReelInk.drawLine(c, {
+                        line: line, font: c.font, width: w, size: size, lineHeight: lineH,
+                        rtl: rtl, x: mid, y: y, reveal: shown, color: clip.color || '#fff',
+                        outline: outline ? {width:outline.width*H/720,color:outline.color} : null
+                    });
+                    if (traced) tip = traced;
+                    budget -= w;
+                    return;
+                }
                 if (budget >= w) { paint(line, mid, y); budget -= w; tip = lineEnd; return; }
                 revealPart(budget);
                 budget = 0;
@@ -997,10 +1034,10 @@
             } else {
                 // The pen moves up and down through the letters as it writes.
                 const writing = anim.reveal < 1;
-                const bob = writing ? Math.sin(local * 23) * size * 0.22 : 0;
+                const bob = writing && !tip.traced ? Math.sin(local * 23) * size * 0.22 : 0;
                 // `px` is the pencil's length: about two and a half letters tall.
                 const px = Math.min(H * 0.45, Math.max(H * 0.1, size * 2.6)) * hand.size;
-                drawHand(c, hand, tip.x, tip.y + size * 0.1 + bob, px, anim.exit, W, H,
+                drawHand(c, hand, tip.x, tip.y + (tip.traced ? 0 : size * 0.1) + bob, px, anim.exit, W, H,
                     { angle: writing ? Math.sin(local * 9) * 0.03 : 0, ink: clip.color });
             }
         }
@@ -2374,17 +2411,26 @@
         const H = window.ReelHands;
         if (!H) return [];
         const hand = tools.indexOf(clip.hand) !== -1 ? clip.hand : 'none';
+        const realistic = clip.handStyle === 'realistic' && hand !== 'finger';
         const out = [chooser('Hand', hand, [['none', 'No hand']].concat(tools.map((k) => [k, H.TOOLS[k]])),
-            (v) => T.updateClip(state.project, clip.id, { hand: v }))];
+            (v) => T.updateClip(state.project, clip.id, { hand: v, handStyle: v === 'pencil' && realistic ? 'sketch' : clip.handStyle }))];
         if (hand === 'none') return out;
         if (hand !== 'finger') {
-            out.push(chooser('Hand style', clip.handStyle === 'sketch' ? 'sketch' : 'emoji', Object.keys(H.STYLES).map((k) => [k, H.STYLES[k]]),
-                (v) => T.updateClip(state.project, clip.id, { handStyle: v })));
+            out.push(chooser('Hand style', H.STYLES[clip.handStyle] ? clip.handStyle : 'emoji', Object.keys(H.STYLES).map((k) => [k, H.STYLES[k]]),
+                (v) => T.updateClip(state.project, clip.id, { handStyle: v, hand: v === 'realistic' ? 'pen' : hand })));
         }
-        out.push(chooser('Skin', H.SKINS[clip.handSkin] ? clip.handSkin : 'yellow', Object.keys(H.SKINS).map((k) => [k, H.SKINS[k].label]),
+        if (!realistic) out.push(chooser('Skin', H.SKINS[clip.handSkin] ? clip.handSkin : 'yellow', Object.keys(H.SKINS).map((k) => [k, H.SKINS[k].label]),
             (v) => T.updateClip(state.project, clip.id, { handSkin: v })));
-        out.push(slider(clip, 'Hand size', (c) => Math.round((c.handSize || 1) * 100), (v) => ({ handSize: v / 100 }), { min: 30, max: 300, step: 5, show: pct }));
-        if (hand !== 'finger') {
+        out.push(slider(clip, 'Hand size', (c) => Math.round((c.handSize || 1) * 100), (v) => ({ handSize: v / 100 }), { min: 20, max: 400, step: 5, show: pct }));
+        out.push(el('div', { className: 'row-buttons' }, [
+            button('Small', () => apply(T.updateClip(state.project, clip.id, { handSize: .6 }))),
+            button('Reset size', () => apply(T.updateClip(state.project, clip.id, { handSize: 1 }))),
+            button('Large', () => apply(T.updateClip(state.project, clip.id, { handSize: 1.8 })))
+        ]));
+        if (clip.anim === 'handwrite') out.push(slider(clip, 'Write time', c => c.writeDuration || c.duration * .75,
+            v => ({ writeDuration: v }), { min: .5, max: Math.max(.5,clip.duration*.9), step: .1, show: secs }));
+        out.push(el('p', { className: 'hint', text: 'Hand size changes only the hand, not the text. Preview and exported video use the same size.' }));
+        if (hand !== 'finger' && !realistic) {
             const toolName = hand === 'pencil' ? 'Pencil' : 'Pen';
             const own = /^#[0-9a-f]{6}$/i.test(clip.penColor || '');
             const sameAs = clip.type === 'draw' ? 'Same as the drawing' : 'Same as the text';
@@ -2464,6 +2510,11 @@
         if (actions.length) box.append(group('Tools', [el('div', { className: 'row-buttons' }, actions)]));
 
         if (clip.type === 'text') {
+            if (T.REVEAL_ANIMS.includes(clip.anim)) box.append(group('Writing hand', handControls(clip, ['pen','pencil','finger'])));
+            if (clip.lyricStyle) box.append(group('Lyrics', [
+                select_(clip, 'Style', 'lyricStyle', [['karaoke','Word highlight'],['plain','Plain captions']]),
+                colour(clip, 'Highlight', 'lyricHighlight')
+            ]));
             const area = el('textarea', { rows: 3, spellcheck: 'true', dir: 'auto' });
             area.value = clip.text;
             area.addEventListener('input', function () { liveEdit(clip.id, { text: area.value }); });
@@ -2475,7 +2526,7 @@
                 control('Text', area),
                 // Right under the text, where it is easy to find on a phone too.
                 el('div', { className: 'row-buttons' }, [
-                    button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: clip.hand === 'pencil' ? 'pencil' : 'pen' })); },
+                    button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: 'pen', handStyle: 'realistic' })); },
                         { title: 'The title is written out by a hand holding a pen' }),
                     button('⌨ Type with hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger' })); },
                         { title: 'The title is typed letter by letter by a tapping finger' })
@@ -2504,7 +2555,7 @@
                 clip.anim && ['fade', 'rise', 'pop', 'slide'].indexOf(clip.anim) !== -1
                     ? slider(clip, 'Duration', (c) => c.animDuration || 0.6, (v) => ({ animDuration: v }), { min: 0.1, max: 3, step: 0.1, show: secs })
                     : null
-            ].concat(T.REVEAL_ANIMS.indexOf(clip.anim) !== -1 ? handControls(clip, ['pen', 'pencil', 'finger']) : [])));
+            ]));
         } else if (clip.type === 'draw') {
             const n = (clip.strokes || []).length;
             box.append(group('Drawing', [
@@ -2895,7 +2946,7 @@
 
     /** A title that a hand holding a pen writes out. */
     function addHandwrittenTitle() {
-        addTitle({ anim: 'handwrite', hand: 'pen' });
+        addTitle({ anim: 'handwrite', hand: 'pen', handStyle: 'realistic', font: 'hand', bold: false, writeDuration: 3.5 });
         toast('Type your words, then press Play to watch the hand write them.');
     }
 
@@ -3440,6 +3491,14 @@
         $('export-bar').value = 0;
         pause();
         await fontsReady();
+        if (state.project.clips.some(c => T.handOf(c) && c.handStyle === 'realistic') && window.ReelHands) {
+            const ready = await window.ReelHands.ready();
+            if (!ready) {
+                $('export-status').textContent = 'The realistic hand could not load. Reconnect and reload the editor, or choose Sketch in Hand style.';
+                $('export-start').hidden = false;
+                return;
+            }
+        }
         if (choice.kind === 'fast') return startFastExport(choice);
         return startRealtimeExport(choice);
     }
@@ -3790,7 +3849,9 @@
         renderAll: renderAll,
         requestDraw: requestDraw,
         drawFrame: drawFrame,
+        applyTransition: applyTransition,
         pause: pause,
+        play: play,
         seek: seek,
         importFiles: importFiles,
         placeMedia: placeMedia,

@@ -41,7 +41,42 @@
         outline: { label: 'Line art', fill: '#ffffff', hi: '#ffffff', lo: '#e4e4e4', shade: '#c8c8c8', line: '#1a1a1a', ink: '#141414', outlined: true }
     };
     const TOOLS = { pen: 'Hand with pen', pencil: 'Hand with pencil', finger: 'Hand typing' };
-    const STYLES = { emoji: 'Emoji ✍️', sketch: 'Sketch' };
+    const STYLES = { realistic: 'Realistic · black pen', emoji: 'Emoji ✍️', sketch: 'Sketch' };
+    // Same-origin transparent asset; safe to composite into exported video.
+    let photo = null, photoPlate = null;
+    const photoReady = typeof Image === 'undefined' ? Promise.resolve(false) : new Promise(function (resolve) {
+        photo = new Image();
+        photo.onload = function () { resolve(true); if (window.ReelApp) window.ReelApp.requestDraw(); };
+        photo.onerror = function () { resolve(false); };
+        const script = document.currentScript && document.currentScript.src;
+        const url = new URL('assets/hand-real.webp', script || location.href);
+        if (script) url.search = new URL(script).search;
+        photo.src = url.href;
+    });
+
+    function drawPhoto(c, o, size) {
+        if (!photo || !photo.complete || !photo.naturalWidth) return false;
+        // Anchor at the photographed nib, not the centre of the hand.
+        if (!photoPlate) {
+            photoPlate = document.createElement('canvas');
+            photoPlate.width = photo.naturalWidth; photoPlate.height = photo.naturalHeight;
+            const g = photoPlate.getContext('2d'), w = photoPlate.width;
+            g.drawImage(photo, 0, 0);
+            // Feather the cropped forearm into the scene instead of showing a hard cut.
+            g.globalCompositeOperation = 'destination-out';
+            const fade = g.createLinearGradient(w*.8, 0, w, 0);
+            fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)');
+            g.fillStyle = fade; g.fillRect(w*.8, 0, w*.2, w);
+        }
+        const width = size / 0.72;
+        c.rotate(o.angle || 0);
+        c.shadowColor = 'rgba(0,0,0,.16)';
+        c.shadowBlur = size * .025;
+        c.shadowOffsetX = size * .012;
+        c.shadowOffsetY = size * .025;
+        c.drawImage(photoPlate, -width * .074, -width * .579, width, width);
+        return true;
+    }
 
     // The writing hand is drawn with its tool lying flat to the right of its
     // tip at (0, 0), in units where the pencil is 610 long, then tipped a
@@ -473,11 +508,13 @@
             c.scale(size / TAP_UNIT, size / TAP_UNIT);
             c.rotate((o.angle || 0) - 0.15);
             tapping(c, s, o.press === undefined ? 1 : o.press);
+        } else if (o.style === 'realistic' && drawPhoto(c, o, size)) {
+            // Photograph already drawn with its pen tip at the origin.
         } else {
             drawHolding(c, s, o, size);
         }
         c.restore();
     }
 
-    return { draw: draw, pale: pale, SKINS: SKINS, TOOLS: TOOLS, STYLES: STYLES };
+    return { draw: draw, ready: function () { return photoReady; }, pale: pale, SKINS: SKINS, TOOLS: TOOLS, STYLES: STYLES };
 }));

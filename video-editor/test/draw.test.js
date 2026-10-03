@@ -19,7 +19,7 @@ test('a drawing lives on a titles track and needs no media', () => {
     assert.equal(T.isTimed(p, clip), false);
     p = T.addClip(p, clip);
     assert.equal(p.clips.length, 1);
-    assert.deepEqual([p.clips[0].anim, p.clips[0].hand], ['draw', 'pencil']);
+    assert.deepEqual([p.clips[0].anim, p.clips[0].hand], ['draw', 'pen']);
     // It survives saving and opening, and splitting keeps both halves.
     const back = T.deserialize(T.serialize(p));
     assert.equal(back.clips[0].strokes.length, 1);
@@ -64,13 +64,13 @@ test('only revealing entrances show a hand', () => {
     assert.equal(T.handOf(title), null, 'titles have no hand by default');
     assert.equal(T.handOf(Object.assign({}, title, { hand: 'pen', anim: 'fade' })), null);
     assert.deepEqual(T.handOf(Object.assign({}, title, { hand: 'pen', anim: 'handwrite' })),
-        { tool: 'pen', style: 'emoji', skin: 'yellow', size: 1, pen: null }, 'like the ✍️ emoji by default');
+        { tool: 'pen', style: 'realistic', skin: 'medium', size: 1, pen: null }, 'realistic hand by default');
     const own = T.handOf(Object.assign({}, title, { hand: 'pencil', anim: 'handwrite', handStyle: 'sketch', penColor: '#c62828', handSkin: 'dark', handSize: 1.5 }));
     assert.deepEqual(own, { tool: 'pencil', style: 'sketch', skin: 'dark', size: 1.5, pen: '#c62828' });
     assert.equal(T.handOf(Object.assign({}, title, { hand: 'pen', anim: 'handwrite', penColor: 'red' })).pen, null, 'only real colours');
     assert.equal(T.handOf(Object.assign({}, title, { hand: 'finger', anim: 'typewriter', handSkin: 'dark' })).skin, 'dark');
     const drawing = T.drawClip('T1', 0, []);
-    assert.equal(T.handOf(drawing).tool, 'pencil');
+    assert.equal(T.handOf(drawing).tool, 'pen');
     assert.equal(T.handOf(Object.assign({}, drawing, { anim: 'fade' })), null);
     assert.equal(T.handOf(Object.assign({}, drawing, { hand: 'none' })), null);
 });
@@ -102,7 +102,7 @@ test('freehand points are thinned and rounded', () => {
 
 test('the hand module knows its tools, styles and skins', () => {
     assert.deepEqual(Object.keys(Hands.TOOLS), T.HAND_TOOLS);
-    assert.deepEqual(Object.keys(Hands.STYLES), ['emoji', 'sketch']);
+    assert.deepEqual(Object.keys(Hands.STYLES), ['realistic', 'emoji', 'sketch']);
     assert.ok(Hands.SKINS.yellow, 'the emoji yellow');
     assert.ok(Object.keys(Hands.SKINS).length >= 5);
     assert.ok(Hands.SKINS.outline, 'a black-and-white line-art hand');

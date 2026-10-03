@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Video Editor">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Scheherazade+New:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Reem+Kufi:wght@400;700&family=Cairo:wght@400;700&family=Cormorant+Garamond:wght@600;700&family=Marcellus&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Scheherazade+New:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Reem+Kufi:wght@400;700&family=Cairo:wght@400;700&family=Cormorant+Garamond:wght@600;700&family=Marcellus&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root {
     --bg: #0e1014;
@@ -430,6 +430,40 @@ dialog#consentGate h1:focus-visible { outline: none; }
     :root { --head-w: 96px; }
 }
 @media (min-width: 901px) { .show-narrow { display: none !important; } }
+
+/* Creative tools stay within reach on both phones and computers. */
+.studio-bar { display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:9px 12px; border-bottom:1px solid var(--line); background:linear-gradient(110deg,#16332e,#1c2630); flex-shrink:0; }
+.studio-label { font-size:9px; letter-spacing:.13em; color:#aecfc0; margin-right:4px; }
+.studio-bar button { font-size:11px; padding:7px 10px; border-color:#486357; background:#223b32; color:#e9f4eb; min-height:32px; }
+.studio-bar button:hover { background:#355744; }
+.studio-bar #studio-templates { background:#e3c681; color:#202b22; border-color:#e3c681; font-weight:650; }
+.studio-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:22px; }
+.studio-grid.transitions { grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+.studio-card { display:flex; flex-direction:column; padding:0 0 12px; overflow:hidden; text-align:left; border-radius:12px; background:#222931; border:2px solid transparent; min-width:0; gap:0; transition:border-color .15s,transform .15s; }
+.studio-card:hover { border-color:#7b998d; transform:translateY(-2px); }
+.studio-card[aria-pressed=true] { border-color:#e3c681; background:#30372f; }
+.studio-card canvas { width:100%; height:auto; display:block; margin-bottom:12px; }
+.studio-card strong { padding:0 12px; font-size:13px; line-height:1.4; white-space:normal; }
+.studio-tag { color:#b1cdbf; font-size:9px; letter-spacing:.08em; padding:0 12px 4px; }
+.studio-template-detail { padding:16px; background:#1a2228; border:1px solid #354047; border-radius:12px; display:grid; gap:12px; }
+.personal-template-row { display:flex; align-items:center; gap:10px; padding:14px 0; border-bottom:1px solid var(--line); }
+.personal-template-row>div { flex:1; min-width:0; overflow-wrap:anywhere; }
+.personal-template-row p { margin:4px 0 0; }
+.studio-lyrics { width:100%; min-height:175px; font-size:18px; line-height:1.75; margin:12px 0; padding:14px; }
+.studio-lyrics:dir(rtl) { font-family:Amiri,serif; }
+.dialog-body input[type=file] { max-width:100%; }
+@media(max-width:650px) {
+    .studio-bar { gap:5px; padding:7px 8px; }
+    .studio-bar button { font-size:11px; min-height:36px; flex:1 1 auto; padding:7px 8px; }
+    .studio-label { display:none; }
+    .studio-grid,.studio-grid.transitions { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .studio-card strong { font-size:12px; padding:0 8px; }
+    .studio-tag { font-size:8px; padding:0 8px 4px; }
+    .dialog-grid { grid-template-columns:minmax(0,1fr); }
+    .studio-template-detail { padding:10px; }
+}
+@media(prefers-reduced-motion:reduce) { .studio-card { transition:none; } .studio-card:hover { transform:none; } }
+
 </style>
 </head>
 <body>
@@ -613,12 +647,15 @@ dialog#consentGate h1:focus-visible { outline: none; }
 <script src="audio-core.js?v=dev"></script>
 <script src="webm.js?v=dev"></script>
 <script src="hands.js?v=dev"></script>
+<script src="handwriting.js?v=dev"></script>
 <script src="editor.js?v=dev"></script>
 <script src="media-store.js?v=dev"></script>
 <script src="audio-mix.js?v=dev"></script>
 <script src="export-fast.js?v=dev"></script>
 <script src="quran.js?v=dev"></script>
 <script src="captions.js?v=dev"></script>
+<script src="studio.js?v=dev"></script>
+<script src="creator-tools.js?v=dev"></script>
 <script>
 // Works offline after the first visit (http only; the service worker cannot run from a file).
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {

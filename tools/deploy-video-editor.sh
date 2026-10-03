@@ -12,14 +12,15 @@ SRC="$HERE/video-editor"
 DEST=${1:-"$HERE/../barnoota/video-editing"}
 V=$(date -u +%Y%m%d%H%M)
 
-FILES="index.html help.html manifest.webmanifest sw.js consent.js timeline.js hands.js audio-core.js webm.js editor.js
+FILES="index.html help.html manifest.webmanifest sw.js consent.js timeline.js hands.js handwriting.js studio.js creator-tools.js audio-core.js webm.js editor.js
 media-store.js audio-mix.js export-fast.js quran.js captions.js transcribe-worker.js"
 
 rm -rf "$DEST"
-mkdir -p "$DEST/icons" "$DEST/vendor"
+mkdir -p "$DEST/icons" "$DEST/vendor" "$DEST/assets"
 for f in $FILES; do cp "$SRC/$f" "$DEST/$f"; done
 cp "$SRC"/icons/* "$DEST/icons/"
 cp "$SRC"/vendor/* "$DEST/vendor/"
+cp "$SRC"/assets/* "$DEST/assets/"
 # Portable in-place edit (GNU and BSD sed disagree on -i).
 perl -pi -e "s/\?v=[0-9a-z]+/?v=$V/g" "$DEST/index.html"
 perl -pi -e 's/^<!DOCTYPE html>/<!DOCTYPE html>\n<!-- Built from fes-reshid\/zikr video-editor\/ by tools\/deploy-video-editor.sh — edit the source there. -->/' "$DEST/index.html"

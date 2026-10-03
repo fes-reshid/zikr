@@ -71,7 +71,7 @@
         verse: { label: 'Arabic verse', patch: { fontSize: 64, bold: false, box: false, shadow: true, x: 0.5, y: 0.42, anim: 'fade', font: 'amiri', color: '#ffffff' } }
     };
 
-    const TRANSITIONS = ['crossfade', 'dip', 'slide', 'push', 'wipe', 'zoom'];
+    const TRANSITIONS = ['crossfade', 'dip', 'slide', 'push', 'wipe', 'zoom', 'slide-up', 'wipe-right', 'iris', 'blur'];
     const MOTIONS = ['zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'pan-up', 'pan-down'];
     const TEXT_ANIMS = ['fade', 'rise', 'pop', 'slide', 'typewriter', 'words', 'handwrite'];
     /** Entrances that reveal a title bit by bit, and so can show a hand doing it. */
@@ -349,8 +349,8 @@
             anim: 'none',
             animDuration: 0.6,
             hand: 'none',
-            handStyle: 'emoji',
-            handSkin: 'yellow',
+            handStyle: 'realistic',
+            handSkin: 'medium',
             handSize: 1,
             penColor: null
         };
@@ -378,9 +378,9 @@
             fadeOut: 0.3,
             anim: 'draw',
             animDuration: 3,
-            hand: 'pencil',
-            handStyle: 'emoji',
-            handSkin: 'yellow',
+            hand: 'pen',
+            handStyle: 'realistic',
+            handSkin: 'medium',
             handSize: 1,
             penColor: null
         };
@@ -793,7 +793,7 @@
      */
     function transitionMix(type, progress) {
         if (type === 'dip') return { from: clamp(1 - 2 * progress, 0, 1), to: clamp(2 * progress - 1, 0, 1) };
-        if (type === 'crossfade' || type === 'zoom') return { from: 1 - progress, to: progress };
+        if (type === 'crossfade' || type === 'zoom' || type === 'blur') return { from: 1 - progress, to: progress };
         // Slides and wipes move the pictures instead; the sound still crossfades.
         return { from: 1, to: 1, soundFrom: 1 - progress, soundTo: progress };
     }
@@ -992,7 +992,9 @@
             out.scale = 0.6 + 0.4 * back;
         } else if (REVEAL_ANIMS.indexOf(type) !== -1) {
             // Spread across most of the clip, so the last word lands before it ends.
-            const span = Math.max(d, clip.duration * 0.75);
+            const span = type === 'handwrite' && clip.writeDuration > 0
+                ? Math.max(0.1, Math.min(clip.writeDuration, clip.duration * 0.9))
+                : Math.max(d, clip.duration * 0.75);
             out.reveal = clamp(local / span, 0, 1);
             out.unit = type === 'typewriter' ? 'chars' : type === 'words' ? 'words' : 'width';
             out.exit = handExit(local - span);
@@ -1015,7 +1017,7 @@
         if (clip.type === 'draw' ? clip.anim !== 'draw' : REVEAL_ANIMS.indexOf(clip.anim) === -1) return null;
         return {
             tool: clip.hand,
-            style: clip.handStyle === 'sketch' ? 'sketch' : 'emoji',
+            style: ['realistic', 'sketch'].includes(clip.handStyle) ? clip.handStyle : 'emoji',
             skin: clip.handSkin || 'yellow',
             size: clip.handSize > 0 ? clip.handSize : 1,
             pen: /^#[0-9a-f]{6}$/i.test(clip.penColor || '') ? clip.penColor : null
