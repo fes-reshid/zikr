@@ -432,7 +432,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
 @media (min-width: 901px) { .show-narrow { display: none !important; } }
 
 /* Creative tools stay within reach on both phones and computers. */
-.studio-bar { display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:9px 12px; border-bottom:1px solid var(--line); background:linear-gradient(110deg,#16332e,#1c2630); flex-shrink:0; }
+.studio-bar { max-height:110px; overflow-y:auto; display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:9px 12px; border-bottom:1px solid var(--line); background:linear-gradient(110deg,#16332e,#1c2630); flex-shrink:0; }
 .studio-label { font-size:9px; letter-spacing:.13em; color:#aecfc0; margin-right:4px; }
 .studio-bar button { font-size:11px; padding:7px 10px; border-color:#486357; background:#223b32; color:#e9f4eb; min-height:32px; }
 .studio-bar button:hover { background:#355744; }
@@ -445,6 +445,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
 .studio-card canvas { width:100%; height:auto; display:block; margin-bottom:12px; }
 .studio-card strong { padding:0 12px; font-size:13px; line-height:1.4; white-space:normal; }
 .studio-tag { color:#b1cdbf; font-size:9px; letter-spacing:.08em; padding:0 12px 4px; }
+.resize-card { min-height:80px; white-space:normal; font-size:15px; border:1px solid #60806c; background:#203d32; }
 .studio-template-detail { padding:16px; background:#1a2228; border:1px solid #354047; border-radius:12px; display:grid; gap:12px; }
 .personal-template-row { display:flex; align-items:center; gap:10px; padding:14px 0; border-bottom:1px solid var(--line); }
 .personal-template-row>div { flex:1; min-width:0; overflow-wrap:anywhere; }
@@ -656,6 +657,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
 <script src="captions.js?v=dev"></script>
 <script src="studio.js?v=dev"></script>
 <script src="creator-tools.js?v=dev"></script>
+<script src="creative-effects.js?v=dev"></script>
 <script>
 // Works offline after the first visit (http only; the service worker cannot run from a file).
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {

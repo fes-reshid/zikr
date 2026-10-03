@@ -597,7 +597,8 @@
             c.save();
             c.globalAlpha = layer.alpha;
             if (layer.transition) applyTransition(c, layer.transition, W, H);
-            if (layer.clip.type === 'draw') drawDrawing(c, layer.clip, t, W, H, source);
+            if (layer.clip.sticker && window.ReelEffects) window.ReelEffects.sticker(c, layer.clip, t, W, H);
+            else if (layer.clip.type === 'draw') drawDrawing(c, layer.clip, t, W, H, source);
             else if (layer.kind === 'text') drawText(c, layer.clip, t, W, H);
             else drawVisual(c, layer.clip, layer.kind, t, W, H, source);
             c.restore();
@@ -729,8 +730,9 @@
      */
     function drawVisual(c, clip, kind, t, W, H, source) {
         if (!files.has(clip.mediaId)) { drawOffline(c, clip, W, H); return; }
-        const s = source(clip, kind);
+        let s = source(clip, kind);
         if (!s) return;
+        if (clip.cutout && window.ReelEffects) s = window.ReelEffects.processBackground(s, clip, t);
         const fx = T.fxOf(clip);
         const cr = T.cropRect(s.w, s.h, fx.crop);
         const m = T.motionAt(clip, t);
@@ -2497,6 +2499,7 @@
         box.append(group('Timing', timing));
 
         const actions = [];
+        if ((kind === 'video' || kind === 'image') && window.ReelEffects) actions.push(button('Remove / replace background', function () { window.ReelEffects.openBackground(); }));
         if (kind === 'video' && !clip.freeze && !clip.audioOnly) {
             actions.push(button('Freeze frame', freezeSelected, { disabled: !underPlayhead, title: 'Hold the frame under the playhead for 2 s (F)' }));
             actions.push(button('Detach audio', detachSelected, { title: 'Move the sound to its own clip on an audio track' }));
@@ -2556,6 +2559,8 @@
                     ? slider(clip, 'Duration', (c) => c.animDuration || 0.6, (v) => ({ animDuration: v }), { min: 0.1, max: 3, step: 0.1, show: secs })
                     : null
             ]));
+        } else if (clip.sticker) {
+            box.append(group('Animated sticker', [button('Edit sticker / arrow', function () { window.ReelEffects.openStickers(); })]));
         } else if (clip.type === 'draw') {
             const n = (clip.strokes || []).length;
             box.append(group('Drawing', [
@@ -2990,6 +2995,7 @@
      * the clip being edited), as one undoable step.
      */
     function openDrawMode(clipId) {
+        if (clipId && T.getClip(state.project, clipId)?.sticker && window.ReelEffects) { selectOnly(clipId); window.ReelEffects.openStickers(); return; }
         if (drawMode) return;
         pause();
         const editing = clipId ? T.getClip(state.project, clipId) : null;
@@ -3379,8 +3385,9 @@
         updateRestoreBanner();
     }
 
-    function snapshot() {
+    async function snapshot() {
         pause();
+        if (window.ReelEffects) { try { await window.ReelEffects.ready(state.project); } catch (e) { toast('Background removal could not load. Reconnect or remove the effect first.'); return; } }
         drawFrame(state.time);
         canvas.toBlob(function (blob) {
             if (blob) download(blob, safeName(state.project.name) + ' ' + fmt(state.time).replace(/[:.]/g, '-') + '.png');
@@ -3491,6 +3498,10 @@
         $('export-bar').value = 0;
         pause();
         await fontsReady();
+        if (window.ReelEffects) {
+            try { await window.ReelEffects.ready(state.project); }
+            catch (e) { $('export-status').textContent = 'Background removal could not load. Reconnect or remove the effect before exporting.'; $('export-start').hidden = false; return; }
+        }
         if (state.project.clips.some(c => T.handOf(c) && c.handStyle === 'realistic') && window.ReelHands) {
             const ready = await window.ReelHands.ready();
             if (!ready) {

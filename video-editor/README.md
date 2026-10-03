@@ -182,3 +182,7 @@ repo. The copy there is generated: edit the source here.
 `studio.js` adds six editable templates, ten transition previews and original English/Arabic nasheed lyrics. Lyrics support word highlighting, handwriting, optional local vocal audio and evenly distributed timing. Templates append to existing projects and are undoable. `handwriting.js` traces the centre of shaped glyphs for the realistic pen, including Arabic. The generated realistic hand asset is an AI-created photographic cutout, not footage of an actual person.
 
 `creator-tools.js` provides microphone recording (five minutes per take), local Whisper word alignment with a 60% overall and 50% per-line match threshold, and personal templates in a separate IndexedDB database (including media, up to 150 MB each). They survive project resets but not clearing browser site data. Tests: `node video-editor/test/creator-tools.test.js`.
+
+## Creative effects
+
+`creative-effects.js` adds ten canvas stickers, four social resize presets, chroma-key removal and on-device MediaPipe person segmentation (tasks-vision 0.10.14; selfie_segmenter float16 v1). Person segmentation runs synchronously on each frame and can reduce playback/export speed, especially on phones. Cutouts are processed at up to 1280 px. The shared renderer applies effects to preview and export. Ramadan, Eid, class and lesson templates add editable titles and sticker decorations. Run `node video-editor/test/creative-effects.test.js`.

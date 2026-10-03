@@ -17,6 +17,10 @@
         {id:'journey',name:'Steps of goodness · English',theme:'rose',lines:['Across the road, beneath the sky','We see the days go softly by','With thankful hearts and purpose clear','We choose the good, both far and near']}
     ];
     const TEMPLATES=[
+        {id:'ramadan',name:'Ramadan reflections',tag:'RAMADAN',theme:'midnight',title:'Ramadan Mubarak',subtitle:'A month of reflection, prayer and generosity',lines:['Make time for prayer and Qur’an','Share kindness with those around you'],motif:'crescent'},
+        {id:'eid',name:'Eid greetings',tag:'EID',theme:'emerald',title:'Eid Mubarak',subtitle:'Wishing you and your family joy and peace',lines:['Celebrate with grateful hearts','Share the joy with family and neighbours'],motif:'sparkles'},
+        {id:'class',name:'Islamic class invitation',tag:'ONLINE CLASS',theme:'paper',title:'Learn together. Grow together.',subtitle:'Add your course, teacher and registration details',lines:['Class time: add your day and time','Register: add your contact or website'],motif:'book'},
+        {id:'lesson',name:'My Islamic lesson',tag:'LESSON INTRO',theme:'sky',title:'Bismillah — let’s begin',subtitle:'Add your lesson topic here',lines:['Today we will learn…','Think, practise and share what you learned'],hand:true,motif:'star'},
         {id:'whiteboard',name:'The whiteboard',tag:'HANDWRITING',theme:'paper',title:'Every good deed matters',subtitle:'A small lesson. A lasting difference.',lines:['Begin with a kind word','Follow it with a helping hand'],hand:true},
         {id:'reminder',name:'A moment to reflect',tag:'REMINDER',theme:'emerald',title:'Pause. Reflect. Be grateful.',subtitle:'Make room for what matters.',lines:['Notice the blessings around you','Share one kindness today']},
         {id:'lyrics',name:'Words from the heart',tag:'NASHEED LYRICS',theme:'midnight',title:'A grateful heart',subtitle:'Original words, ready for your voice.',lyrics:true},
@@ -79,10 +83,11 @@
             const bg=Object.assign(T.clipFromMedia(T.getMedia(p,mediaId),bgTrack.id,at),{duration:scene,fit:'cover',transition:i?{type:'crossfade',duration:.8}:null});
             p=T.addClip(p,bg);
             p=addTitle(p,titleTrack.id,at,text,{duration:scene,y:.44,fontSize:portrait?34:58,color:palette.ink,shadow:false,
-                font:item.hand?'hand':'marcellus',anim:item.hand?'handwrite':'rise',hand:item.hand?'pen':'none',handStyle:'realistic',writeDuration:4.4,handSize:1});
+                font:T.isArabic(text)?'amiri':item.hand?'hand':'marcellus',anim:item.hand?'handwrite':'rise',hand:item.hand?'pen':'none',handStyle:'realistic',writeDuration:4.4,handSize:1});
             p=addTitle(p,detailTrack.id,at,i===0?(options.subtitle.trim()||item.subtitle):['','One small action can make a difference.','Create something worth sharing.'][i],
                 {duration:scene,y:.69,font:'sans',fontSize:portrait?14:23,color:palette.ink,shadow:false,anim:'fade',opacity:.85});
         });
+        if(item.motif){const st=newTrack(p,'text','Template decoration');p=st.p;const deco=Object.assign(T.drawClip(st.id,start,[]),{duration:scene*texts.length,anim:'none',hand:'none',x:.5,y:.17,scale:.55,sticker:{kind:item.motif,motion:'float',color:palette.accent,rotation:0}});p=T.addClip(p,deco);}
         app.apply(p);app.seek(start+1.3);app.zoomToFit();
         const first=p.clips.find(c=>c.track===titleTrack.id);app.selectOnly(first.id);
         app.toast('Template added. Select any title to edit it. Undo removes the whole template.');
