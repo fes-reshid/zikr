@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Editor Help</title>
+<meta name="description" content="How to use the Diin Islaam video editor: editing, titles in Arabic, Qur’an verse videos, captions, sound and export.">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<style>
+:root { --bg: #0e1014; --panel: #151920; --line: #2a313d; --text: #e7eaf0; --muted: #a2a9b7; --accent: #7aa2ff; --gold: #f2d27a; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 4px; }
+h2 { font-size: 20px; margin: 36px 0 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+h3 { font-size: 16px; margin: 20px 0 4px; }
+p, li { color: var(--muted); }
+strong, b { color: var(--text); }
+a { color: var(--accent); }
+.lead { font-size: 18px; }
+.back { display: inline-block; margin-bottom: 20px; color: var(--muted); text-decoration: none; }
+nav ul { columns: 2; padding-left: 18px; }
+kbd { font: 12px ui-monospace, Menlo, monospace; background: #232a35; border: 1px solid #394253; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--text); }
+table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+td { padding: 5px 8px; border-bottom: 1px solid var(--line); color: var(--muted); vertical-align: top; }
+td:first-child { white-space: nowrap; width: 1%; }
+.note { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 8px; padding: 10px 14px; }
+@media (max-width: 560px) { nav ul { columns: 1; } }
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="./">← Back to the editor</a>
+<h1>Video Editor — help</h1>
+<p class="lead">Everything runs in your browser. Your videos, photos and recordings are never uploaded: they are opened on this device, and the finished video is made on this device.</p>
+
+<nav aria-label="Contents"><ul>
+    <li><a href="#start">Getting started</a></li>
+    <li><a href="#editing">Cutting and arranging</a></li>
+    <li><a href="#look">Layers, motion and colour</a></li>
+    <li><a href="#effects">Effects</a></li>
+    <li><a href="#titles">Titles, Arabic and animation</a></li>
+    <li><a href="#drawing">Drawing</a></li>
+    <li><a href="#quran">Qur’ān verse videos</a></li>
+    <li><a href="#sound">Sound and ducking</a></li>
+    <li><a href="#captions">Captions and subtitles</a></li>
+    <li><a href="#export">Export</a></li>
+    <li><a href="#saving">Saving and reopening</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a href="#keys">Keyboard shortcuts</a></li>
+</ul></nav>
+
+<h2 id="start">Getting started</h2>
+<ol>
+    <li><b>Import</b> video, audio and pictures with the Import button, or drop files anywhere on the page.</li>
+    <li><b>Double-click</b> a file (or drag it onto a track) to put it on the timeline.</li>
+    <li>Press <kbd>Space</kbd> to play. Click the ruler to move the playhead.</li>
+    <li>Press <b>Export</b> to make the video file.</li>
+</ol>
+<p>Choose the frame at the top: <b>16:9</b> for YouTube, <b>9:16</b> for Reels, Shorts and TikTok, <b>1:1</b> or <b>4:5</b> for feeds. You can change it at any time.</p>
+
+<h2 id="editing">Cutting and arranging</h2>
+<ul>
+    <li><b>Move</b> a clip by dragging it, also onto another track of the same kind. Clips snap to edges, markers and the playhead (turn off with <b>Snap</b>).</li>
+    <li><b>Trim</b> by dragging either end of a clip.</li>
+    <li><b>Split</b> at the playhead with <kbd>S</kbd>. <b>Delete</b> with <kbd>Del</kbd>; <kbd>Shift</kbd>+<kbd>Del</kbd> also closes the gap.</li>
+    <li><b>Several clips at once:</b> <kbd>Shift</kbd>- or <kbd>Ctrl</kbd>-click to select more, then drag them together, delete them, or copy and paste (<kbd>Ctrl</kbd>+<kbd>C</kbd>, <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes at the playhead).</li>
+    <li><b>Speed:</b> select a video or audio clip and pick a speed from ¼× to 4×. Voices keep their pitch.</li>
+    <li><b>Freeze frame:</b> put the playhead on a video and press <kbd>F</kbd>. The frame is held for 2 seconds; drag its end to hold it longer.</li>
+    <li><b>Transitions:</b> when two clips touch on a track, select the second one and choose a transition — crossfade, dip to black, slide, push, wipe or zoom. <i>Tools ▸ Transition on every cut</i> does all of them at once.</li>
+    <li><b>Markers:</b> press <kbd>M</kbd> to mark a moment. Drag markers on the ruler, double-click to rename. <i>Tools ▸ Copy chapters for YouTube</i> turns them into chapter lines for the video description.</li>
+    <li><b>Undo</b> anything with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
+</ul>
+<p>On a phone or tablet, drag with one finger to scroll the timeline, tap to move the playhead, and pinch to zoom.</p>
+
+<h2 id="look">Layers, motion and colour</h2>
+<ul>
+    <li>Upper video tracks are drawn over lower ones. Use <b>Scale</b> and <b>Position</b>, or the <b>Corner</b> preset, for picture-in-picture.</li>
+    <li><b>Pan &amp; zoom</b> slowly moves across a photo or video (the “Ken Burns” effect).</li>
+    <li><b>Bars ▸ Blurred copy</b> fills the empty sides with a blurred copy of the picture — the usual way to show a landscape video in a vertical frame.</li>
+    <li><b>Colour:</b> brightness, contrast, saturation, greyscale, sepia, hue and blur, plus fade in and out.</li>
+</ul>
+
+<h2 id="effects">Effects</h2>
+<p>Select a picture or video clip; its effects are in the panel on the right. Clips with effects show an <b>fx</b> badge on the timeline.</p>
+<ul>
+    <li><b>Look</b> gives a clip a ready-made style in one step — Warm, Cool, Golden hour, Vintage, Black &amp; white, Vivid, Faded, Dramatic or Night — setting its colour, tint, vignette and grain. Adjust any of them afterwards. With several clips selected, the look is applied to all of them.</li>
+    <li><b>Transform:</b> mirror left to right or flip upside down, rotate, and crop any edge; the cropped picture fills the frame again.</li>
+    <li><b>Frame:</b> rounded corners, a coloured border and a drop shadow — scale a clip down under Layout first for a neat picture-in-picture.</li>
+    <li><b>Hide an area</b> blurs, pixelates or covers a rectangle or oval of the picture, such as a face, a number plate or an image that should not be shown. Move and size it with the sliders; a dashed outline shows it while the clip is selected.</li>
+    <li><b>Tools ▸ Colour or gradient card</b> adds a plain or gradient background at the playhead, for a title card or a pause.</li>
+</ul>
+
+<h2 id="titles">Titles, Arabic and animation</h2>
+<p>Press <kbd>T</kbd> (or <b>Title</b>) to add a title at the playhead, then type in the panel on the right (on a phone it opens below the preview). Arabic text is laid out right to left automatically; choose an Arabic font — <b>Amiri</b>, <b>Scheherazade New</b>, <b>Noto Naskh Arabic</b>, <b>Reem Kufi</b> or <b>Cairo</b> — for the best result. <b>Entrance</b> animates a title: fade, rise, pop, slide, typewriter, word by word or handwriting.</p>
+<p>The quickest way is the <b>Write</b> button beside <b>Title</b> under the preview (or <kbd>W</kbd>): it adds a title that a hand writes out — type your words and press Play. For a title you already have, click it on the timeline: <b>✍ Write by hand</b>, just under the text box, makes a hand holding a pen write the title out, from the start of the line — the right for Arabic. <b>⌨ Type with hand</b> types it letter by letter with a tapping finger. Once the title is complete, the hand moves away. A hand works with the Handwriting, Typewriter and Word by word entrances. Under <b>Hand</b> you can change the following:</p>
+<ul>
+    <li><b>Hand</b>: a pen, a pencil, a typing finger, or no hand;</li>
+    <li><b>Hand style</b>: <b>Realistic · black pen</b> (the default), a photographic hand following the letter strokes; <b>Emoji ✍️</b>, a rounded hand like the writing-hand emoji, or <b>Sketch</b>, an outlined drawing;</li>
+    <li><b>Skin</b> (illustrated styles): emoji yellow, four skin colours, or black-and-white line art;</li>
+    <li><b>Hand size</b>: from 20% to 400%, with Small, Reset size and Large buttons;</li>
+    <li><b>Pen colour</b> (illustrated styles): the same as the text, or any colour you choose. The realistic hand holds a black pen; its ink follows your text colour. <b>Write time</b> controls how quickly a title is written.</li>
+</ul>
+<p>The <b>title styles</b> — Big title, Lower-third bar, Subtitle, Quote and Verse — set font, size, place and box in one click. <b>Outline</b> draws a coloured edge round the letters so they stay readable over a busy picture.</p>
+
+<h2>Templates, transitions and nasheed lyrics</h2>
+<p>The buttons above the preview open six editable templates, a gallery of ten transitions, and original English and Arabic nasheed verses. Templates append to your timeline and preserve existing clips. Select any title to edit it. Nasheed lyrics can highlight each word, fade in, or be written by hand. Add your own vocal recording for sound; fit-to-audio uses even timing that you can adjust on the timeline. No songs are included.</p>
+<h2>Voice recording and personal templates</h2>
+<p><b>Record voice</b> opens the microphone recorder. Press Record, allow microphone access, then Stop to listen back before adding the take. Each take can last up to five minutes. Use headphones when playing the timeline while recording.</p>
+<p><b>Sync lyrics</b> matches a vocal clip to the text on a lyrics track with the existing on-device speech recogniser. A speech model downloads on first use. It creates a new timed track, including word highlighting, and hides the original. Check the result by listening, especially for singing. Low-confidence matches are rejected instead of guessing. Undo restores the original.</p>
+<p><b>My templates</b> saves the current project with its media in this browser, up to 150 MB per template. Use adds a saved template to the end of your timeline. Templates are specific to this device and browser and are removed if site data is cleared.</p>
+<h2>Stickers, resizing and backgrounds</h2>
+<p><b>Stickers</b> adds animated arrows, highlight rings, stars, checks, hearts, crescents, sparkles, books and lanterns. Choose colour, motion, rotation, size, position and duration. Select a sticker and use <b>Edit sticker / arrow</b> to change it.</p>
+<p><b>Resize</b> provides WhatsApp Status / Reels (9:16), YouTube (16:9), Instagram square (1:1) and portrait (4:5). Choose blurred fit, plain fit or crop. Timing stays unchanged. Check text and sticker positions after resizing. Undo returns to the previous format.</p>
+<p>Select a photo or video and choose <b>Background</b>. Auto removal keeps people; Green / blue screen removes a chosen colour with tolerance and edge controls. Keep the cutout transparent to reveal a lower video track, or fill with a colour. Auto mode downloads Google's MediaPipe person model once and processes locally. Fine hair and fast motion may need correction. Processing uses up to 1280 pixels on the long edge and can slow down video playback or export on phones.</p>
+<p><b>Templates</b> also includes Ramadan reflections, Eid greetings, Islamic class invitations and lesson introductions, with editable titles and animated decorations.</p>
+<h2 id="drawing">Drawing</h2>
+<p>Press <kbd>D</kbd> (or <b>Draw</b>) to draw on the picture at the playhead. You get these tools:</p>
+<ul>
+    <li><b>Pen</b> and <b>Highlighter</b> for freehand lines, and <b>Line</b>, <b>Arrow</b>, <b>Box</b> and <b>Circle</b>, which you drag out;</li>
+    <li>a colour and four thicknesses;</li>
+    <li><b>Eraser</b>, which rubs out whole strokes, and <b>Undo</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>) and <b>Clear</b>.</li>
+</ul>
+<p>Press <b>Done</b> to add the drawing to a titles track. If that spot is taken, the editor adds a new titles track. <b>Cancel</b> or <kbd>Esc</kbd> closes the board without adding anything.</p>
+<p>When the drawing plays, a hand holding a pencil draws it, stroke by stroke and in the order you drew them, like a whiteboard video. The pencil changes colour to match each stroke, unless you choose its colour under <b>Pencil colour</b>; the hand's style, skin and size can be changed as for titles. In the panel on the right you can do the following:</p>
+<ul>
+    <li>set the <b>Drawing time</b>;</li>
+    <li>switch to a pen or no hand, or change the skin colour and size;</li>
+    <li>have the drawing simply fade in instead;</li>
+    <li>move it and change its size under <b>Layout</b>.</li>
+</ul>
+<p>Double-click the drawing, or press <b>Edit drawing</b>, to draw more on it or rub parts out.</p>
+
+<h2 id="quran">Qur’ān verse videos</h2>
+<p>Press <b>﴿ ﴾ Qur’ān video</b>. Choose the surah, the ayat, a reciter and a translation, and the editor makes the whole video:</p>
+<ul>
+    <li>each ayah’s recitation, one after another;</li>
+    <li>the Arabic of each ayah on screen for exactly as long as it is recited, with its number ﴿١﴾;</li>
+    <li>the translation beneath it, timed the same;</li>
+    <li>a surah title card and Bismillah, and a background — a gradient, or your own picture or video.</li>
+</ul>
+<p>Everything it adds is ordinary clips: change the font, colours or timing, add your own intro, then export. It is one step to undo.</p>
+<p class="note">Text, translations and recitations come from <a href="https://quran.com" target="_blank" rel="noopener">Quran.com</a>. If the recitation cannot be downloaded, you can import a recitation file yourself and choose it under <i>Your own recitation</i> — the verses are then spread across it by length and you can adjust them — or make the captions alone.</p>
+
+<h2 id="sound">Sound and ducking</h2>
+<ul>
+    <li>Set each clip’s <b>volume</b> (up to 200%) and fades, or mute it. Tracks have their own mute buttons.</li>
+    <li><b>Normalise loudness</b> sets a clip’s volume so its loudest moment is just below the maximum — handy for quiet phone recordings.</li>
+    <li><b>Detach audio</b> moves a video’s sound to its own clip, so you can cut or move it separately.</li>
+    <li><b>Ducking:</b> press the <b>▁▃▅</b> button on a background-sound track, such as a nasheed. It then goes quieter by itself whenever someone is speaking on another track, and comes back up afterwards. Set how quiet in the project panel (click an empty part of the timeline).</li>
+    <li><b>Clean up voice</b> removes background noise from a clip’s sound with a small speech-trained neural network — the same one the audio editor uses. The original is kept.</li>
+    <li><b>Edit in audio editor</b> opens a clip’s sound in the site’s <a href="../audio-editor/">audio editor</a>. There, <i>File ▸ Send to Video Editor</i> brings the result back.</li>
+</ul>
+
+<h2 id="captions">Captions and subtitles</h2>
+<ul>
+    <li><b>Tools ▸ Auto captions</b> listens to the sound with Whisper, on this device, and writes captions onto a new track. The speech model downloads the first time (40–250 MB). Afaan Oromoo is not yet supported by Whisper.</li>
+    <li><b>Tools ▸ Import subtitles</b> reads an .srt or .vtt file.</li>
+    <li><b>Tools ▸ Save a titles track as subtitles</b> writes any titles track as .srt or .vtt, for uploading beside the video.</li>
+</ul>
+
+<h2 id="export">Export</h2>
+<p><b>Fast</b> formats render every frame exactly and usually finish quicker than the video plays; you can switch to another tab while they work. <b>Real time</b> formats play the project through once and need the tab in front — use them only if your browser offers no fast format. Chrome, Edge and Safari make MP4; Firefox makes WebM. The camera button under the preview saves the current frame as a picture.</p>
+
+<h2 id="saving">Saving and reopening</h2>
+<p>Your project is saved in this browser as you work, together with copies of the files you imported, so it opens again just as you left it. <b>Save</b> downloads the project as a small <code>.reel.json</code> file (without the media) to keep or move to another computer; open it there and import the same files again. The editor also works offline once it has been opened.</p>
+
+<h2 id="about">About</h2>
+<p><b>Help ▸ About</b> shows the version, who made the editor, how to get in touch, and the free software it is built on.</p>
+
+<h2 id="keys">Keyboard shortcuts</h2>
+<table>
+    <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+    <tr><td><kbd>S</kbd></td><td>Split at the playhead</td></tr>
+    <tr><td><kbd>Del</kbd> · <kbd>Shift</kbd>+<kbd>Del</kbd></td><td>Delete · delete and close the gap</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>X</kbd> / <kbd>V</kbd></td><td>Copy, cut, paste at the playhead</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Duplicate</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all clips</td></tr>
+    <tr><td><kbd>T</kbd> · <kbd>W</kbd> · <kbd>D</kbd></td><td>Add a title · a title written by hand · draw</td></tr>
+    <tr><td><kbd>M</kbd> · <kbd>F</kbd></td><td>Add a marker · freeze frame</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>One frame back or forward (<kbd>Shift</kbd>: one second; <kbd>Alt</kbd>: nudge the selected clips)</td></tr>
+    <tr><td><kbd>Home</kbd> · <kbd>End</kbd></td><td>Start · end</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Undo · redo</td></tr>
+    <tr><td><kbd>+</kbd> <kbd>−</kbd> · <kbd>Ctrl</kbd>+wheel</td><td>Zoom the timeline</td></tr>
+</table>
+</main>
+</body>
+</html>

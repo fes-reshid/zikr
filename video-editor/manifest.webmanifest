@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "Video Editor — Diin Islaam",
+  "short_name": "Video Editor",
+  "description": "Edit videos in your browser: cut, layer, titles in Arabic and English, Qur’an verse videos with recitation, captions and MP4 export. Works offline; nothing is uploaded.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e1014",
+  "theme_color": "#151920",
+  "categories": ["photo", "education", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "file_handlers": [
+    { "action": "./", "accept": { "video/*": [".mp4", ".mov", ".webm", ".mkv"], "application/json": [".reel.json"] } }
+  ]
+}
