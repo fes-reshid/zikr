@@ -13,7 +13,7 @@ function open(){
  const choice=el('select',{},HADITH.map((h,i)=>el('option',{value:i,text:h.title+' — '+h.ref})));
  const arabic=el('textarea',{rows:3,dir:'rtl',lang:'ar'}),meaning=el('textarea',{rows:2});
  const source=el('a',{target:'_blank',rel:'noopener noreferrer',text:'Read the full hadith on Sunnah.com'});
- const background=el('select',{},window.ReelGallery.ART.filter(a=>!a[0].startsWith('uploaded-')).map(([value,text])=>el('option',{value,text})));background.value='blank-emerald-panel';
+ const background=el('select',{},window.ReelGallery.ART.filter(a=>!window.ReelGallery.SHAPES.includes(a[0])).map(([value,text])=>el('option',{value,text})));background.value='blank-emerald-panel';
  const duration=el('input',{type:'number',min:5,max:120,value:15});
  const format=el('select',{},[['1280x720','Landscape'],['1080x1920','Portrait'],['1080x1080','Square']].map(([value,text])=>el('option',{value,text})));
  const refresh=()=>{const h=HADITH[Number(choice.value)];arabic.value=h.arabic;meaning.value=h.meaning;source.href=h.url;};choice.onchange=refresh;refresh();

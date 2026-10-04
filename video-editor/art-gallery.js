@@ -2,7 +2,8 @@
 (function(){
 'use strict';
 const app=window.ReelApp,T=app.T,el=app.el;
-const ART=[['emerald-arch','Emerald & gold arch'],['moonlit-mosque','Moonlit mosque'],['ivory-lanterns','Ivory lantern courtyard'],['blank-emerald-panel','Blank emerald & gold panel'],['blank-ivory-panel','Blank ivory & gold panel'],['blank-midnight-panel','Blank midnight & gold panel'],['uploaded-zoom-banner','Your Zoom banner (original text)'],['uploaded-date-panel','Your date panel (original text)'],['uploaded-gold-ornament','Your gold ornament']];
+const ART=[['emerald-arch','Emerald & gold arch'],['moonlit-mosque','Moonlit mosque'],['ivory-lanterns','Ivory lantern courtyard'],['blank-emerald-panel','Blank emerald & gold panel'],['blank-ivory-panel','Blank ivory & gold panel'],['blank-midnight-panel','Blank midnight & gold panel'],['emerald-label','Emerald gold label'],['ivory-label','Ivory gold cartouche'],['gold-flourish','Gold arabesque flourish']];
+const SHAPES=['emerald-label','ivory-label','gold-flourish'];
 const THEMES=[['emerald','Emerald geometry'],['midnight','Midnight geometry'],['paper','Warm paper'],['rose','Rose glow'],['sky','Soft sky']];
 async function importArt(id){
  if(!ART.some(a=>a[0]===id))throw new Error('Unknown background');
@@ -34,15 +35,17 @@ async function makePoster(item,options){
  });
  app.apply(p);app.seek(start+2);app.zoomToFit();app.selectOnly(p.clips[p.clips.length-6].id);app.toast('Invitation added. Every text line is editable; Undo removes the template.');
 }
-function openBackgrounds(){
- app.pause();let chosen=ART[0][0];const cards=[],grid=el('div',{className:'studio-grid'});
- [...ART,...THEMES].forEach(([id,name])=>{
-  const art=ART.some(a=>a[0]===id),preview=art?el('img',{src:'assets/'+id+'.webp',alt:name,loading:'lazy',style:{width:'100%',height:'170px',objectFit:'cover'}}):window.ReelStudio.background(id,320,200);
-  const card=el('button',{type:'button',className:'studio-card','aria-pressed':String(id===chosen),onclick:()=>{chosen=id;cards.forEach(([b,key])=>b.setAttribute('aria-pressed',String(key===id)));}},[preview,el('strong',{text:name})]);grid.append(card);cards.push([card,id]);
+function openBackgrounds(onlyShapes=false){
+ onlyShapes=onlyShapes===true;
+ app.pause();let chosen=onlyShapes?SHAPES[0]:ART[0][0];const cards=[],grid=el('div',{className:'studio-grid'});
+ (onlyShapes?ART.filter(a=>SHAPES.includes(a[0])):[...ART,...THEMES]).forEach(([id,name])=>{
+  const art=ART.some(a=>a[0]===id),preview=art?el('img',{src:'assets/'+id+'.webp',alt:name,loading:'lazy',style:{width:'100%',height:'170px',objectFit:SHAPES.includes(id)?'contain':'cover',background:'#23372f'}}):window.ReelStudio.background(id,320,200);
+  const card=el('button',{type:'button',className:'studio-card','aria-pressed':String(id===chosen),onclick:()=>{chosen=id;target.value=SHAPES.includes(id)?'overlay':'new';cards.forEach(([b,key])=>b.setAttribute('aria-pressed',String(key===id)));}},[preview,el('strong',{text:name})]);grid.append(card);cards.push([card,id]);
  });
  const duration=el('input',{type:'number',value:10,min:1,max:300,step:1});
- const target=el('select',{},[el('option',{value:'new',text:'Add at playhead, behind existing clips'}),el('option',{value:'replace',text:'Replace selected image background'})]);
- app.openDialog({title:'Background images',wide:true,intro:'Artwork, blank panels and your supplied image crops. Text within uploaded images is part of the picture. Add one behind your titles, or replace a selected image.',body:[grid,app.dialogField('Action',target),app.dialogField('Duration (seconds)',duration)],actions:[{label:'Cancel'},{label:'Use background',primary:true,run:async d=>{
+ const target=el('select',{},[el('option',{value:'overlay',text:'Add as a movable decoration above images'}),el('option',{value:'new',text:'Add at playhead, behind existing clips'}),el('option',{value:'replace',text:'Replace selected image background'})]);
+ target.value=onlyShapes?'overlay':'new';
+ app.openDialog({title:onlyShapes?'Decorative shapes':'Background images',wide:true,intro:'Text-free artwork and transparent decorative shapes. Move and resize a shape on the preview, then add your own text above it.',body:[grid,app.dialogField('Action',target),app.dialogField('Duration (seconds)',duration)],actions:[{label:'Cancel'},{label:'Use background',primary:true,run:async d=>{
   const seconds=Number(duration.value),before=app.state.project,selected=T.getClip(before,app.state.selected),time=app.state.time;
   if(!Number.isFinite(seconds)||seconds<1||seconds>300){d.status('Choose 1–300 seconds.');return false;}
   if(target.value==='replace'&&(!selected||T.clipKind(before,selected)!=='image')){d.status('Select an image clip first, or choose Add at playhead.');return false;}
@@ -51,6 +54,7 @@ function openBackgrounds(){
    const mediaId=ART.some(a=>a[0]===chosen)?await importArt(chosen):await window.ReelStudio.importBackground(chosen,before.width,before.height);
    let p=T.clone(app.state.project),id;
    if(target.value==='replace'){id=selected.id;p=T.updateClip(p,id,{mediaId,cutout:null,fit:'contain',bgFill:'blur'});}
+   else if(target.value==='overlay'){const track=T.nextTrackId(p,'video');p=T.addTrack(p,'video','Decorative shape');const clip=Object.assign(T.clipFromMedia(T.getMedia(p,mediaId),track,time),{duration:seconds,fit:'contain',bgFill:'none',scale:.65});id=clip.id;p=T.addClip(p,clip);}
    else{const track=T.nextTrackId(p,'video');p=T.addTrack(p,'video','Background image');const entry=p.tracks.find(t=>t.id===track);p.tracks=p.tracks.filter(t=>t.id!==track);const audio=p.tracks.findIndex(t=>t.kind==='audio');p.tracks.splice(audio<0?p.tracks.length:audio,0,entry);const clip=Object.assign(T.clipFromMedia(T.getMedia(p,mediaId),track,time),{duration:seconds,fit:'contain',bgFill:'blur'});id=clip.id;p=T.addClip(p,clip);}
    app.apply(p);app.selectOnly(id);app.zoomToFit();app.toast('Background added.');return true;
   }catch(e){app.state.project=before;app.afterChange();d.busy(false);d.status(e.message);return false;}
@@ -58,5 +62,7 @@ function openBackgrounds(){
 }
 document.querySelector('.studio-bar').append(el('button',{type:'button',id:'studio-backgrounds',text:'Background images',onclick:openBackgrounds}));
 app.addTool({section:'Create',label:'Background images…',run:openBackgrounds});
-window.ReelGallery={ART,openBackgrounds,importArt,makePoster};
+document.querySelector('.studio-bar').append(el('button',{type:'button',id:'studio-shapes',text:'Shapes',onclick:()=>openBackgrounds(true)}));
+app.addTool({section:'Create',label:'Decorative shapes…',run:()=>openBackgrounds(true)});
+window.ReelGallery={ART,SHAPES,openBackgrounds,importArt,makePoster};
 }());
