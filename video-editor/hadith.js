@@ -24,7 +24,7 @@ function open(){
  const mediaId=await window.ReelGallery.importArt(background.value);let p=T.clone(app.state.project);if(!before.clips.length){[p.width,p.height]=format.value.split('x').map(Number);p.name=h.title;}
  const start=T.projectDuration(before),track=T.nextTrackId(p,'video');p=T.addTrack(p,'video','Hadith background');p=T.addClip(p,Object.assign(T.clipFromMedia(T.getMedia(p,mediaId),track,start),{duration:seconds,fit:'cover'}));
  const ratio=Math.min(1,p.width/p.height),light=background.value.includes('ivory'),ink=light?'#24372d':'#fff4d6',gold=light?'#855821':'#edcf83';
- const rows=[['Hadith',.21,23,gold,'marcellus'],[arabic.value.trim(),.39,40,ink,'amiri'],[meaning.value.trim(),.60,23,ink,'sans'],[h.ref,.77,17,gold,'sans'],[h.url.replace('https://','')+' · English meaning',.83,13,gold,'sans']];
+ const rows=[['Hadith',.21,23,gold,'marcellus'],[arabic.value.trim(),.39,40,ink,'amiri'],[meaning.value.trim(),.60,23,ink,'sans'],[h.ref,.74,17,gold,'sans'],[h.url.replace('https://','')+' · English meaning',.80,13,gold,'sans']];
  rows.forEach(([text,y,size,color,font],i)=>{if(!text)return;const id=T.nextTrackId(p,'text');p=T.addTrack(p,'text',['Hadith heading','Arabic hadith','English meaning','Hadith reference','Hadith source'][i]);p=T.addClip(p,Object.assign(T.textClip(id,start,text),{duration:seconds,y,fontSize:size*ratio,font,color,bold:false,shadow:!light,box:false,fadeIn:.6,fadeOut:.6,anim:'fade'}));});
  app.apply(p);app.seek(start+1);app.zoomToFit();app.toast('Hadith video added. Drag layers or double-click text to edit.');return true;
  }catch(e){app.state.project=before;app.afterChange();d.busy(false);d.status(e.message);return false;}
