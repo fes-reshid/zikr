@@ -1130,6 +1130,28 @@
         }
     }
 
+    // Frame-space bounds shared by preview selection and direct manipulation.
+    function previewBounds(clip) {
+        const p=state.project,W=p.width,H=p.height,t=state.time;
+        if(clip.type==='text'){
+            ctx.save();const lay=layoutText(ctx,clip,String(clip.text||''),clip.fontSize*H/720,W);ctx.restore();
+            const a=T.textAnimAt(clip,t),w=Math.max(12,...lay.widths)*a.scale,h=lay.lines.length*lay.size*(T.isArabic(clip.text)?1.6:1.22)*a.scale;
+            return {x:(clip.x+a.dx)*W-w/2,y:(clip.y+a.dy)*H-h/2,w,h};
+        }
+        if(clip.sticker){const s=Math.min(W,H)*.17*(clip.scale||1)*1.25;return {x:clip.x*W-s/2,y:clip.y*H-s/2,w:s,h:s};}
+        if(clip.type==='draw'){
+            const points=(clip.strokes||[]).flatMap(s=>s.points||[]);if(!points.length)return null;
+            const xs=points.filter((_,i)=>i%2===0),ys=points.filter((_,i)=>i%2===1),sc=clip.scale||1;
+            const x=Math.min(...xs),y=Math.min(...ys),w=Math.max(...xs)-x,h=Math.max(...ys)-y;
+            return {x:(clip.x+(x-.5)*sc)*W,y:(clip.y+(y-.5)*sc)*H,w:Math.max(12,w*sc*W),h:Math.max(12,h*sc*H)};
+        }
+        const media=T.getMedia(p,clip.mediaId);if(!media||media.type==='audio'||clip.audioOnly)return null;
+        const fx=T.fxOf(clip),cr=T.cropRect(media.width||W,media.height||H,fx.crop),m=T.motionAt(clip,t);
+        const r=T.placeRect(cr.sw,cr.sh,W,H,clip.fit,(clip.scale||1)*m.scale,(clip.x??.5)+m.dx,(clip.y??.5)+m.dy);
+        const a=(fx.rotate||0)*Math.PI/180,w=Math.abs(r.w*Math.cos(a))+Math.abs(r.h*Math.sin(a)),h=Math.abs(r.w*Math.sin(a))+Math.abs(r.h*Math.cos(a));
+        return {x:r.x+r.w/2-w/2,y:r.y+r.h/2-h/2,w,h};
+    }
+
     function fitCanvas() {
         const stage = $('stage');
         const box = stage.getBoundingClientRect();
@@ -3860,6 +3882,7 @@
         renderAll: renderAll,
         requestDraw: requestDraw,
         drawFrame: drawFrame,
+        previewBounds: previewBounds,
         applyTransition: applyTransition,
         pause: pause,
         play: play,

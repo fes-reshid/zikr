@@ -465,6 +465,15 @@ dialog#consentGate h1:focus-visible { outline: none; }
 }
 @media(prefers-reduced-motion:reduce) { .studio-card { transition:none; } .studio-card:hover { transform:none; } }
 
+
+#preview {touch-action:none;cursor:move;}
+.preview-edit-bar {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 12px;font-size:11px;color:#c1d3ca;}
+.preview-edit-bar select {max-width:220px;min-width:100px;}
+.preview-selection {position:absolute;border:2px solid #e8c777;pointer-events:none;box-sizing:border-box;z-index:4;}
+.preview-resize {position:absolute;right:-8px;bottom:-8px;width:17px;height:17px;padding:0;border:2px solid #fff;background:#b18737;pointer-events:auto;touch-action:none;cursor:nwse-resize;}
+.preview-text-editor {position:absolute;z-index:8;background:#182421;padding:10px;border:1px solid #e8c777;border-radius:8px;box-shadow:0 8px 25px #0008;}
+.preview-text-editor textarea {width:100%;min-height:90px;background:#fff;color:#172e25;font:20px sans-serif;padding:8px;box-sizing:border-box;}
+.preview-text-editor>div {display:flex;gap:8px;margin-top:6px;}
 </style>
 </head>
 <body>
@@ -659,6 +668,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
 <script src="creator-tools.js?v=dev"></script>
 <script src="creative-effects.js?v=dev"></script>
 <script src="art-gallery.js?v=dev"></script>
+<script src="preview-edit.js?v=dev"></script>
 <script>
 // Works offline after the first visit (http only; the service worker cannot run from a file).
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {
