@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const app=window.ReelApp,T=app.T,el=app.el;
-const ART=[['emerald-arch','Emerald & gold arch'],['moonlit-mosque','Moonlit mosque'],['ivory-lanterns','Ivory lantern courtyard']];
+const ART=[['emerald-arch','Emerald & gold arch'],['moonlit-mosque','Moonlit mosque'],['ivory-lanterns','Ivory lantern courtyard'],['blank-emerald-panel','Blank emerald & gold panel'],['blank-ivory-panel','Blank ivory & gold panel'],['blank-midnight-panel','Blank midnight & gold panel'],['uploaded-zoom-banner','Your Zoom banner (original text)'],['uploaded-date-panel','Your date panel (original text)'],['uploaded-gold-ornament','Your gold ornament']];
 const THEMES=[['emerald','Emerald geometry'],['midnight','Midnight geometry'],['paper','Warm paper'],['rose','Rose glow'],['sky','Soft sky']];
 async function importArt(id){
  if(!ART.some(a=>a[0]===id))throw new Error('Unknown background');
@@ -42,7 +42,7 @@ function openBackgrounds(){
  });
  const duration=el('input',{type:'number',value:10,min:1,max:300,step:1});
  const target=el('select',{},[el('option',{value:'new',text:'Add at playhead, behind existing clips'}),el('option',{value:'replace',text:'Replace selected image background'})]);
- app.openDialog({title:'Background images',wide:true,intro:'Original artwork and simple backgrounds. Add one behind your titles, or replace a selected image.',body:[grid,app.dialogField('Action',target),app.dialogField('Duration (seconds)',duration)],actions:[{label:'Cancel'},{label:'Use background',primary:true,run:async d=>{
+ app.openDialog({title:'Background images',wide:true,intro:'Artwork, blank panels and your supplied image crops. Text within uploaded images is part of the picture. Add one behind your titles, or replace a selected image.',body:[grid,app.dialogField('Action',target),app.dialogField('Duration (seconds)',duration)],actions:[{label:'Cancel'},{label:'Use background',primary:true,run:async d=>{
   const seconds=Number(duration.value),before=app.state.project,selected=T.getClip(before,app.state.selected),time=app.state.time;
   if(!Number.isFinite(seconds)||seconds<1||seconds>300){d.status('Choose 1–300 seconds.');return false;}
   if(target.value==='replace'&&(!selected||T.clipKind(before,selected)!=='image')){d.status('Select an image clip first, or choose Add at playhead.');return false;}
