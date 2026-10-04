@@ -17,6 +17,12 @@
         {id:'journey',name:'Steps of goodness · English',theme:'rose',lines:['Across the road, beneath the sky','We see the days go softly by','With thankful hearts and purpose clear','We choose the good, both far and near']}
     ];
     const TEMPLATES=[
+        {id:'muhadara-gold',name:'Emerald Muhadara',tag:'GOLD COLLECTION',theme:'emerald',art:'emerald-arch',title:'Muhadara on Zoom',subtitle:'In English & Afaan Oromo',topic:'لِكُلِّ شَيْءٍ أَجْرٌ',speaker:'By Shekh Shamsuddin'},
+        {id:'moonlight-talk',name:'Moonlight lecture',tag:'GOLD COLLECTION',theme:'midnight',art:'moonlit-mosque',title:'An evening of reflection',subtitle:'Learn • Reflect • Grow',topic:'Add your lecture topic',speaker:'Speaker: add a name'},
+        {id:'ivory-class',name:'Ivory learning circle',tag:'GOLD COLLECTION',theme:'paper',art:'ivory-lanterns',title:'Islamic learning circle',subtitle:'A welcoming space to learn together',topic:'Add your class topic',speaker:'Teacher: add a name'},
+        {id:'gold-eid',name:'Golden Eid invitation',tag:'CELEBRATION',theme:'emerald',art:'emerald-arch',title:'Eid Mubarak',subtitle:'Celebrate with family and friends',topic:'You are warmly invited',speaker:'Hosted by: add your organisation'},
+        {id:'night-reminder',name:'Ramadan nights',tag:'RAMADAN',theme:'midnight',art:'moonlit-mosque',title:'Ramadan nights',subtitle:'Prayer • Reflection • Generosity',topic:'A moment for your heart',speaker:'Add your reminder or speaker'},
+        {id:'ivory-event',name:'Community gathering',tag:'INVITATION',theme:'paper',art:'ivory-lanterns',title:'You are invited',subtitle:'Together in learning and kindness',topic:'Add your event name',speaker:'Hosted by: add your organisation'},
         {id:'ramadan',name:'Ramadan reflections',tag:'RAMADAN',theme:'midnight',title:'Ramadan Mubarak',subtitle:'A month of reflection, prayer and generosity',lines:['Make time for prayer and Qur’an','Share kindness with those around you'],motif:'crescent'},
         {id:'eid',name:'Eid greetings',tag:'EID',theme:'emerald',title:'Eid Mubarak',subtitle:'Wishing you and your family joy and peace',lines:['Celebrate with grateful hearts','Share the joy with family and neighbours'],motif:'sparkles'},
         {id:'class',name:'Islamic class invitation',tag:'ONLINE CLASS',theme:'paper',title:'Learn together. Grow together.',subtitle:'Add your course, teacher and registration details',lines:['Class time: add your day and time','Register: add your contact or website'],motif:'book'},
@@ -65,6 +71,7 @@
     async function makeTemplate(id,options){
         const item=TEMPLATES.find(t=>t.id===id);if(!item) throw new Error('Unknown template');
         if(item.lyrics){openLyrics('gratitude');return;}
+        if(item.art)return window.ReelGallery.makePoster(item,options);
         app.pause();
         const before=app.state.project;
         const size=options.size.split('x').map(Number),empty=!before.clips.length;
@@ -96,24 +103,27 @@
         app.pause();let chosen=TEMPLATES[0];
         const grid=el('div',{className:'studio-grid'}),preview=el('div',{className:'studio-template-detail'});
         const title=el('input',{type:'text',value:chosen.title,maxlength:160}),subtitle=el('input',{type:'text',value:chosen.subtitle,maxlength:200});
-        const size=select([['1280x720','Landscape · 16:9'],['1080x1920','Portrait · 9:16'],['1080x1080','Square · 1:1']],'1280x720');
+        const size=select([['1080x1350','Portrait poster · 4:5'],['1280x720','Landscape · 16:9'],['1080x1920','Portrait · 9:16'],['1080x1080','Square · 1:1']],'1080x1350');
+        const topic=el('input',{value:chosen.topic||'',dir:'auto',maxlength:160}),speaker=el('input',{value:chosen.speaker||'',maxlength:120}),date=el('input',{value:'Add your date • Add your time',maxlength:120}),venue=el('input',{value:'Join us on Zoom • Add meeting ID',maxlength:160});
+        const posterFields=el('div',{},[field('Topic / Arabic heading',topic),field('Speaker / host',speaker),field('Date and time',date),field('Venue / Zoom details',venue)]);
         const cards=[];
         TEMPLATES.forEach(item=>{
             const image=background(item.theme,320,180),c=image.getContext('2d'),theme=THEMES[item.theme];
             c.textAlign='center';c.fillStyle=theme.ink;c.font='23px Georgia';
             const words=item.name.split(' '),half=Math.ceil(words.length/2);
             c.fillText(words.slice(0,half).join(' '),160,83);c.fillText(words.slice(half).join(' '),160,111);
-            const card=button('',()=>{chosen=item;title.value=item.title;subtitle.value=item.subtitle;cards.forEach(b=>b.setAttribute('aria-pressed',String(b===card)));preview.hidden=!!item.lyrics;},
+            const card=button('',()=>{chosen=item;title.value=item.title;subtitle.value=item.subtitle;topic.value=item.topic||'';speaker.value=item.speaker||'';posterFields.hidden=!item.art;cards.forEach(b=>b.setAttribute('aria-pressed',String(b===card)));preview.hidden=!!item.lyrics;},
                 {className:'studio-card','aria-label':item.name,'aria-pressed':String(item===chosen)});
-            card.append(image,el('span',{className:'studio-tag',text:item.tag}),el('strong',{text:item.name}));cards.push(card);grid.append(card);
+            card.append(item.art?el('img',{src:'assets/'+item.art+'.webp',alt:item.name,loading:'lazy',style:{width:'100%',height:'150px',objectFit:'cover',objectPosition:'center 25%'}}):image,el('span',{className:'studio-tag',text:item.tag}),el('strong',{text:item.name}));cards.push(card);grid.append(card);
         });
-        preview.append(field('Opening title',title),field('Subtitle',subtitle),field('Format',size,app.state.project.clips.length?'Uses your current project’s frame size and adds scenes at the end.':'Choose the shape of your new video.'));
+        posterFields.hidden=!chosen.art;
+        preview.append(field('Opening title',title),field('Subtitle',subtitle),posterFields,field('Format',size,app.state.project.clips.length?'Uses your current project’s frame size and adds scenes at the end.':'Choose the shape of your new video.'));
         app.openDialog({title:'Start with a template',wide:true,intro:'A little inspiration, ready to make your own. Every title, scene and transition stays editable.',
             body:[grid,preview],actions:[{label:'Cancel'},{label:'Use template',primary:true,run:async d=>{
                 if(chosen.lyrics){d.close();openLyrics('gratitude');return false;}
                 const before=app.state.project;
                 d.busy(true);d.status('Creating your scenes…');
-                try{await makeTemplate(chosen.id,{title:title.value,subtitle:subtitle.value,size:size.value});return true;}
+                try{await makeTemplate(chosen.id,{title:title.value,subtitle:subtitle.value,size:size.value,topic:topic.value,speaker:speaker.value,date:date.value,venue:venue.value});return true;}
                 catch(e){app.state.project=before;app.afterChange();d.status(e.message);d.busy(false);return false;}
             }}]});
     }
@@ -222,5 +232,5 @@
     app.addTool({section:'Timeline',label:'Transition gallery…',run:openTransitions});
     const hint=document.getElementById('stage-hint');
     hint.textContent='Your next video starts here. Import clips, or choose a template above.';
-    window.ReelStudio={openTemplates,openLyrics,openTransitions,makeTemplate,TEMPLATES,PACKS,paintTransition};
+    window.ReelStudio={openTemplates,openLyrics,openTransitions,makeTemplate,TEMPLATES,PACKS,paintTransition,background,importBackground};
 }());

@@ -28,7 +28,7 @@ const app=window.ReelApp,T=app.T,el=app.el;
 const select=items=>el('select',null,items.map(([value,text])=>el('option',{value,text})));
 const button=(text,onclick,extra)=>el('button',Object.assign({type:'button',text,onclick},extra));
 const slider=(value,min,max,step=1)=>el('input',{type:'range',value,min,max,step});
-const STICKERS={arrow:'Arrow',curved:'Curved arrow',circle:'Highlight ring',star:'Gold star',check:'Check mark',heart:'Heart',crescent:'Crescent',sparkles:'Sparkles',book:'Open book',lantern:'Lantern'};
+const STICKERS={arrow:'Arrow',curved:'Curved arrow',circle:'Highlight ring',star:'Gold star',check:'Check mark',heart:'Heart',crescent:'Crescent',sparkles:'Sparkles',book:'Open book',lantern:'Lantern',mosque:'Mosque',beads:'Prayer beads',prayerMat:'Prayer mat',bookstand:'Book on a stand',palm:'Palm tree',flower:'Flower',sunrise:'Sunrise',mountains:'Mountains',cloud:'Cloud',rosette:'Geometric rosette',gift:'Gift',leaf:'Leaf branch'};
 function sticker(c,clip,t,W,H){
  const o=clip.sticker||{},local=Math.max(0,t-clip.start),s=Math.min(W,H)*.17*(clip.scale||1);
  const motion=o.motion||'pop',intro=clamp(local/.55,0,1);
@@ -38,6 +38,18 @@ function sticker(c,clip,t,W,H){
  c.fillStyle=o.color||'#e5bc55';c.strokeStyle=c.fillStyle;c.lineWidth=.075;c.lineCap='round';c.lineJoin='round';
  const path=(points,fill=false)=>{c.beginPath();points.forEach((p,i)=>i?c.lineTo(...p):c.moveTo(...p));if(fill){c.closePath();c.fill();}else c.stroke();};
  switch(o.kind){
+ case 'mosque':c.strokeRect(-.32,-.06,.64,.46);c.beginPath();c.moveTo(-.32,-.06);c.bezierCurveTo(-.32,-.3,-.12,-.28,0,-.48);c.bezierCurveTo(.12,-.28,.32,-.3,.32,-.06);c.stroke();for(const x of [-.48,.4]){c.strokeRect(x,-.33,.08,.73);path([[x-.02,-.33],[x+.04,-.46],[x+.1,-.33]]);}c.beginPath();c.moveTo(-.09,.4);c.lineTo(-.09,.19);c.arc(0,.19,.09,Math.PI,0);c.lineTo(.09,.4);c.stroke();break;
+ case 'beads':for(let i=0;i<22;i++){const a=i/22*Math.PI*2;c.beginPath();c.arc(Math.cos(a)*.28,Math.sin(a)*.34-.07,.035,0,Math.PI*2);c.fill();}path([[0,.28],[0,.41],[-.09,.52],[.09,.52],[0,.41]]);break;
+ case 'prayerMat':c.strokeRect(-.3,-.4,.6,.8);c.lineWidth=.035;c.strokeRect(-.24,-.33,.48,.66);path([[-.17,.2],[-.17,-.07],[0,-.25],[.17,-.07],[.17,.2]]);for(let i=0;i<7;i++){const x=-.27+i*.09;path([[x,-.4],[x,-.48]]);path([[x,.4],[x,.48]]);}break;
+ case 'bookstand':path([[-.38,.05],[.38,.44]]);path([[.38,.05],[-.38,.44]]);path([[0,-.25],[-.42,-.37],[-.4,-.03],[0,.12],[.4,-.03],[.42,-.37],[0,-.25]]);path([[0,-.25],[0,.12]]);break;
+ case 'palm':c.beginPath();c.moveTo(-.06,.48);c.quadraticCurveTo(.1,.07,0,-.2);c.stroke();for(const [x,y] of [[-.44,-.03],[-.4,-.3],[-.19,-.49],[.2,-.46],[.44,-.25],[.46,.02]]){c.beginPath();c.moveTo(0,-.2);c.quadraticCurveTo(x*.65,y-.14,x,y);c.stroke();}break;
+ case 'flower':for(let i=0;i<6;i++){const a=i*Math.PI/3;c.beginPath();c.ellipse(Math.cos(a)*.22,Math.sin(a)*.22-.1,.16,.09,a,0,Math.PI*2);c.stroke();}c.beginPath();c.arc(0,-.1,.09,0,Math.PI*2);c.fill();path([[0,.24],[0,.49]]);path([[0,.38],[.18,.25]]);break;
+ case 'sunrise':c.beginPath();c.arc(0,.2,.26,Math.PI,0);c.stroke();path([[-.48,.2],[.48,.2]]);path([[-.35,.34],[.35,.34]]);for(let i=0;i<7;i++){const a=Math.PI+i*Math.PI/6;path([[Math.cos(a)*.35,.2+Math.sin(a)*.35],[Math.cos(a)*.46,.2+Math.sin(a)*.46]]);}break;
+ case 'mountains':path([[-.5,.34],[-.16,-.37],[.13,.2],[.3,-.15],[.5,.34],[-.5,.34]]);path([[-.26,-.16],[-.16,-.07],[-.06,-.16]]);break;
+ case 'cloud':c.beginPath();c.moveTo(-.3,.24);c.bezierCurveTo(-.67,.23,-.56,-.2,-.3,-.15);c.bezierCurveTo(-.27,-.53,.26,-.5,.29,-.16);c.bezierCurveTo(.62,-.2,.65,.25,.3,.24);c.closePath();c.stroke();break;
+ case 'rosette':for(let i=0;i<8;i++){c.save();c.rotate(i*Math.PI/4);path([[0,0],[-.12,-.24],[0,-.48],[.12,-.24],[0,0]]);c.restore();}break;
+ case 'gift':c.strokeRect(-.34,-.08,.68,.49);c.strokeRect(-.4,-.2,.8,.12);path([[0,-.2],[0,.41]]);c.beginPath();c.moveTo(0,-.2);c.bezierCurveTo(-.55,-.26,-.3,-.64,0,-.2);c.bezierCurveTo(.55,-.26,.3,-.64,0,-.2);c.stroke();break;
+ case 'leaf':path([[-.3,.45],[.28,-.4]]);for(let i=0;i<4;i++){const x=-.2+i*.12,y=.29-i*.18;for(const sign of [-1,1]){c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x+sign*.3,y-.03,x+sign*.18,y-.22);c.quadraticCurveTo(x,y-.23,x,y);c.stroke();}}break;
  case 'arrow':path([[-.48,-.1],[.12,-.1],[.12,-.3],[.5,0],[.12,.3],[.12,.1],[-.48,.1]],true);break;
  case 'curved':c.beginPath();c.moveTo(-.45,.35);c.bezierCurveTo(-.5,-.35,.1,-.4,.42,-.08);c.stroke();path([[.12,-.12],[.44,-.06],[.38,-.37]]);break;
  case 'circle':c.beginPath();c.ellipse(0,0,.46,.36,0,0,Math.PI*2);c.stroke();break;
@@ -51,10 +63,10 @@ function sticker(c,clip,t,W,H){
  }
  c.restore();
 }
-function openStickers(){
- app.pause();const existing=T.getClip(app.state.project,app.state.selected),editing=existing?.sticker;
+function openStickers(preset){
+ app.pause();const existing=typeof preset==='string'?null:T.getClip(app.state.project,app.state.selected),editing=existing?.sticker;
  const kind=select(Object.entries(STICKERS)),motion=select([['pop','Pop in'],['pulse','Pulse'],['float','Float'],['wiggle','Wiggle'],['none','Still']]);
- kind.value=editing?.kind||'arrow';motion.value=editing?.motion||'pop';
+ kind.value=typeof preset==='string'?preset:editing?.kind||'arrow';motion.value=editing?.motion||'pop';
  const color=el('input',{type:'color',value:editing?.color||'#e5bc55'}),rotation=slider(editing?.rotation||0,-180,180),size=slider((existing?.sticker?existing.scale:1)*100,20,300);
  const x=slider(existing?.sticker?existing.x*100:50,0,100),y=slider(existing?.sticker?existing.y*100:50,0,100);
  const length=el('input',{type:'number',min:.2,max:120,step:.1,value:editing?existing.duration:5});
@@ -122,7 +134,16 @@ function openBackground(){
   }catch(e){d.busy(false);d.status('Could not load background removal. Check your connection or choose Green / blue screen.');return false;}
  }}]});
 }
-const bar=document.querySelector('.studio-bar');bar.append(button('Stickers',openStickers,{id:'studio-stickers'}),button('Resize',openResize,{id:'studio-resize'}),button('Background',openBackground,{id:'studio-background'}));
+function openDrawings(){
+ app.pause();const grid=el('div',{className:'studio-grid'});let dialog;
+ Object.entries(STICKERS).filter(([id])=>!['arrow','curved','circle','check'].includes(id)).forEach(([id,name])=>{
+  const cv=el('canvas',{width:240,height:170});sticker(cv.getContext('2d'),{start:0,x:.5,y:.5,scale:3.7,sticker:{kind:id,motion:'none',color:'#e5bc55'}},1,240,170);
+  grid.append(button('',()=>{dialog.close();openStickers(id);},{className:'studio-card','aria-label':name}));grid.lastChild.append(cv,el('strong',{text:name}));
+ });
+ dialog=app.openDialog({title:'Drawing images',wide:true,intro:'Choose a drawing, then adjust its colour, size, position and animation. Each drawing stays separate from your background.',body:[grid],actions:[{label:'Close'}]});
+}
+const bar=document.querySelector('.studio-bar');bar.append(button('Stickers',openStickers,{id:'studio-stickers'}),button('Drawings',openDrawings,{id:'studio-drawings'}),button('Resize',openResize,{id:'studio-resize'}),button('Background',openBackground,{id:'studio-background'}));
+app.addTool({section:'Create',label:'Drawing images…',run:openDrawings});
 app.addTool({section:'Create',label:'Animated stickers & arrows…',run:openStickers});app.addTool({section:'Timeline',label:'Resize for social media…',run:openResize});app.addTool({section:'Effects',label:'Remove / replace background…',run:openBackground});
-window.ReelEffects={sticker,openStickers,openResize,openBackground,processBackground,ready,keyPixels,resizeProject};
+window.ReelEffects={sticker,openStickers,openDrawings,openResize,openBackground,processBackground,ready,keyPixels,resizeProject};
 }());
