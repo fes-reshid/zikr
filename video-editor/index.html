@@ -474,6 +474,17 @@ dialog#consentGate h1:focus-visible { outline: none; }
 .preview-text-editor {position:absolute;z-index:8;background:#182421;padding:10px;border:1px solid #e8c777;border-radius:8px;box-shadow:0 8px 25px #0008;}
 .preview-text-editor textarea {width:100%;min-height:90px;background:#fff;color:#172e25;font:20px sans-serif;padding:8px;box-sizing:border-box;}
 .preview-text-editor>div {display:flex;gap:8px;margin-top:6px;}
+
+.workspace-size-bar {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 12px;background:#172521;border-bottom:1px solid var(--line);font-size:12px;flex-shrink:0;}
+.workspace-size-bar label {display:flex;align-items:center;gap:8px;}
+.workspace-size-bar input {width:105px;}
+body.preview-wide .workspace {grid-template-columns:minmax(0,1fr);}
+body.preview-wide .workspace>.bin,body.preview-wide .workspace>.inspector {display:none;}
+body.preview-expanded .viewer {position:fixed;inset:8px;z-index:35;border:1px solid var(--accent);border-radius:10px;}
+body.preview-expanded .workspace-size-bar input,body.preview-expanded .workspace-size-bar output {display:none;}
+.resizer {position:relative;touch-action:none;}
+.resizer::after {content:'';display:block;width:64px;height:3px;border-radius:5px;background:var(--accent);margin:1px auto;}
+@media(max-width:900px){body{grid-template-rows:auto minmax(0,1fr) 10px var(--timeline-h,36vh);}.resizer{display:block;}.workspace-size-bar{gap:4px;padding:4px;}.workspace-size-bar button{font-size:11px;padding:5px;}.workspace-size-bar input{width:80px;}}
 </style>
 </head>
 <body>
@@ -670,6 +681,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
 <script src="art-gallery.js?v=dev"></script>
 <script src="preview-edit.js?v=dev"></script>
 <script src="hadith.js?v=dev"></script>
+<script src="workspace-layout.js?v=dev"></script>
 <script>
 // Works offline after the first visit (http only; the service worker cannot run from a file).
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {
