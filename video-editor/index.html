@@ -484,7 +484,81 @@ body.preview-expanded .viewer {position:fixed;inset:8px;z-index:35;border:1px so
 body.preview-expanded .workspace-size-bar input,body.preview-expanded .workspace-size-bar output {display:none;}
 .resizer {position:relative;touch-action:none;}
 .resizer::after {content:'';display:block;width:64px;height:3px;border-radius:5px;background:var(--accent);margin:1px auto;}
-@media(max-width:900px){body{grid-template-rows:auto minmax(0,1fr) 10px var(--timeline-h,36vh);}.resizer{display:block;}.workspace-size-bar{gap:4px;padding:4px;}.workspace-size-bar button{font-size:11px;padding:5px;}.workspace-size-bar input{width:80px;}}
+/* Phone layout: keep the preview useful, turn side panels into sheets, and
+   make every dense toolbar swipe horizontally instead of squeezing controls. */
+@media(max-width:900px){
+    :root{--head-w:76px;--row-h:54px;--ruler-h:24px;}
+    html,body{height:100%;height:100dvh;overscroll-behavior:none;}
+    body{grid-template-rows:auto minmax(0,1fr) 8px var(--timeline-h,30dvh);padding-bottom:env(safe-area-inset-bottom);}
+    button,select,input[type=color]{min-height:40px;}
+    .topbar{padding:6px max(8px,env(safe-area-inset-right)) 6px max(8px,env(safe-area-inset-left));gap:5px;scrollbar-width:none;}
+    .topbar::-webkit-scrollbar,.tl-toolbar::-webkit-scrollbar,.studio-bar::-webkit-scrollbar,.preview-edit-bar::-webkit-scrollbar,.workspace-size-bar::-webkit-scrollbar,.draw-bar::-webkit-scrollbar{display:none;}
+    .brand-mark{width:32px;height:32px;}
+    #resolution{width:106px;max-width:106px;}
+    #fps{display:none;}
+    .topbar button{min-width:40px;justify-content:center;}
+
+    .workspace{position:relative;display:block;overflow:hidden;min-height:0;}
+    .viewer{height:100%;width:100%;}
+    .bin,.inspector{display:none;position:absolute;inset:0;z-index:32;max-height:none!important;border:0!important;background:var(--panel);}
+    .workspace.show-bin .bin,.workspace.show-inspector .inspector{display:flex;}
+    .workspace.show-bin .viewer,.workspace.show-inspector .viewer{visibility:hidden;}
+    .panel-head{min-height:50px;padding:8px 12px;font-size:12px;}
+    .panel-body{padding-bottom:max(12px,env(safe-area-inset-bottom));}
+    .inspector-body{padding:12px max(12px,env(safe-area-inset-right)) 20px max(12px,env(safe-area-inset-left));}
+
+    .workspace-size-bar{gap:6px;padding:4px 8px;flex-wrap:nowrap;overflow-x:auto;min-height:44px;}
+    .workspace-size-bar label{flex:none;}
+    .workspace-size-bar button{font-size:11px;padding:5px 8px;min-height:34px;}
+    .workspace-size-bar input{width:82px;}
+    .studio-bar{max-height:none;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;gap:6px;padding:6px 8px;min-height:48px;}
+    .studio-bar button{flex:0 0 auto!important;min-height:36px;padding:7px 10px;}
+    .preview-edit-bar{flex-wrap:nowrap;overflow-x:auto;padding:4px 8px;min-height:42px;}
+    .preview-edit-bar>*{flex:none;}
+    .stage{padding:4px;}
+    .transport{padding:5px 6px;gap:2px;flex-wrap:nowrap;overflow-x:auto;min-height:48px;}
+    .transport button{min-width:38px;min-height:38px;justify-content:center;}
+    .timecode{min-width:132px;font-size:11px;}
+    #play{width:42px;}
+
+    .resizer{display:block;height:8px;}
+    .resizer::after{width:74px;height:4px;margin:1px auto;}
+    .timeline-panel{min-height:0;}
+    .tl-toolbar{padding:4px 6px;gap:2px;min-height:46px;scrollbar-width:none;}
+    .tl-toolbar button{min-width:40px;min-height:38px;justify-content:center;padding:6px 8px;}
+    .tl-toolbar .sep{margin:0 2px;}
+    #zoom{width:86px;}
+    .tl-head{padding:0 2px 0 5px;}
+    .tl-head .name{font-size:10px;}
+    .tl-head button{min-width:34px;min-height:34px;padding:6px;}
+    .clip{top:3px;bottom:3px;}
+
+    .draw-bar{top:auto;bottom:8px;left:8px;right:8px;transform:none;max-width:none;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;padding:6px;}
+    .draw-bar .draw-tools,.draw-swatches{flex:none;}
+    .draw-bar button,.draw-bar select,.draw-bar input[type=color]{min-width:40px;min-height:40px;}
+    .draw-bar .spacer{display:none;}
+    .draw-sep{height:34px;flex:none;}
+
+    .modal{padding:0;align-items:end;}
+    .dialog,.dialog.wide{width:100%;max-width:none;max-height:90dvh;border-radius:18px 18px 0 0;padding:16px max(14px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));overflow:auto;}
+    .dialog .actions{position:sticky;bottom:0;background:var(--panel);padding-top:8px;}
+    .menu{max-height:75dvh;}
+    .preview-text-editor{left:6px!important;right:6px!important;width:auto!important;max-width:none!important;}
+}
+@media(max-width:560px){
+    .dialog .field,.dialog-body .field.wide,.field-pair .field.wide{grid-template-columns:minmax(0,1fr);gap:4px;}
+    .dialog-body .field .hint{grid-column:1;}
+    .field-pair{grid-template-columns:minmax(0,1fr);}
+    .dialog input,.dialog select,.dialog textarea{width:100%;font-size:16px;}
+    .studio-grid,.studio-grid.transitions{grid-template-columns:minmax(0,1fr);}
+    dialog#consentGate{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:16px;}
+}
+@media(max-width:900px) and (orientation:landscape) and (max-height:520px){
+    body{grid-template-rows:auto minmax(0,1fr) 8px var(--timeline-h,42dvh);}
+    .studio-bar{min-height:42px;padding-block:3px;}
+    .workspace-size-bar{min-height:38px;}
+    .transport{min-height:42px;padding-block:2px;}
+}
 </style>
 </head>
 <body>
@@ -570,6 +644,7 @@ body.preview-expanded .workspace-size-bar input,body.preview-expanded .workspace
         <div class="panel-head">
             <span>Media</span>
             <button id="import"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Import</button>
+            <button id="mobile-close-bin" class="show-narrow icon ghost" aria-label="Close media" title="Close media">×</button>
             <input id="import-input" type="file" multiple accept="video/*,audio/*,image/*" hidden>
         </div>
         <div class="panel-body">
@@ -599,7 +674,7 @@ body.preview-expanded .workspace-size-bar input,body.preview-expanded .workspace
     </section>
 
     <section class="panel inspector" aria-label="Inspector">
-        <div class="panel-head"><span>Inspector</span></div>
+        <div class="panel-head"><span>Inspector</span><button id="mobile-close-inspector" class="show-narrow icon ghost" aria-label="Close details" title="Close details">×</button></div>
         <div class="panel-body"><div id="inspector" class="inspector-body"></div></div>
     </section>
 </main>

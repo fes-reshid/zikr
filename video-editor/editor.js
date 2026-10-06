@@ -2950,13 +2950,18 @@
      */
     function showDetails() {
         if (!window.matchMedia || !window.matchMedia('(max-width: 900px)').matches) return;
+        $('workspace').classList.remove('show-bin');
         $('workspace').classList.add('show-inspector');
-        syncDetailsButton();
+        syncMobilePanels();
     }
 
-    function syncDetailsButton() {
-        const on = $('workspace').classList.contains('show-inspector');
-        $('toggle-inspector').setAttribute('aria-pressed', String(on));
+    function syncMobilePanels() {
+        const bin = $('workspace').classList.contains('show-bin');
+        const details = $('workspace').classList.contains('show-inspector');
+        $('toggle-bin').setAttribute('aria-pressed', String(bin));
+        $('toggle-bin').setAttribute('aria-label', bin ? 'Close media' : 'Show media');
+        $('toggle-inspector').setAttribute('aria-pressed', String(details));
+        $('toggle-inspector').setAttribute('aria-label', details ? 'Close details' : 'Show details');
     }
 
     /** A title that a hand holding a pen writes out. */
@@ -3748,8 +3753,21 @@
     $('export-start').addEventListener('click', startExport);
     $('export-cancel').addEventListener('click', closeExport);
 
-    $('toggle-bin').addEventListener('click', function () { $('workspace').classList.toggle('show-bin'); });
-    $('toggle-inspector').addEventListener('click', function () { $('workspace').classList.toggle('show-inspector'); syncDetailsButton(); });
+    $('toggle-bin').addEventListener('click', function () {
+        const open = !$('workspace').classList.contains('show-bin');
+        $('workspace').classList.remove('show-bin', 'show-inspector');
+        if (open) $('workspace').classList.add('show-bin');
+        syncMobilePanels();
+    });
+    $('toggle-inspector').addEventListener('click', function () {
+        const open = !$('workspace').classList.contains('show-inspector');
+        $('workspace').classList.remove('show-bin', 'show-inspector');
+        if (open) $('workspace').classList.add('show-inspector');
+        syncMobilePanels();
+    });
+    $('mobile-close-bin').addEventListener('click', function () { $('workspace').classList.remove('show-bin'); syncMobilePanels(); });
+    $('mobile-close-inspector').addEventListener('click', function () { $('workspace').classList.remove('show-inspector'); syncMobilePanels(); });
+    syncMobilePanels();
 
     // Timeline height: drag the bar between the workspace and the timeline.
     (function () {
