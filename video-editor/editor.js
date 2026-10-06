@@ -197,8 +197,7 @@
     }
 
     function selectedClips() {
-        return state.selection.map((id) => T.getClip(state.project, id)).filter(Boolean);
-    }
+        return state.selection.map((id) => T.getClip(state.project, id)).filter(Boolean);    }
 
     function headWidth() {
         return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--head-w')) || 132;
@@ -398,7 +397,6 @@
         let entry = pool.get(clip.id);
         if (entry && entry.url !== f.url) { disposeEntry(entry); pool.delete(clip.id); entry = null; }
         if (entry) return entry;
-
         const media = T.getMedia(state.project, clip.mediaId);
         const node = document.createElement(media && media.type === 'audio' ? 'audio' : 'video');
         node.preload = 'auto';
@@ -597,8 +595,7 @@
             c.save();
             c.globalAlpha = layer.alpha;
             if (layer.transition) applyTransition(c, layer.transition, W, H);
-            if (layer.clip.sticker && window.ReelEffects) window.ReelEffects.sticker(c, layer.clip, t, W, H);
-            else if (layer.clip.type === 'draw') drawDrawing(c, layer.clip, t, W, H, source);
+            if (layer.clip.sticker && window.ReelEffects) window.ReelEffects.sticker(c, layer.clip, t, W, H);            else if (layer.clip.type === 'draw') drawDrawing(c, layer.clip, t, W, H, source);
             else if (layer.kind === 'text') drawText(c, layer.clip, t, W, H);
             else drawVisual(c, layer.clip, layer.kind, t, W, H, source);
             c.restore();
@@ -797,8 +794,7 @@
             c.fillRect(-hw + ox, -hh + oy, r.w, r.h);
             c.restore();
         }
-        c.restore();
-        if (fx.border.width > 0) {
+        c.restore();        if (fx.border.width > 0) {
             const bw = fx.border.width * H / 720;
             c.lineWidth = bw;
             c.strokeStyle = fx.border.color || '#ffffff';
@@ -997,8 +993,7 @@
             } else {
                 let out = '';
                 line.split(/(\s+)/).forEach(function (part) {
-                    if (!part.trim()) { if (budget > 0) out += part; return; }
-                    if (budget > 0) out += part;
+                    if (!part.trim()) { if (budget > 0) out += part; return; }                    if (budget > 0) out += part;
                     budget -= 1;
                 });
                 prefix = out.trimEnd();
@@ -1197,7 +1192,6 @@
         updatePlayhead(false);
         requestDraw();
     }
-
     function togglePlay() {
         if (state.playing) pause(); else play();
     }
@@ -1397,8 +1391,7 @@
                 continue;
             }
             URL.revokeObjectURL(url);
-            let target = null;
-            if (relinkTarget && T.getMedia(state.project, relinkTarget)) {
+            let target = null;            if (relinkTarget && T.getMedia(state.project, relinkTarget)) {
                 target = T.getMedia(state.project, relinkTarget);
                 relinkTarget = null;
             } else if (!o.fresh) {
@@ -1597,8 +1590,7 @@
             const t = i * minor;
             const isMajor = Math.abs(t / major - Math.round(t / major)) < 1e-6;
             const tick = el('div', { className: 'tick' + (isMajor ? ' major' : ''), style: { left: t * pps + 'px' } });
-            if (isMajor) tick.append(el('span', { text: rulerLabel(t, major) }));
-            ruler.append(tick);
+            if (isMajor) tick.append(el('span', { text: rulerLabel(t, major) }));            ruler.append(tick);
         }
         (p.markers || []).forEach(function (m) {
             ruler.append(el('div', {
@@ -1797,8 +1789,7 @@
         const line = $('tl-snapline');
         if (!line) return;
         if (t === null) { line.hidden = true; return; }
-        line.hidden = false;
-        line.style.left = headWidth() + t * state.pps + 'px';
+        line.hidden = false;        line.style.left = headWidth() + t * state.pps + 'px';
     }
 
     function selectMarker(id) {
@@ -1997,8 +1988,7 @@
 
     /** Double-clicking a clip: a title's text is ready to type into; a drawing opens on the board. */
     function openClip(clip) {
-        if (clip.type === 'text') {
-            showDetails();
+        if (clip.type === 'text') {            showDetails();
             const box = $('inspector').querySelector('textarea');
             if (box) { box.focus(); box.select(); }
         } else if (clip.type === 'draw') {
@@ -2197,8 +2187,7 @@
     }
 
     function openMenuName() {
-        return MENUS.find((which) => $(which + '-menu') && !$(which + '-menu').hidden) || null;
-    }
+        return MENUS.find((which) => $(which + '-menu') && !$(which + '-menu').hidden) || null;    }
 
     function openGuide() {
         window.open('help.html', '_blank', 'noopener');
@@ -2398,7 +2387,6 @@
         const o = opts || {};
         return el('button', { className: o.primary ? 'primary' : 'ghost', text: label, title: o.title, disabled: o.disabled, onclick: run });
     }
-
     const pct = (v) => Math.round(v) + '%';
     const secs = (v) => Number(v).toFixed(1) + 's';
 
@@ -2435,14 +2423,16 @@
         const H = window.ReelHands;
         if (!H) return [];
         const hand = tools.indexOf(clip.hand) !== -1 ? clip.hand : 'none';
-        const realistic = clip.handStyle === 'realistic' && hand !== 'finger';
+        const realistic = clip.handStyle === 'realistic';
         const out = [chooser('Hand', hand, [['none', 'No hand']].concat(tools.map((k) => [k, H.TOOLS[k]])),
             (v) => T.updateClip(state.project, clip.id, { hand: v, handStyle: v === 'pencil' && realistic ? 'sketch' : clip.handStyle }))];
         if (hand === 'none') return out;
-        if (hand !== 'finger') {
-            out.push(chooser('Hand style', H.STYLES[clip.handStyle] ? clip.handStyle : 'emoji', Object.keys(H.STYLES).map((k) => [k, H.STYLES[k]]),
-                (v) => T.updateClip(state.project, clip.id, { handStyle: v, hand: v === 'realistic' ? 'pen' : hand })));
-        }
+        const styles = hand === 'finger'
+            ? [['realistic', 'Real hand · typing finger'], ['emoji', 'Illustrated typing hand']]
+            : Object.keys(H.STYLES).map((k) => [k, H.STYLES[k]]);
+        const chosenStyle = hand === 'finger' ? (clip.handStyle === 'realistic' ? 'realistic' : 'emoji') : (H.STYLES[clip.handStyle] ? clip.handStyle : 'emoji');
+        out.push(chooser('Hand style', chosenStyle, styles,
+            (v) => T.updateClip(state.project, clip.id, { handStyle: v, hand: v === 'realistic' && hand !== 'finger' ? 'pen' : hand })));
         if (!realistic) out.push(chooser('Skin', H.SKINS[clip.handSkin] ? clip.handSkin : 'yellow', Object.keys(H.SKINS).map((k) => [k, H.SKINS[k].label]),
             (v) => T.updateClip(state.project, clip.id, { handSkin: v })));
         out.push(slider(clip, 'Hand size', (c) => Math.round((c.handSize || 1) * 100), (v) => ({ handSize: v / 100 }), { min: 20, max: 400, step: 5, show: pct }));
@@ -2553,8 +2543,8 @@
                 el('div', { className: 'row-buttons' }, [
                     button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: 'pen', handStyle: 'realistic' })); },
                         { title: 'The title is written out by a hand holding a pen' }),
-                    button('⌨ Type with hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger' })); },
-                        { title: 'The title is typed letter by letter by a tapping finger' })
+                    button('⌨ Type with real hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger', handStyle: 'realistic', handSkin: 'medium' })); },
+                        { title: 'The title is typed letter by letter by a real tapping finger' })
                 ]),
                 fontSelect(clip),
                 slider(clip, 'Size', (c) => c.fontSize, (v) => ({ fontSize: v }), { min: 12, max: 240, show: (v) => v + 'px' }),
@@ -2597,7 +2587,6 @@
                     : null
             ].concat(clip.anim === 'draw' ? handControls(clip, ['pen', 'pencil']) : [])));
         }
-
         if (kind !== 'audio') {
             const layout = [];
             if (kind !== 'text') {
@@ -2797,8 +2786,7 @@
         const label = el('input', { type: 'text', value: m.label || '' });
         label.addEventListener('change', function () { apply(T.updateMarker(state.project, m.id, { label: label.value.trim() })); });
         box.append(
-            el('div', { className: 'insp-title' }, [el('span', { className: 'chip', text: 'Marker' }), el('span', { text: m.label || fmt(m.time) })]),
-            group('Marker', [
+            el('div', { className: 'insp-title' }, [el('span', { className: 'chip', text: 'Marker' }), el('span', { text: m.label || fmt(m.time) })]),            group('Marker', [
                 control('Label', label),
                 timeField('Time', m.time, (v) => T.updateMarker(state.project, m.id, { time: v })),
                 el('div', { className: 'row-buttons' }, [
@@ -2997,7 +2985,6 @@
     }
 
     /* ---------------------------------------------------------------- drawing */
-
     const DRAW_TOOLS = [
         ['pen', 'Pen', '<path d="M4 20l4-1 11-11-3-3L5 16z"/>'],
         ['highlighter', 'Highlighter', '<path d="M9 14l-4 6h6l2-3M9 14l7-10 4 3-7 10z"/>'],
@@ -3029,8 +3016,13 @@
             tool: 'pen',
             color: '#ffffff',
             width: 6,
+            hand: editing ? editing.hand : 'pen',
+            handStyle: editing ? editing.handStyle : 'realistic',
+            handSkin: editing ? editing.handSkin : 'medium',
+            handSize: editing ? (editing.handSize || 1) : 1,
             current: null,
-            from: null
+            from: null,
+            cursor: null
         };
         const last = editing && editing.strokes && editing.strokes[editing.strokes.length - 1];
         if (last) { drawMode.color = last.color; drawMode.width = last.alpha < 1 ? last.width / 3 : last.width; }
@@ -3057,12 +3049,22 @@
         sizeIn.value = DRAW_SIZES.some((o) => Number(o[0]) === drawMode.width) ? String(drawMode.width) : '6';
         drawMode.width = Number(sizeIn.value);
         sizeIn.addEventListener('change', function () { drawMode.width = Number(sizeIn.value); });
+        const handIn = el('select', { 'aria-label': 'Drawing hand', title: 'Hand shown while drawing' }, [
+            ['real', 'Real hand'], ['emoji', 'Emoji hand'], ['sketch', 'Sketch hand'], ['pencil', 'Pencil hand'], ['none', 'No hand']
+        ].map((o) => el('option', { value: o[0], text: o[1] })));
+        handIn.value = drawMode.hand === 'none' ? 'none' : drawMode.handStyle === 'realistic' ? 'real' : drawMode.hand === 'pencil' ? 'pencil' : drawMode.handStyle === 'sketch' ? 'sketch' : 'emoji';
+        handIn.addEventListener('change', function () {
+            const v = handIn.value;
+            drawMode.hand = v === 'none' ? 'none' : v === 'pencil' ? 'pencil' : 'pen';
+            drawMode.handStyle = v === 'real' ? 'realistic' : v === 'sketch' || v === 'pencil' ? 'sketch' : 'emoji';
+            paintDrawLayer();
+        });
         const undoBtn = el('button', { className: 'ghost', text: 'Undo', title: 'Undo the last stroke (Ctrl+Z)', onclick: undoStroke });
         const clearBtn = el('button', { className: 'ghost', text: 'Clear', onclick: function () { if (drawMode.strokes.length) { drawMode.undo.push(drawMode.strokes); drawMode.strokes = []; paintDrawLayer(); } } });
         const cancelBtn = el('button', { className: 'ghost', text: 'Cancel', onclick: function () { closeDrawMode(false); } });
         const doneBtn = el('button', { className: 'primary', text: 'Done', onclick: function () { closeDrawMode(true); } });
         const bar = el('div', { id: 'draw-bar', className: 'draw-bar', role: 'toolbar', 'aria-label': 'Drawing' }, [
-            tools, el('span', { className: 'draw-sep' }), colourIn, swatches, sizeIn,
+            tools, el('span', { className: 'draw-sep' }), colourIn, swatches, sizeIn, handIn,
             el('span', { className: 'draw-sep' }), undoBtn, clearBtn, el('span', { className: 'spacer' }), cancelBtn, doneBtn
         ]);
         $('stage').append(layer, bar);
@@ -3111,6 +3113,7 @@
         drawMode.layer.setPointerCapture(e.pointerId);
         const pt = drawPoint(e);
         drawMode.from = pt;
+        drawMode.cursor = pt;
         if (drawMode.tool === 'eraser') { drawMode.undo.push(drawMode.strokes); eraseAt(pt); return; }
         drawMode.current = Object.assign(newStroke(), { points: [pt.x, pt.y] });
         if (['line', 'arrow', 'rect', 'oval'].indexOf(drawMode.tool) !== -1) drawMode.current.shape = drawMode.tool;
@@ -3128,6 +3131,7 @@
         } else {
             list.forEach(function (ev) { const pt = drawPoint(ev); cur.points.push(pt.x, pt.y); });
         }
+        drawMode.cursor = drawPoint(e);
         paintDrawLayer();
     }
 
@@ -3136,6 +3140,7 @@
         const cur = drawMode.current;
         drawMode.from = null;
         drawMode.current = null;
+        drawMode.cursor = null;
         if (!cur) { paintDrawLayer(); return; }
         drawMode.undo.push(drawMode.strokes);
         drawMode.strokes = drawMode.strokes.concat(finishStroke(cur));
@@ -3195,28 +3200,34 @@
         paintStrokes(c, drawMode.strokes, W, H);
         if (drawMode.current) paintStrokes(c, finishStroke(drawMode.current), W, H);
         c.restore();
+        if (drawMode.cursor && drawMode.hand !== 'none' && drawMode.tool !== 'eraser') {
+            const pt = drawMode.cursor;
+            const at = { x: (f.x + (pt.x - .5) * f.scale) * W, y: (f.y + (pt.y - .5) * f.scale) * H };
+            drawHand(c, { tool: drawMode.hand, style: drawMode.handStyle, skin: drawMode.handSkin, size: drawMode.handSize },
+                at.x, at.y, H * .3 * drawMode.handSize, 0, W, H, { ink: drawMode.color });
+        }
     }
 
-    function closeDrawMode(save) {
-        if (!drawMode) return;
+    function closeDrawMode(save) {        if (!drawMode) return;
         const m = drawMode;
         drawMode = null;
         m.layer.remove();
         m.bar.remove();
         $('stage').classList.remove('drawing');
         if (save && m.clipId && T.getClip(state.project, m.clipId)) {
-            if (m.strokes.length) apply(T.updateClip(state.project, m.clipId, { strokes: m.strokes }));
+            if (m.strokes.length) apply(T.updateClip(state.project, m.clipId, { strokes: m.strokes, hand: m.hand, handStyle: m.handStyle, handSkin: m.handSkin, handSize: m.handSize }));
             else toast('The drawing is empty — delete the clip if you no longer want it.');
         } else if (save && m.strokes.length) {
-            addDrawing(m.strokes);
+            addDrawing(m.strokes, { hand: m.hand, handStyle: m.handStyle, handSkin: m.handSkin, handSize: m.handSize });
         }
         requestDraw();
     }
 
     /** Puts a new drawing at the playhead on a titles track with room for it, adding a track if none has. */
-    function addDrawing(strokes) {
+    function addDrawing(strokes, hand) {
         let p = state.project;
         const clip = T.drawClip(null, Math.round(state.time * 1000) / 1000, strokes);
+        Object.assign(clip, hand || {});
         let track = p.tracks.filter((t) => t.kind === 'text').find(function (t) {
             const at = T.findFreeStart(p, t.id, clip.start, clip.duration, null);
             return at !== null && Math.abs(at - clip.start) < 1e-6;
@@ -3397,8 +3408,7 @@
         try {
             const got = await window.ReelStore.find(missing, byName);
             for (const pair of got) {
-                const media = T.getMedia(state.project, pair[0]);
-                if (!media || files.has(media.id)) continue;
+                const media = T.getMedia(state.project, pair[0]);                if (!media || files.has(media.id)) continue;
                 await attachFile(media.id, pair[1]);
                 found += 1;
             }
@@ -3597,8 +3607,7 @@
     function holdRecorder(hold) {
         const r = state.exporting && state.exporting.recorder;
         if (!r) return;
-        if (hold && r.state === 'recording') r.pause();
-        else if (!hold && r.state === 'paused') r.resume();
+        if (hold && r.state === 'recording') r.pause();        else if (!hold && r.state === 'paused') r.resume();
     }
 
     function exportProgress(fraction, label) {
@@ -3797,8 +3806,7 @@
             if (e.key === 'Escape') { e.preventDefault(); closeDrawMode(false); } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !inField) {
                 e.preventDefault();
                 undoStroke();
-            }
-            return;
+            }            return;
         }
         if (dialogStack.length) {
             if (e.key === 'Escape') dialogStack[dialogStack.length - 1].close();

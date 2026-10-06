@@ -43,7 +43,7 @@
     const TOOLS = { pen: 'Hand with pen', pencil: 'Hand with pencil', finger: 'Hand typing' };
     const STYLES = { realistic: 'Realistic · black pen', emoji: 'Emoji ✍️', sketch: 'Sketch' };
     // Same-origin transparent asset; safe to composite into exported video.
-    let photo = null, photoPlate = null;
+    let photo = null, photoPlate = null, typingPhoto = null;
     const photoReady = typeof Image === 'undefined' ? Promise.resolve(false) : new Promise(function (resolve) {
         photo = new Image();
         photo.onload = function () { resolve(true); if (window.ReelApp) window.ReelApp.requestDraw(); };
@@ -52,6 +52,15 @@
         const url = new URL('assets/hand-real.webp', script || location.href);
         if (script) url.search = new URL(script).search;
         photo.src = url.href;
+    });
+    const typingPhotoReady = typeof Image === 'undefined' ? Promise.resolve(false) : new Promise(function (resolve) {
+        typingPhoto = new Image();
+        typingPhoto.onload = function () { resolve(true); if (window.ReelApp) window.ReelApp.requestDraw(); };
+        typingPhoto.onerror = function () { resolve(false); };
+        const script = document.currentScript && document.currentScript.src;
+        const url = new URL('assets/hand-typing-real.webp', script || location.href);
+        if (script) url.search = new URL(script).search;
+        typingPhoto.src = url.href;
     });
 
     function drawPhoto(c, o, size) {
@@ -75,6 +84,23 @@
         c.shadowOffsetX = size * .012;
         c.shadowOffsetY = size * .025;
         c.drawImage(photoPlate, -width * .074, -width * .579, width, width);
+        return true;
+    }
+
+    /** A photographed tapping hand, anchored at the extended index fingertip. */
+    function drawTypingPhoto(c, o, size) {
+        if (!typingPhoto || !typingPhoto.complete || !typingPhoto.naturalWidth) return false;
+        // Anchor measured in the 1100 x 733 cutout. Moving it up as `press`
+        // falls makes each typed character read as a real lift and tap.
+        const k = size / 610;
+        const press = o.press === undefined ? 1 : Math.max(0, Math.min(1, o.press));
+        c.translate(0, -(1 - press) * size * .09);
+        c.rotate((o.angle || 0) + (1 - press) * .025);
+        c.shadowColor = 'rgba(0,0,0,.17)';
+        c.shadowBlur = size * .025;
+        c.shadowOffsetX = size * .012;
+        c.shadowOffsetY = size * .022;
+        c.drawImage(typingPhoto, -282 * k, -652 * k, typingPhoto.naturalWidth * k, typingPhoto.naturalHeight * k);
         return true;
     }
 
@@ -504,7 +530,9 @@
         const size = Math.max(10, o.size || 200);
         c.save();
         c.translate(o.x, o.y);
-        if (o.tool === 'finger') {
+        if (o.tool === 'finger' && o.style === 'realistic' && drawTypingPhoto(c, o, size)) {
+            // Photograph already drawn with its fingertip at the origin.
+        } else if (o.tool === 'finger') {
             c.scale(size / TAP_UNIT, size / TAP_UNIT);
             c.rotate((o.angle || 0) - 0.15);
             tapping(c, s, o.press === undefined ? 1 : o.press);
@@ -516,5 +544,5 @@
         c.restore();
     }
 
-    return { draw: draw, ready: function () { return photoReady; }, pale: pale, SKINS: SKINS, TOOLS: TOOLS, STYLES: STYLES };
+    return { draw: draw, ready: function () { return Promise.all([photoReady, typingPhotoReady]).then(function (a) { return a.every(Boolean); }); }, pale: pale, SKINS: SKINS, TOOLS: TOOLS, STYLES: STYLES };
 }));
