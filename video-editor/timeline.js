@@ -1286,6 +1286,56 @@
         return p;
     }
 
+    /**
+     * Auto-reframe: a camera path that keeps a face in a frame narrower than
+     * the source (a wide video in a 9:16 Short). `samples` are { t: seconds
+     * into the clip, fx: the face's centre across the source 0–1 (null when
+     * no face) }. The picture holds still until the face moves more than
+     * `deadZone` of the frame, then glides there over `glide` seconds, like a
+     * camera operator. Returns keyframes [{ t, x }] for the clip.
+     */
+    function reframeKeys(samples, srcW, srcH, dstW, dstH, options) {
+        const o = Object.assign({ scale: 1, deadZone: 0.12, glide: 0.6 }, options);
+        if (!srcW || !srcH || !samples || !samples.length) return [];
+        const rw = srcW * Math.max(dstW / srcW, dstH / srcH) * o.scale / dstW;
+        const room = Math.max(0, (rw - 1) / 2);
+        if (room < 1e-3) return [];
+        const xFor = (fx) => round(clamp(0.5 + (0.5 - fx) * rw, 0.5 - room, 0.5 + room));
+        const seen = samples.filter((s) => s.fx != null).sort((a, b) => a.t - b.t);
+        if (!seen.length) return [];
+        // Lightly smooth the detections so one wobbly frame does not move the camera.
+        const smooth = seen.map(function (s, i) {
+            const near = seen.slice(Math.max(0, i - 1), i + 2).map((n) => n.fx).sort((a, b) => a - b);
+            return { t: s.t, fx: near[Math.floor(near.length / 2)] };
+        });
+        const keys = [{ t: 0, x: xFor(smooth[0].fx) }];
+        let held = keys[0].x;
+        let heldSince = 0;
+        smooth.forEach(function (s) {
+            const x = xFor(s.fx);
+            // |x − held| is how far the face sits from the middle of the frame, in frame widths.
+            if (Math.abs(x - held) <= o.deadZone) return;
+            const start = Math.max(heldSince, s.t - o.glide);
+            if (start - keys[keys.length - 1].t > 1e-3) keys.push({ t: round(start), x: held });
+            keys.push({ t: round(Math.max(start + 0.05, s.t)), x: x });
+            held = x;
+            heldSince = s.t;
+        });
+        return keys;
+    }
+
+    /** Puts a reframe path on a clip (replacing its keyframes) and fills the frame with it. */
+    function applyReframe(project, id, keys) {
+        const clip = getClip(project, id);
+        if (!clip || !keys.length) return project;
+        const p = clone(project);
+        const c = p.clips.find((x) => x.id === id);
+        c.fit = 'cover';
+        c.keys = keys.filter((k) => k.t <= c.duration + EPS).map((k) => ({ t: k.t, x: k.x }));
+        if (!c.keys.length) delete c.keys;
+        return p;
+    }
+
     function removeKeyframe(project, id, index) {
         const clip = getClip(project, id);
         if (!clip || !clip.keys || !clip.keys[index]) return project;
@@ -2019,7 +2069,7 @@
         previousAdjacent, transitionWindow, transitionAt, setTransition, transitionAllCuts, transitionMix,
         activeClips, sourceTime, fadeAt, edgeFade, renderLayers, mediaAt, audibleClips, placeRect,
         nextAdjacent, soundWindow, clipGainAt,
-        motionAt, textAnimAt, keyframeAt, setKeyframe, removeKeyframe, KEY_PROPS, moveAt, combineMoves, isStill, exitAt, clipMoveAt, handOf, drawAnimAt, strokeLengths, revealStrokes, simplifyPoints, shapeStrokes, filterString, duckEnvelope, envelopeAt,
+        motionAt, textAnimAt, keyframeAt, setKeyframe, removeKeyframe, reframeKeys, applyReframe, KEY_PROPS, moveAt, combineMoves, isStill, exitAt, clipMoveAt, handOf, drawAnimAt, strokeLengths, revealStrokes, simplifyPoints, shapeStrokes, filterString, duckEnvelope, envelopeAt,
         addMarker, updateMarker, removeMarker, chaptersText,
         snapTime, rulerStep, formatTime, parseTime, toFrame,
         isArabic, arabicDigits, wordsToCaptions, alignWords, alignLines, toSRT, toVTT, parseSubtitles, trackCues,

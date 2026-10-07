@@ -29,6 +29,8 @@ td:first-child { white-space: nowrap; width: 1%; }
 figure { margin: 18px 0 22px; }
 figure img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); }
 figure.small img { max-width: 460px; }
+figure.phone img { max-width: 300px; }
+.phone-pair { display: flex; gap: 16px; flex-wrap: wrap; }
 figure.medium img { max-width: 680px; }
 figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; }
 .tutorial { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 18px 8px; margin: 18px 0; }
@@ -88,9 +90,9 @@ figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; }
 <table>
     <tr><td><b>File</b></td><td>New project, new tab, open and save a project file, My projects, import media, save the frame as a picture, export.</td></tr>
     <tr><td><b>Edit</b></td><td>Undo and redo, cut, copy, paste, duplicate, split, delete, select all, markers, a transition on every cut, YouTube chapters.</td></tr>
-    <tr><td><b>View</b></td><td>Preview size, expand the preview, hide the side panels, fit the timeline, snapping.</td></tr>
-    <tr><td><b>Create</b></td><td>Titles and handwriting, drawing, Qur’ān, hadith and nasheed videos, templates, stickers and backgrounds, recording, the sound library, pictures on the pauses, brand kit and Shorts.</td></tr>
-    <tr><td><b>Tools</b></td><td>Captions and subtitles, resizing for social media, background removal, and the other tools.</td></tr>
+    <tr><td><b>View</b></td><td>Preview size, expand the preview, hide the side panels, frame size (16:9, 9:16, square…), fit the timeline, snapping.</td></tr>
+    <tr><td><b>Create</b></td><td>Titles and handwriting, drawing, Qur’ān, hadith, nasheed and occasion videos, templates, stickers and backgrounds, recording, Read aloud, the sound library, pictures on the pauses, brand kit and Shorts.</td></tr>
+    <tr><td><b>Tools</b></td><td>Captions and subtitles, auto-reframe, resizing for social media, background removal, and the other tools.</td></tr>
     <tr><td><b>Help</b></td><td>This guide, keyboard shortcuts and About.</td></tr>
 </table>
 <figure class="medium"><img src="help-img/menus-create.jpg" width="800" height="880" loading="lazy" alt="The menu bar at the top right, with the Create menu open."><figcaption>The menu bar at the top right, with the Create menu open.</figcaption></figure>
@@ -107,6 +109,11 @@ figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; }
     <li><a href="#t-draw">Draw on your video</a></li>
     <li><a href="#t-template">An event poster from a template</a></li>
     <li><a href="#t-short">Your brand on a Short</a></li>
+    <li><a href="#t-occasion">A Ramadan, Eid, Jumu‘ah or Hajj video</a></li>
+    <li><a href="#t-speak">Read aloud: a voice-over from your text</a></li>
+    <li><a href="#t-quran-scenes">A Qur’ān video with a new background each āyah</a></li>
+    <li><a href="#t-reframe">Keep the speaker in a tall Short (auto-reframe)</a></li>
+    <li><a href="#t-phone">Editing on your phone</a></li>
 </ul>
 
 <div class="tutorial" id="t-first">
@@ -214,11 +221,80 @@ figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; }
 <ol start="2">
     <li>Open <b>Create ▸ Make a Short</b>, choose the part of the video (up to 3 minutes), type a big title, and press <b>Make Short</b>.</li>
 </ol>
-<figure class="small"><img src="help-img/short-dialog.jpg" width="440" height="482" loading="lazy" alt="Make a Short: choose the part and a title."><figcaption>Make a Short: choose the part and a title.</figcaption></figure>
+<figure class="small"><img src="help-img/short-dialog.jpg" width="440" height="512" loading="lazy" alt="Make a Short: choose the part and a title."><figcaption>Make a Short: choose the part and a title.</figcaption></figure>
 <ol start="3">
     <li>The vertical 9:16 Short opens in a new tab with the title on top, a progress bar and a “Follow for more” end card. Your original video is left as it was.</li>
 </ol>
 <figure><img src="help-img/short-result.jpg" width="1440" height="900" loading="lazy" alt="The Short in its own tab, ready to export for YouTube Shorts, Reels, TikTok or WhatsApp Status."><figcaption>The Short in its own tab, ready to export for YouTube Shorts, Reels, TikTok or WhatsApp Status.</figcaption></figure>
+</div>
+
+<div class="tutorial" id="t-occasion">
+<h3>9. A Ramadan, Eid, Jumu‘ah or Hajj video</h3>
+<p class="time">No photos needed: the scenes are painted on your device.</p>
+<ol>
+    <li>Put a recitation or nasheed on the timeline (or skip this — then each scene stays four seconds).</li>
+    <li>Open <b>Create ▸ Occasion video</b> and choose the occasion: Ramadan, Eid al-Fitr, Eid al-Adha, Jumu‘ah, Hajj, Laylat al-Qadr or Nature. You see its five scenes straight away.</li>
+    <li>Change the greeting, the Arabic, the second line and the closing line if you like. If you have a brand kit, your name is added to the closing line.</li>
+</ol>
+<figure class="medium"><img src="help-img/occasion-dialog.jpg" width="680" height="454" loading="lazy" alt="Occasion video: the five painted scenes for Ramadan and the greeting."><figcaption>Occasion video: the five painted scenes for Ramadan and the greeting.</figcaption></figure>
+<ol start="4">
+    <li>Press <b>Make video</b>. The scenes go on a new track, changing on the pauses of the voice, with a slow zoom, crossfades and the greeting on top.</li>
+</ol>
+<figure><img src="help-img/occasion-result.jpg" width="1440" height="900" loading="lazy" alt="The greeting over the first scene; the scenes change on the voice’s pauses."><figcaption>The greeting over the first scene; the scenes change on the voice’s pauses.</figcaption></figure>
+</div>
+
+<div class="tutorial" id="t-speak">
+<h3>10. Read aloud: a voice-over from your text</h3>
+<p class="time">Voices for English, Afaan Oromoo, Amharic, Somali, Swahili, Hausa, French, Indonesian and Turkish.</p>
+<ol>
+    <li>Move the playhead to where the voice should start and open <b>Create ▸ Read aloud</b>.</li>
+    <li>Choose the voice’s language and type or paste the text. Leave <b>Also add each sentence as a caption</b> ticked to get captions too.</li>
+</ol>
+<figure class="small"><img src="help-img/speak-dialog.jpg" width="440" height="492" loading="lazy" alt="Read aloud in Afaan Oromoo."><figcaption>Read aloud in Afaan Oromoo.</figcaption></figure>
+<ol start="3">
+    <li>Press <b>Make voice-over</b>. The first time, the voice for that language downloads (about 30 MB); after that it works offline. The voice-over goes on an audio track and each sentence becomes a caption that appears exactly while it is spoken.</li>
+</ol>
+<figure><img src="help-img/speak-result.jpg" width="1440" height="900" loading="lazy" alt="The voice-over and its captions; each caption lasts as long as its sentence."><figcaption>The voice-over and its captions; each caption lasts as long as its sentence.</figcaption></figure>
+<p class="note">The voices are Meta’s MMS voices, made on your device. Their licence (CC BY-NC 4.0) allows non-commercial use such as teaching and da‘wah. Amharic is read from the Ge‘ez letters automatically. If a language’s voice cannot be downloaded, the editor says so — record your own voice instead. Do not use it for the Qur’ān: choose a reciter in the Qur’ān tool.</p>
+</div>
+
+<div class="tutorial" id="t-quran-scenes">
+<h3>11. A Qur’ān video with a new background each āyah</h3>
+<ol>
+    <li>Open <b>Create ▸ Qur’ān verse video</b> and choose the sūrah, āyāt, reciter and translation as usual.</li>
+    <li>Under <b>Background</b>, choose one of <b>A new background each āyah</b>: painted scenes (Nature, Jumu‘ah, Ramadan, Laylat al-Qadr or Hajj), or <b>My photos</b> if you have imported two or more pictures.</li>
+</ol>
+<figure class="medium"><img src="help-img/quran-scenes-dialog.jpg" width="680" height="418" loading="lazy" alt="Background: painted Jumu‘ah scenes, a new one each āyah."><figcaption>Background: painted Jumu‘ah scenes, a new one each āyah.</figcaption></figure>
+<ol start="3">
+    <li>Press <b>Make video</b>. The title card gets one picture and each āyah the next, changing with a crossfade exactly where the reciter starts the āyah.</li>
+</ol>
+<figure><img src="help-img/quran-scenes-result.jpg" width="1440" height="900" loading="lazy" alt="Each picture on track V3 starts with its āyah."><figcaption>Each picture on track V3 starts with its āyah.</figcaption></figure>
+</div>
+
+<div class="tutorial" id="t-reframe">
+<h3>12. Keep the speaker in a tall Short (auto-reframe)</h3>
+<ol>
+    <li>Make a Short (<b>Create ▸ Make a Short</b>) with <b>Fill the tall frame</b> — <b>Follow the speaker’s face</b> is ticked for you — or, for any tall or square project with a wide video, open <b>Tools ▸ Auto-reframe — follow the face</b>.</li>
+</ol>
+<figure class="small"><img src="help-img/reframe-dialog.jpg" width="440" height="240" loading="lazy" alt="Auto-reframe for the selected clip or every wide video."><figcaption>Auto-reframe for the selected clip or every wide video.</figcaption></figure>
+<ol start="2">
+    <li>Press <b>Follow the face</b>. The editor looks through the video, finds the face, and adds keyframes so the picture glides to keep it in the middle — holding still while the speaker stays near the centre.</li>
+</ol>
+<figure><img src="help-img/reframe-result.jpg" width="1440" height="900" loading="lazy" alt="The speaker walked to the right of the wide video; the tall frame followed. The diamonds on the clip are the keyframes."><figcaption>The speaker walked to the right of the wide video; the tall frame followed. The diamonds on the clip are the keyframes.</figcaption></figure>
+<p class="note">Faces are found on your device: with the browser’s face detector, or Google’s MediaPipe detector (downloaded once, about 1 MB). Without the internet it estimates from skin colour, which can be fooled by wood, sand or beige walls — check the result and drag <b>Position X</b> where needed. Undo takes it all back.</p>
+</div>
+
+<div class="tutorial" id="t-phone">
+<h3>13. Editing on your phone</h3>
+<ol>
+    <li>Everything fits on the screen: <b>+</b> at the top is the Create menu, <b>☰</b> holds File, Edit, View, Tools and Help, the folder shows your media, the sliders show the details of what you selected, and the arrow is Export.</li>
+    <li>The picture takes only the room it needs, and the rest is timeline. Pinch the timeline with two fingers to zoom it, and drag the blue bar to give the picture or the timeline more room.</li>
+</ol>
+<figure class="phone"><img src="help-img/phone-layout.jpg" width="390" height="844" loading="lazy" alt="The editor on a phone, with an Eid video."><figcaption>The editor on a phone, with an Eid video.</figcaption></figure>
+<ol start="3">
+    <li>Menus open as a sheet from the bottom of the screen with big buttons; tap outside to close.</li>
+</ol>
+<figure class="phone"><img src="help-img/phone-menu.jpg" width="390" height="844" loading="lazy" alt="The Create menu as a sheet on a phone."><figcaption>The Create menu as a sheet on a phone.</figcaption></figure>
 </div>
 
 <h2 id="editing">Cutting and arranging</h2>

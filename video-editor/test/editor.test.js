@@ -1476,12 +1476,116 @@ async function probeFile(page, bytes) {
         check('timed captions from your text work in any script (Amharic)', amTrack && onTrack(p, amTrack.id).some((c) => /ሰላም/.test(c.text)));
         await page.keyboard.press('Control+z');
 
+        /* ------------------------------------------------- occasion videos */
+        await page.evaluate((id) => window.Reel.select(id), talkId);
+        await menu(page, 'create', /Occasion video/);
+        const occBox = page.locator('.modal.generic');
+        await occBox.getByRole('combobox', { name: 'Occasion' }).selectOption('hajj');
+        check('each occasion shows its painted scenes and greeting', await occBox.locator('.occasion-preview canvas').count() === 5 &&
+            await occBox.getByRole('textbox', { name: 'Greeting' }).inputValue() === 'Labbayk Allahumma labbayk');
+        check('and follows the selected voice', /talk\.wav/.test(await occBox.getByRole('combobox', { name: 'Timing' }).evaluate((s) => s.options[s.selectedIndex].textContent)));
+        await occBox.getByRole('button', { name: 'Make video' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
+        p = await project(page);
+        const hajjTrack = p.tracks.find((t) => t.name === 'Hajj scenes');
+        const hajj = hajjTrack ? onTrack(p, hajjTrack.id) : [];
+        check('an occasion video puts painted scenes on the voice’s pauses', hajj.length >= 2 && approx(hajj[0].start, talk.start, 0.01) &&
+            approx(hajj[hajj.length - 1].start + hajj[hajj.length - 1].duration, talk.start + talk.duration, 0.02) &&
+            p.media.filter((m) => /^Hajj – /.test(m.name)).length === 5, hajj.map((c) => (c.start - talk.start).toFixed(2)).join(','));
+        check('with the greeting in English and Arabic', p.clips.some((c) => c.type === 'text' && c.text === 'Labbayk Allahumma labbayk') &&
+            p.clips.some((c) => c.type === 'text' && c.text === 'لبيك اللهم لبيك'));
+        const occFrame = await pixel(page, hajj[0].start + 0.5, 0.5, 0.2);
+        check('the painted scene is drawn', occFrame[0] + occFrame[1] + occFrame[2] > 30, occFrame.join(','));
+        await page.keyboard.press('Control+z');
+        check('one undo takes the occasion video off', !(await project(page)).tracks.some((t) => t.name === 'Hajj scenes'));
+
+        /* ------------------------------------------------------- read aloud */
+        await page.evaluate(function () {
+            window.__speakerCalls = [];
+            window.__reelTestSpeaker = async function (parts, models) {
+                window.__speakerCalls.push({ parts: parts, models: models });
+                return { rate: 16000, model: models[0], parts: parts.map((t) => Float32Array.from({ length: 16000 * (0.5 + t.length / 40) }, (x, i) => Math.sin(i / 8) * 0.3)) };
+            };
+        });
+        const sayAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
+        await page.evaluate((t) => window.Reel.seek(t), sayAt);
+        await menu(page, 'create', /Read aloud/);
+        const sayBox = page.locator('.modal.generic');
+        await sayBox.getByRole('combobox', { name: 'Voice' }).selectOption('amh');
+        await sayBox.getByRole('textbox', { name: 'Text' }).fill('ሰላም ነው። እንኳን ደህና መጣችሁ።');
+        await sayBox.getByRole('button', { name: 'Make voice-over' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 15000 });
+        const calls = await page.evaluate(() => window.__speakerCalls);
+        check('read aloud gives the voice each sentence, Amharic romanised', calls.length === 1 && calls[0].parts.length === 2 && calls[0].parts[0] === 'selam new.' &&
+            calls[0].models[0] === 'Xenova/mms-tts-amh', JSON.stringify(calls[0]));
+        p = await project(page);
+        const sayMedia = p.media.find((m) => /^Read aloud \(Amharic\)/.test(m.name));
+        const sayClip = sayMedia && p.clips.find((c) => c.mediaId === sayMedia.id);
+        const sayCaps = p.tracks.find((t) => t.name === 'Voice-over captions');
+        const capsOn = sayCaps ? onTrack(p, sayCaps.id) : [];
+        check('the voice-over lands at the playhead with a caption per sentence, timed to it', sayClip && approx(sayClip.start, sayAt, 0.01) &&
+            capsOn.length === 2 && capsOn[0].text === 'ሰላም ነው።' && approx(capsOn[0].start, sayAt, 0.01) && capsOn[1].start > capsOn[0].start + 0.5,
+            capsOn.map((c) => c.text + '@' + (c.start - sayAt).toFixed(2)).join(' | '));
+        await page.keyboard.press('Control+z');
+
+        /* ---------------------------------------------- Qur'an backgrounds */
+        await menu(page, 'create', /Qur’ān verse video/);
+        const qBox = page.locator('.modal.generic');
+        await qBox.getByRole('combobox', { name: 'Recitation' }).locator('option[value="rec:7"]').waitFor({ state: 'attached' });
+        await qBox.getByRole('combobox', { name: 'Recitation' }).selectOption('rec:7');
+        await qBox.getByRole('spinbutton', { name: 'To ayah' }).fill('3');
+        await qBox.getByRole('spinbutton', { name: 'To ayah' }).dispatchEvent('change');
+        await qBox.getByRole('combobox', { name: 'Background' }).selectOption('scenes:nature');
+        await qBox.getByRole('button', { name: 'Make video' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+        p = await project(page);
+        const bgTrack = p.tracks.filter((t) => t.name === 'Background').pop();
+        const bgs = bgTrack ? onTrack(p, bgTrack.id).filter((c) => /Nature/.test((p.media.find((m) => m.id === c.mediaId) || {}).name || '')) : [];
+        const ayat = p.clips.filter((c) => /001-00[1-3]/.test((p.media.find((m) => m.id === c.mediaId) || {}).name || '')).sort((a, b) => a.start - b.start).slice(-3);
+        check('a Qur’ān video can change its painted background on each āyah', bgs.length === 4 && ayat.length === 3 &&
+            ayat.every((a) => bgs.some((b) => approx(b.start, a.start, 0.01))), bgs.map((c) => c.start.toFixed(2)).join(',') + ' / ' + ayat.map((c) => c.start.toFixed(2)).join(','));
+        await page.keyboard.press('Control+z');
+
+        /* ------------------------------------------------- auto-reframe */
+        const sizeBefore = await page.evaluate(() => [window.Reel.project.width, window.Reel.project.height]);
+        await menu(page, 'view', /1080×1920/);
+        await page.evaluate(function () {
+            let n = 0;
+            // The face starts in the middle, then moves to the right.
+            window.__reelTestFaceDetector = async function () { n += 1; return n <= 2 ? 0.5 : 0.85; };
+        });
+        const vidClip = (await project(page)).clips.find((c) => c.mediaId === vid.id);
+        await page.evaluate((id) => window.Reel.select(id), vidClip.id);
+        await menu(page, 'tools', /Auto-reframe/);
+        await page.locator('.modal.generic').getByRole('button', { name: 'Follow the face' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
+        const framed = (await project(page)).clips.find((c) => c.id === vidClip.id);
+        check('auto-reframe follows the face in a tall frame with keyframes', framed.fit === 'cover' && framed.keys && framed.keys[0].x === 0.5 &&
+            framed.keys[framed.keys.length - 1].x < 0.2, JSON.stringify(framed.keys) + ' ' + (await page.locator('#toast').textContent()));
+        await page.keyboard.press('Control+z');
+        await page.keyboard.press('Control+z');
+        const sizeAfter = await page.evaluate(() => [window.Reel.project.width, window.Reel.project.height]);
+        if (sizeAfter.join('x') !== sizeBefore.join('x')) await menu(page, 'view', new RegExp('^\\W*' + sizeBefore.join('×')));
+        check('and undo puts the clip and frame back', !(await project(page)).clips.find((c) => c.id === vidClip.id).keys &&
+            (await page.evaluate(() => window.Reel.project.width)) === sizeBefore[0]);
+
         /* ---------------------------------------------------------- on a phone */
         await page.setViewportSize({ width: 390, height: 844 });
         await page.waitForTimeout(200);
         const phoneAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
         await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); document.getElementById('workspace').classList.remove('show-inspector'); }, phoneAt);
         check('on a phone the details panel starts hidden', !(await page.locator('#inspector').isVisible()));
+        const bar = await page.evaluate(() => { const t = document.querySelector('.topbar'); const e = document.getElementById('export').getBoundingClientRect(); return [t.scrollWidth, t.clientWidth, e.right]; });
+        check('on a phone the top bar fits, with Export in reach', bar[0] <= bar[1] + 1 && bar[2] <= 390, bar.join(','));
+        await page.click('#create');
+        const sheet = await page.locator('#create-menu').boundingBox();
+        check('on a phone menus open as a sheet from the bottom', Math.abs(sheet.y + sheet.height - 844) < 2 && sheet.width >= 388, JSON.stringify(sheet));
+        await page.mouse.click(195, 40);
+        await page.waitForTimeout(1200);
+        const stageBox = await page.locator('#stage').boundingBox();
+        const tlBox = await page.locator('.timeline-panel').boundingBox();
+        check('on a phone the preview is only as tall as the picture, the rest is timeline', stageBox.height < 390 * 0.85 && tlBox.height > 844 * 0.35,
+            Math.round(stageBox.height) + ' / ' + Math.round(tlBox.height));
         await page.click('#add-text');
         await page.keyboard.type('On a phone');
         const phoneTitle = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'On a phone');

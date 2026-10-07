@@ -59,6 +59,11 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **Pictures on the pauses** | Finds the pauses in a voice from its sound and puts chosen photos on them as scenes (transitions, slow zoom), cuts a clip at them, removes them as jump cuts, or marks them (`pauses.js`; `findPauses`, `pauseCuts`, `removeTime`, `removePauses` in `timeline.js`). |
 | **Captions in Afaan Oromoo, Amharic, Somali** | Amharic and Somali through Whisper's most accurate model; Afaan Oromoo (or any language) by timing a pasted text to the speech by its pauses, one caption per line (`alignWords`, `alignLines`). |
 | **Menu bar** | File, Edit, View, Create, Tools and Help on the right of the top bar; Create groups everything that adds to a video, Tools holds captions and the rest; arrow keys and hover move between menus; on phones + and ☰. |
+| **Occasion videos** | Ramadan, Eid al-Fitr, Eid al-Adha, Jumu'ah, Hajj, Laylat al-Qadr and nature sets of scenes painted on the device (no photos, no faces), with greetings, changing on a voice's pauses (`occasions.js`). |
+| **Auto-reframe** | Follows the speaker's face in a tall or square frame with eased keyframes and a dead zone; faces from the browser's FaceDetector, MediaPipe, or a skin-colour estimate offline; on by default in Make a Short (`reframe.js`, `reframeKeys` in `timeline.js`). |
+| **Read aloud** | Text to a voice-over on the device with Meta's MMS voices (CC BY-NC 4.0) through transformers.js, Amharic romanised from Ge'ez, a caption per sentence timed to the voice (`speak.js`, `speak-worker.js`). |
+| **Qur'an backgrounds each ayah** | The Qur'an tool can change the background on each ayah, from painted scenes or your own photos. |
+| **Phone layout** | A top bar that fits, menus as bottom sheets, the preview sized to the picture, pinch-to-zoom on the timeline (`mobile.js`). |
 | **Help ▸ About** | A pop-up like the audio editor's: name, author, version, privacy note, contact and credits. |
 
 Keyboard shortcuts and a user guide are in [help.html](help.html).
@@ -76,6 +81,7 @@ Keyboard shortcuts and a user guide are in [help.html](help.html).
 | `export-fast.js` | Frame-exact export with mediabunny and WebCodecs |
 | `quran.js` | The Qur'ān verse video tool (Quran.com API) |
 | `captions.js` | Auto captions (Whisper), captions timed from a pasted text, and subtitle import/export |
+| `occasions.js`, `reframe.js`, `speak.js` + `speak-worker.js`, `mobile.js` | Occasion videos, auto-reframe, Read aloud, the phone layout |
 | `pauses.js` | Sync to the voice: pictures on the pauses, cut at pauses, jump cuts |
 | `transcribe-worker.js` | The Whisper worker, shared with the audio editor |
 | `vendor/mediabunny.min.mjs` | [mediabunny](https://mediabunny.dev) 1.61 (MPL-2.0, licence alongside), loaded only when exporting |

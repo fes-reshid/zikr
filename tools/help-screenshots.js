@@ -321,6 +321,164 @@ async function makePhotos(page) {
     await settle();
     await shot('short-result');
 
+    /* 8. An occasion video */
+    await menu('file', 'New tab');
+    await menu('view', /1280×720/);
+    await page.setInputFiles('#import-input', [talk]);
+    await page.waitForFunction(() => window.Reel.project.media.some((m) => m.name === 'Talk.wav'), null, { timeout: 20000 });
+    await page.evaluate(function () {
+        const m = window.Reel.project.media.find((x) => x.name === 'Talk.wav');
+        window.ReelApp.addToTimeline(m.id);
+        window.Reel.select(window.Reel.project.clips[0].id);
+    });
+    await menu('create', /Occasion video/);
+    await dialog().getByRole('combobox', { name: 'Occasion' }).selectOption('ramadan');
+    await settle();
+    await shot('occasion-dialog', dialog());
+    await dialog().getByRole('button', { name: 'Make video' }).click();
+    await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+    await page.evaluate(() => window.Reel.select(null));
+    await seek(1.6);
+    await settle();
+    await shot('occasion-result');
+
+    /* 9. Read aloud */
+    await page.evaluate(function () {
+        // Stands in for the downloaded voice: a voice-like sound as long as each sentence.
+        window.__reelTestSpeaker = async function (parts, models) {
+            return { rate: 16000, model: models[0], parts: parts.map(function (t) {
+                const n = Math.round(16000 * (0.6 + t.length / 16));
+                return Float32Array.from({ length: n }, (x, i) => Math.sin(i / 7 + Math.sin(i / 900) * 3) * 0.35 * (0.5 + 0.5 * Math.abs(Math.sin(i / 2600))));
+            }) };
+        };
+    });
+    await seek(10.2);
+    await menu('create', /Read aloud/);
+    await dialog().getByRole('combobox', { name: 'Voice' }).selectOption('orm');
+    await dialog().getByRole('textbox', { name: 'Text' }).fill('Assalaamu alaykum. Ji’i Ramadaanaa baga nagaan geessan. Rabbiin soomana keessan haa qeebalu.');
+    await settle();
+    await shot('speak-dialog', dialog());
+    await dialog().getByRole('button', { name: 'Make voice-over' }).click();
+    await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
+    const sayAt = await page.evaluate(() => { const p = window.Reel.project; const t = p.tracks.find((x) => x.name === 'Voice-over captions'); return p.clips.filter((c) => c.track === t.id).sort((a, b) => a.start - b.start)[1].start + 0.6; });
+    await page.evaluate(() => window.Reel.select(null));
+    await seek(sayAt);
+    await settle();
+    await shot('speak-result');
+    await page.evaluate(() => { delete window.__reelTestSpeaker; });
+
+    /* 10. A Qur'an video with a new background each ayah */
+    await menu('file', 'New tab');
+    await menu('create', /Qur’ān verse video/);
+    await dialog().getByRole('combobox', { name: 'Recitation' }).locator('option[value="rec:7"]').waitFor({ state: 'attached' });
+    await dialog().getByRole('combobox', { name: 'Recitation' }).selectOption('rec:7');
+    await dialog().getByRole('spinbutton', { name: 'To ayah' }).fill('3');
+    await dialog().getByRole('spinbutton', { name: 'To ayah' }).dispatchEvent('change');
+    await dialog().getByRole('combobox', { name: 'Background' }).selectOption('scenes:jumuah');
+    await settle();
+    await shot('quran-scenes-dialog', dialog());
+    await dialog().getByRole('button', { name: 'Make video' }).click();
+    await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+    await page.evaluate(() => window.Reel.select(null));
+    await seek(await page.evaluate(() => {
+        const p = window.Reel.project;
+        const c = p.clips.filter((x) => x.type === 'text' && x.lyricStyle === 'karaoke').sort((a, b) => a.start - b.start)[1];
+        return c.start + 1;
+    }));
+    await settle();
+    await shot('quran-scenes-result');
+
+    /* 11. Auto-reframe */
+    await menu('file', 'New tab');
+    await menu('view', /1280×720/);
+    const talker = await page.evaluate(async function () {
+        // A wide clip of a speaker who walks from the left to the right of the picture.
+        const c = document.createElement('canvas');
+        c.width = 640;
+        c.height = 360;
+        const g = c.getContext('2d');
+        const rec = new MediaRecorder(c.captureStream(30), { mimeType: 'video/webm' });
+        const chunks = [];
+        rec.ondataavailable = (e) => chunks.push(e.data);
+        const began = performance.now();
+        rec.start();
+        await new Promise(function (resolve) {
+            (function frame() {
+                const u = Math.min(1, (performance.now() - began) / 3000);
+                const sky = g.createLinearGradient(0, 0, 0, 360);
+                sky.addColorStop(0, '#2c3e50');
+                sky.addColorStop(1, '#4b6584');
+                g.fillStyle = sky;
+                g.fillRect(0, 0, 640, 360);
+                g.fillStyle = '#3d6b4a';
+                g.fillRect(0, 270, 640, 90);
+                g.fillStyle = '#8fa3b8';
+                g.fillRect(40, 60, 150, 110);
+                g.fillStyle = '#3b5b7a';
+                g.fillRect(48, 68, 134, 94);
+                const x = 120 + u * 400;
+                g.fillStyle = '#1f2a44';
+                g.beginPath();
+                g.ellipse(x, 300, 70, 110, 0, Math.PI, 0);
+                g.fill();
+                g.fillStyle = '#c68e62';
+                g.beginPath();
+                g.ellipse(x, 150, 38, 48, 0, 0, Math.PI * 2);
+                g.fill();
+                g.fillStyle = '#1a1a1a';
+                g.beginPath();
+                g.ellipse(x, 118, 40, 22, 0, Math.PI, 0);
+                g.fill();
+                if (u < 1) requestAnimationFrame(frame); else resolve();
+            }());
+        });
+        rec.stop();
+        await new Promise((r) => { rec.onstop = r; });
+        const buf = await new Blob(chunks, { type: 'video/webm' }).arrayBuffer();
+        let bin = '';
+        new Uint8Array(buf).forEach((b) => { bin += String.fromCharCode(b); });
+        return btoa(bin);
+    });
+    await page.setInputFiles('#import-input', [{ name: 'Speaker.webm', mimeType: 'video/webm', buffer: Buffer.from(talker, 'base64') }]);
+    await page.waitForFunction(() => window.Reel.project.media.some((m) => m.name === 'Speaker.webm'), null, { timeout: 20000 });
+    await page.evaluate(function () {
+        const m = window.Reel.project.media.find((x) => x.name === 'Speaker.webm');
+        window.ReelApp.addToTimeline(m.id);
+    });
+    await menu('view', /1080×1920/);
+    await page.evaluate(function () {
+        // The real offline face finder (skin colour), so the result does not depend on a download.
+        window.__reelTestFaceDetector = window.ReelReframe.skinCentre;
+        const c = window.Reel.project.clips[0];
+        window.Reel.select(c.id);
+    });
+    await menu('tools', /Auto-reframe/);
+    await settle();
+    await shot('reframe-dialog', dialog());
+    await dialog().getByRole('button', { name: 'Follow the face' }).click();
+    await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+    await seek(2.4);
+    await settle();
+    await shot('reframe-result');
+
+    /* 12. On a phone */
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    await phone.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+    const mobile = await phone.newPage();
+    await mobile.goto(base + '/index.html');
+    if (await mobile.locator('#consentCheck').isVisible()) { await mobile.check('#consentCheck'); await mobile.click('#consentAgree'); }
+    await mobile.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+    await mobile.addStyleTag({ content: '.toast, #toast { display: none !important; }' });
+    await mobile.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
+    await mobile.evaluate(async () => { await window.ReelOccasions.makeOccasion({ occasion: 'eid-fitr', title: 'Eid Mubarak', arabic: 'عيد مبارك', sub: 'Taqabbal Allahu minna wa minkum', end: 'Eid Mubarak' }); window.Reel.select(null); window.Reel.seek(1.6); });
+    await mobile.waitForTimeout(1500);
+    const mshot = async (name) => { await mobile.screenshot({ path: path.join(OUT, name + '.jpg'), type: 'jpeg', quality: 80 }); console.log('saved', name); };
+    await mshot('phone-layout');
+    await mobile.click('#create');
+    await mobile.waitForTimeout(400);
+    await mshot('phone-menu');
+    await phone.close();
+
     await browser.close();
     server.close();
 }()).catch(function (err) { console.error(err); process.exit(1); });

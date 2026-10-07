@@ -2299,9 +2299,9 @@
      */
     const CREATE_GROUPS = [
         ['Add', /^Title|written by hand|Drawing \(D\)|gradient card/],
-        ['Islamic videos', /Qur|Hadith|Nasheed/],
+        ['Islamic videos', /Qur|Hadith|Nasheed|Occasion/],
         ['Ready-made designs', /template|Background images|shapes|Drawing images|stickers/i],
-        ['Sound and recording', /Record|Sound library|Sync|pauses/i],
+        ['Sound and recording', /Record|Read aloud|Sound library|Sync|pauses/i],
         ['Share and brand', /Brand|Short/]
     ];
 
@@ -2354,6 +2354,13 @@
                 items.push({ section: 'Preview size', label: tick(L.space() === o[1]) + o[0], run: function () { L.setSpace(o[1]); } });
             });
         }
+        const res = $('resolution');
+        Array.from(res.options).forEach(function (opt) {
+            items.push({ section: 'Frame size', label: (res.value === opt.value ? '✓ ' : '\u2003 ') + opt.textContent, run: function () {
+                res.value = opt.value;
+                res.dispatchEvent(new Event('change'));
+            } });
+        });
         items.push(
             { section: 'Timeline', label: 'Fit the whole project', run: zoomToFit },
             { section: 'Timeline', label: (state.snap ? '✓ ' : '\u2003 ') + 'Snap to edges and the playhead', run: function () { $('snap').click(); } }
@@ -2420,6 +2427,7 @@
         menu.style.top = Math.round(r.bottom + 6) + 'px';
         menu.style.left = '8px';
         menu.hidden = false;
+        document.body.classList.add('menu-open');
         // Keep it on screen, measured now that it has a size.
         menu.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8))) + 'px';
         menu.style.maxHeight = Math.max(200, window.innerHeight - r.bottom - 16) + 'px';
@@ -2429,6 +2437,7 @@
     }
 
     function closeMenus() {
+        document.body.classList.remove('menu-open');
         MENUS.forEach(function (which) {
             const menu = $(which + '-menu');
             if (!menu) return;

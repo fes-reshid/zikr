@@ -443,6 +443,13 @@
         function fillBackgrounds() {
             background.textContent = '';
             Object.keys(BACKGROUNDS).forEach((k) => background.append(option('grad:' + k, 'Gradient — ' + BACKGROUNDS[k].label)));
+            const photos = app.state.project.media.filter((m) => m.type === 'image' && app.files.has(m.id));
+            const each = [];
+            if (photos.length >= 2) each.push(option('photos', 'My ' + photos.length + ' photos — a new one each āyah'));
+            if (window.ReelOccasions && window.ReelOccasions.importScenes) {
+                ['nature', 'jumuah', 'ramadan', 'qadr', 'hajj'].forEach((k) => each.push(option('scenes:' + k, 'Painted scenes — ' + window.ReelOccasions.OCCASIONS[k].label.replace(' (any day)', ''))));
+            }
+            if (each.length) background.append(el('optgroup', { label: 'A new background each āyah' }, each));
             const visuals = app.state.project.media.filter((m) => (m.type === 'image' || m.type === 'video') && app.files.has(m.id));
             if (visuals.length) background.append(el('optgroup', { label: 'From your media' }, visuals.map((m) => option('media:' + m.id, m.name))));
             background.append(option('none', 'None — keep what is on the timeline'));
@@ -627,6 +634,14 @@
         } else if (o.background.startsWith('media:')) {
             bgMedia = o.background.slice(6);
         }
+        // Several backgrounds, changing on each ayah.
+        let bgEach = null;
+        if (o.background === 'photos') {
+            bgEach = app.state.project.media.filter((m) => m.type === 'image' && app.files.has(m.id)).map((m) => m.id);
+        } else if (o.background.startsWith('scenes:') && window.ReelOccasions) {
+            status('Painting the backgrounds…');
+            bgEach = await window.ReelOccasions.importScenes(o.background.slice(7), app.state.project);
+        }
         p = T.clone(app.state.project);
 
         // How long each ayah lasts.
@@ -712,8 +727,10 @@
         }
 
         let t = versesAt;
+        const ayahStarts = [];
         verses.forEach(function (v, i) {
             const d = durations[i];
+            ayahStarts.push(t);
             if (ayahMedia) {
                 const media = T.getMedia(p, ayahMedia[i]);
                 const clip = T.clipFromMedia(media, auTrack, t);
@@ -747,7 +764,10 @@
             p.clips.push(clip);
         }
 
-        if (bgMedia) {
+        if (bgEach && bgEach.length && window.ReelPauses) {
+            const cuts = (versesAt > start + 0.05 ? [versesAt] : []).concat(ayahStarts.slice(1));
+            p = window.ReelPauses.picturesOnCuts(p, bgEach, start, end, cuts, { trackName: 'Background', transition: 'crossfade', transitionDuration: 0.8, kenBurns: true });
+        } else if (bgMedia) {
             const media = T.getMedia(p, bgMedia);
             let track = T.lowestTrack(p, 'video');
             if (!track || !T.isFree(p, track.id, start, end - start, null)) {

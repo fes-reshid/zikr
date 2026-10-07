@@ -73,6 +73,8 @@
         const [endCard, endRow] = check('A “Follow for more” end card (2.5 s)', true);
         const [brand, brandRow] = check('Use my brand kit (logo, font and colours)', hasKit, !hasKit);
         const [captions, captionsRow] = check('Then make captions from the speech (Whisper, on this device)', false, !window.ReelCaptions);
+        const [follow, followRow] = check('Follow the speaker’s face (auto-reframe)', true, !window.ReelReframe);
+        fit.addEventListener('change', function () { followRow.hidden = fit.value !== 'crop' || !window.ReelReframe; });
         const length = el('p', { className: 'hint' });
         const showLength = function () {
             const s = (parse(toIn.value) || 0) - (parse(fromIn.value) || 0);
@@ -89,7 +91,7 @@
                 el('div', { className: 'field-pair' }, [app.dialogField('From', fromIn), app.dialogField('To', toIn)]),
                 el('div', { className: 'row-buttons' }, [useSelection]), length,
                 app.dialogField('Title', title), app.dialogField('Picture', fit),
-                progressRow, endRow, brandRow, captionsRow
+                followRow, progressRow, endRow, brandRow, captionsRow
             ],
             actions: [{ label: 'Cancel' }, {
                 label: 'Make Short', primary: true, run: function (d) {
@@ -103,6 +105,14 @@
                     if (!app.openProjectInTab(short)) return false;
                     app.zoomToFit();
                     app.toast('Your Short is ready in a new tab. Export it when you are happy.');
+                    if (follow.checked && fit.value === 'crop' && window.ReelReframe) {
+                        const wide = window.ReelReframe.candidates(app.state.project).map((c) => c.id);
+                        if (wide.length) {
+                            window.ReelReframe.reframeAll(wide, (t) => app.toast(t, 2000))
+                                .then((r) => app.toast(r.moved ? 'The Short now follows the speaker’s face.' : 'No faces were found to follow.'))
+                                .catch((err) => app.toast('Auto-reframe stopped: ' + err.message));
+                        }
+                    }
                     if (captions.checked && window.ReelCaptions) setTimeout(function () { window.ReelCaptions.open(); }, 300);
                     return true;
                 }
