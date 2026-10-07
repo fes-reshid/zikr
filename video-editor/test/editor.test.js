@@ -917,8 +917,11 @@ async function probeFile(page, bytes) {
         check('Escape closes it without adding anything', await page.locator('#draw-bar').count() === 0 &&
             !(await project(page)).clips.some((c) => c.type === 'draw'));
 
+        const previewBefore = await page.locator('#preview').boundingBox();
         await page.click('#add-draw');
         const board = await page.locator('#draw-layer').boundingBox();
+        check('the picture is bigger while drawing', board.width > previewBefore.width * 1.15 && await page.locator('.studio-bar').isHidden(),
+            Math.round(previewBefore.width) + ' → ' + Math.round(board.width) + ' px wide');
         const drawBar = await page.locator('#draw-bar').boundingBox();
         check('the drawing toolbar sits above the picture, not over it', drawBar.y + drawBar.height <= board.y + 1,
             Math.round(drawBar.y + drawBar.height) + ' vs ' + Math.round(board.y));
@@ -944,6 +947,8 @@ async function probeFile(page, bytes) {
         await stroke([0.25, 0.5], [0.45, 0.8], 4);
         await shot('draw-board');
         await page.getByRole('button', { name: 'Done', exact: true }).click();
+        check('and back to normal afterwards', Math.abs((await page.locator('#preview').boundingBox()).width - previewBefore.width) < 2 &&
+            await page.locator('.studio-bar').isVisible() && await page.locator('.inspector').isVisible());
         p = await project(page);
         const drawing = p.clips.find((c) => c.type === 'draw');
         check('Done adds the drawing at the playhead on a titles track', drawing && Math.abs(drawing.start - drawAt) < 0.01 &&

@@ -1150,7 +1150,7 @@
     function fitCanvas() {
         const stage = $('stage');
         const box = stage.getBoundingClientRect();
-        const pad = 24;
+        const pad = drawMode ? 12 : 24;
         // While drawing, the picture sits below the drawing toolbar, not under it.
         const bar = drawMode && drawMode.bar ? drawMode.bar.offsetHeight + 12 : 0;
         stage.style.paddingTop = bar ? bar + 'px' : '';
@@ -3090,9 +3090,12 @@
         ]);
         $('stage').append(layer, bar);
         $('stage').classList.add('drawing');
+        // Make room for the drawing: see body.drawing-focus in the page's styles.
+        document.body.classList.add('drawing-focus');
         drawMode.layer = layer;
         drawMode.bar = bar;
         fitCanvas();
+        window.dispatchEvent(new Event('resize'));
         paintDrawLayer();
         requestDraw();
 
@@ -3279,7 +3282,9 @@
         m.layer.remove();
         m.bar.remove();
         $('stage').classList.remove('drawing');
+        document.body.classList.remove('drawing-focus');
         fitCanvas();
+        window.dispatchEvent(new Event('resize'));
         let id = null;
         if (!save) {
             if (state.project !== m.base) { state.project = m.base; afterChange(); }

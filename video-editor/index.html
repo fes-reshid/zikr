@@ -482,6 +482,20 @@ body.preview-wide .workspace {grid-template-columns:minmax(0,1fr);}
 body.preview-wide .workspace>.bin,body.preview-wide .workspace>.inspector {display:none;}
 body.preview-expanded .viewer {position:fixed;inset:8px;z-index:35;border:1px solid var(--accent);border-radius:10px;}
 body.preview-expanded .workspace-size-bar input,body.preview-expanded .workspace-size-bar output {display:none;}
+/* While drawing, the picture gets the room: side panels and the bars above the
+   preview step aside (the timeline stays, so the drawing can be seen there). */
+body.drawing-focus .workspace {grid-template-columns:minmax(0,1fr);}
+body.drawing-focus .workspace>.bin,body.drawing-focus .workspace>.inspector,
+body.drawing-focus .workspace-size-bar,body.drawing-focus .studio-bar,body.drawing-focus .preview-edit-bar,
+body.drawing-focus .preview-selection {display:none !important;}
+body.drawing-focus .workspace .viewer {visibility:visible;}
+body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px;}
+@media (min-width:901px) {
+    body.drawing-focus .draw-bar {top:6px;left:8px;right:8px;transform:none;max-width:calc(100% - 16px);width:fit-content;margin:0 auto;padding:4px 6px;gap:3px;}
+    body.drawing-focus .draw-bar .spacer {flex:0 0 8px;}
+    body.drawing-focus .draw-bar button {padding:4px 8px;}
+    body.drawing-focus .draw-bar .draw-tool {padding:4px;}
+}
 .resizer {position:relative;touch-action:none;}
 .resizer::after {content:'';display:block;width:64px;height:3px;border-radius:5px;background:var(--accent);margin:1px auto;}
 /* Phone layout: keep the preview useful, turn side panels into sheets, and
@@ -537,6 +551,8 @@ body.preview-expanded .workspace-size-bar input,body.preview-expanded .workspace
     .draw-bar .draw-tools,.draw-swatches{flex:none;}
     .draw-bar button,.draw-bar select,.draw-bar input[type=color]{min-width:40px;min-height:40px;}
     .draw-bar .spacer{display:none;}
+    /* While drawing, one swipeable row of tools above the picture. */
+    body.drawing-focus .draw-bar{top:4px;bottom:auto;left:4px;right:4px;padding:4px;}
     .draw-sep{height:34px;flex:none;}
 
     .modal{padding:0;align-items:end;}
