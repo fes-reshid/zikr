@@ -637,7 +637,7 @@
             c.fillRect(0, H - h, total > 0 ? W * T.clamp(t / total, 0, 1) : 0, h);
         }
         if (p.brandLogo && p.brandLogo.src) drawBrandLogo(c, p.brandLogo, W, H);
-        if (p.watermark !== false) drawWatermark(c, W, H);
+        if (p.watermark !== false || !mayRemoveWatermark) drawWatermark(c, W, H);
         c.restore();
     }
 
@@ -702,11 +702,34 @@
         c.restore();
     }
 
-    function watermarkOn() {
-        return state.project.watermark !== false;
+    /*
+     * What the site hosting the editor can set before loading it, as
+     * window.REEL_CONFIG = {
+     *   watermark: 'nooreditor.app',          // the text in the corner
+     *   siteUrl: 'https://nooreditor.app',    // shared with exported videos
+     *   canRemoveWatermark: () => bool | Promise<bool>,  // e.g. a paid plan
+     *   upgrade: (reason) => {},              // shows the host's upgrade offer
+     *   features: { readAloud: false }        // switch tools off
+     * }. Call ReelApp.refreshPlan() when the visitor's plan changes.
+     */
+    const CONFIG = Object.assign({ watermark: 'nooreditor.com', siteUrl: 'https://nooreditor.com', canRemoveWatermark: null, upgrade: null, features: {} }, window.REEL_CONFIG || {});
+    let mayRemoveWatermark = !CONFIG.canRemoveWatermark;
+    function refreshPlan() {
+        if (!CONFIG.canRemoveWatermark) return Promise.resolve(true);
+        return Promise.resolve().then(CONFIG.canRemoveWatermark).catch(() => false).then(function (ok) {
+            mayRemoveWatermark = !!ok;
+            requestDraw();
+            if ($('export-watermark')) $('export-watermark').checked = watermarkOn();
+            return mayRemoveWatermark;
+        });
     }
 
-    const WATERMARK = 'nooreditor.com';
+    /** Whether the mark is drawn: always while the host says it may not be removed. */
+    function watermarkOn() {
+        return state.project.watermark !== false || !mayRemoveWatermark;
+    }
+
+    const WATERMARK = CONFIG.watermark;
 
     /** The nooreditor.com mark in the bottom-right corner; it can be turned off per project. */
     function drawWatermark(c, W, H) {
@@ -726,11 +749,20 @@
         c.restore();
     }
 
-    function setWatermark(on) {
-        if ((state.project.watermark !== false) === on) return;
-        const next = T.clone(state.project);
-        next.watermark = on;
-        apply(next);
+    async function setWatermark(on) {
+        if (!on && CONFIG.canRemoveWatermark && !(await refreshPlan())) {
+            // Not on a plan that removes it: keep it, and show the host's offer.
+            renderInspector();
+            if ($('export-watermark')) $('export-watermark').checked = true;
+            if (CONFIG.upgrade) CONFIG.upgrade('watermark'); else toast('The watermark cannot be removed on this plan.');
+            return;
+        }
+        if ((state.project.watermark !== false) !== on) {
+            const next = T.clone(state.project);
+            next.watermark = on;
+            apply(next);
+        }
+        if ($('export-watermark')) $('export-watermark').checked = watermarkOn();
     }
 
     /** Moves, clips or scales a transition's layer on its way in or out. */
@@ -3215,7 +3247,7 @@
             group('Watermark', [
                 (function () {
                     const box = el('input', { type: 'checkbox' });
-                    box.checked = p.watermark !== false;
+                    box.checked = watermarkOn();
                     box.addEventListener('change', function () { setWatermark(box.checked); });
                     return el('label', { className: 'check' }, [box, 'Show the ' + WATERMARK + ' watermark']);
                 }()),
@@ -4032,6 +4064,8 @@
     let exportChoices = [];
 
     $('export-watermark').addEventListener('change', function () { setWatermark($('export-watermark').checked); });
+    $('export-watermark').nextSibling.textContent = ' Add the ' + WATERMARK + ' watermark';
+    refreshPlan();
 
     async function openExport() {
         if (!state.project.clips.length) { toast('Add something to the timeline first.'); return; }
@@ -4045,7 +4079,7 @@
         $('export-result').hidden = true;
         $('export-start').hidden = false;
         $('export-cancel').textContent = 'Cancel';
-        $('export-watermark').checked = state.project.watermark !== false;
+        $('export-watermark').checked = watermarkOn();
         $('export-dialog').hidden = false;
         const p = state.project;
         $('export-summary').textContent = p.width + '×' + p.height + ' · ' + p.fps + ' fps · ' + fmt(duration()) + ' long';
@@ -4257,7 +4291,7 @@
     function shareRow(blob, name) {
         const file = new File([blob], name, { type: blob.type || 'video/mp4' });
         const canShareFile = !!(navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
-        const text = state.project.name + ' — made with nooreditor.com';
+        const text = state.project.name + ' — made with ' + CONFIG.siteUrl.replace(/^https?:\/\//, '');
         const share = async function () {
             try {
                 await navigator.share({ files: [file], title: state.project.name, text: text });
@@ -4277,7 +4311,7 @@
         }));
         buttons.push(el('button', {
             type: 'button', text: 'Telegram', title: 'Send the video on Telegram',
-            onclick: canShareFile ? share : function () { open('https://t.me/share/url?url=' + encodeURIComponent('https://nooreditor.com') + '&text=' + encodeURIComponent(text), 'Telegram'); }
+            onclick: canShareFile ? share : function () { open('https://t.me/share/url?url=' + encodeURIComponent(CONFIG.siteUrl) + '&text=' + encodeURIComponent(text), 'Telegram'); }
         }));
         return el('div', { className: 'share-row' }, [el('span', { className: 'hint', text: 'Share:' })].concat(buttons));
     }
@@ -4529,6 +4563,8 @@
      * through `apply`/`commit`, so their edits are undoable like any other.
      */
     window.ReelApp = {
+        config: CONFIG,
+        refreshPlan: refreshPlan,
         T: T,
         state: state,
         files: files,

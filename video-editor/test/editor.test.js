@@ -1597,6 +1597,33 @@ async function probeFile(page, bytes) {
         await page.setViewportSize({ width: 1440, height: 900 });
         await page.waitForTimeout(200);
 
+        /* ------------------------------------------- a host's plan and branding */
+        const hosted = await context.newPage();
+        await hosted.addInitScript(function () {
+            window.REEL_CONFIG = {
+                watermark: 'nooreditor.app', siteUrl: 'https://nooreditor.app', features: { readAloud: false },
+                canRemoveWatermark: () => window.__pro === true, upgrade: (why) => { window.__upgrade = why; }
+            };
+        });
+        await hosted.goto(base + '/video-editing/');
+        await hosted.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+        await hosted.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
+        await hosted.click('#export');
+        const label = await hosted.locator('#export-watermark').evaluate((b) => b.parentNode.textContent.trim());
+        await hosted.locator('#export-watermark').click();
+        await hosted.waitForTimeout(200);
+        check('a host can brand the watermark and keep it on free plans, showing its upgrade offer', label === 'Add the nooreditor.app watermark' &&
+            await hosted.locator('#export-watermark').isChecked() && await hosted.evaluate(() => window.__upgrade) === 'watermark', label);
+        await hosted.evaluate(() => { window.__pro = true; return window.ReelApp.refreshPlan(); });
+        await hosted.locator('#export-watermark').setChecked(false);
+        await hosted.waitForTimeout(200);
+        check('and on its paid plan the watermark comes off', !(await hosted.locator('#export-watermark').isChecked()) && await hosted.evaluate(() => window.Reel.project.watermark === false));
+        await hosted.click('#export-cancel');
+        await hosted.click('#create');
+        check('a host can switch Read aloud off', await hosted.locator('#create-menu .menu-item', { hasText: 'Read aloud' }).count() === 0 &&
+            await hosted.locator('#create-menu .menu-item', { hasText: 'Occasion video' }).count() === 1);
+        await hosted.close();
+
         /* ------------------------------------------------------------ offline */
         const sw = await context.newPage();
         await sw.goto(base + '/video-editing/');

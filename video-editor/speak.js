@@ -221,6 +221,8 @@
         });
     }
 
+    // A host can switch it off (window.REEL_CONFIG.features.readAloud = false), e.g. a paid site: the voices are non-commercial.
+    if (app.config && app.config.features && app.config.features.readAloud === false) return;
     app.addTool({ section: 'Create', label: 'Read aloud — text to voice-over…', run: openReadAloud });
     Object.assign(window.ReelSpeak, { openReadAloud, readAloud, speak });
 }());
