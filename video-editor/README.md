@@ -46,7 +46,8 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **Tabs** | Up to five projects open at once, each with its own timeline, media and undo history, all saved in the browser. |
 | **Workspace** | Drag the edges of the video area, the bar above the timeline, or the corner grip to resize; sizes are remembered. |
 | **Watermark** | A small nooreditor.com mark in the corner of the preview and exports; it can be turned off per project or in the Export window. |
-| **Templates** | Twenty-eight templates, including Jumu‘ah, Hajj & Umrah, hifz class, du‘a, charity, nikah, aqiqah, quiz, Ramadan countdown, hadith of the day, Seerah and an end screen. |
+| **Templates** | Forty-six templates, including Jumu‘ah, Hajj & Umrah, Arafah, both Eids, the last ten nights, Hijri new year, morning and evening adhkar, hifz class, du‘a, charity and masjid appeals, nikah, aqiqah, quiz, podcast, announcements, book club, sisters' circle, youth halaqa, hadith of the day, Seerah, competition results and end screens. |
+| **Stickers** | About fifty canvas-drawn animated stickers (Islamic, everyday and social-media icons) with nine motions. |
 | **Help ▸ About** | A pop-up like the audio editor's: name, author, version, privacy note, contact and credits. |
 
 Keyboard shortcuts and a user guide are in [help.html](help.html).

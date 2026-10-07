@@ -1179,12 +1179,25 @@ async function probeFile(page, bytes) {
         /* ------------------------------------------------------------ templates */
         await page.click('#studio-templates');
         const cardCount = await page.locator('.modal.generic .studio-card').count();
-        check('there are many templates to start from', cardCount >= 28, cardCount);
+        check('there are many templates to start from', cardCount >= 46, cardCount);
         await page.locator('.modal.generic .studio-card', { hasText: 'Quiz time' }).click();
         await page.locator('.modal.generic').getByRole('button', { name: 'Use template' }).click();
         await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
         const quiz = (await project(page)).clips.filter((c) => c.type === 'text' && c.anim === 'spin');
         check('a new template adds its scenes with its own animation', quiz.length >= 3, quiz.length);
+        await page.keyboard.press('Control+z');
+
+        /* -------------------------------------------------------------- stickers */
+        await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); }, animAt + 20);
+        await page.click('#studio-stickers');
+        const stickerBox = page.locator('.modal.generic');
+        const kinds = await stickerBox.getByRole('combobox', { name: 'Sticker' }).locator('option').count();
+        await stickerBox.getByRole('combobox', { name: 'Sticker' }).selectOption('minaret');
+        await stickerBox.getByRole('combobox', { name: 'Animation' }).selectOption('spin');
+        await stickerBox.getByRole('button', { name: 'Add sticker' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached' });
+        const added = (await project(page)).clips.find((c) => c.sticker && c.sticker.kind === 'minaret');
+        check('there are many stickers, with new ones and new motions', kinds >= 50 && added && added.sticker.motion === 'spin', kinds + ' stickers');
         await page.keyboard.press('Control+z');
 
         /* ------------------------------------------------------------------ tabs */

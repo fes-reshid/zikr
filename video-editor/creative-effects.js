@@ -28,13 +28,16 @@ const app=window.ReelApp,T=app.T,el=app.el;
 const select=items=>el('select',null,items.map(([value,text])=>el('option',{value,text})));
 const button=(text,onclick,extra)=>el('button',Object.assign({type:'button',text,onclick},extra));
 const slider=(value,min,max,step=1)=>el('input',{type:'range',value,min,max,step});
-const STICKERS={arrow:'Arrow',curved:'Curved arrow',circle:'Highlight ring',star:'Gold star',check:'Check mark',heart:'Heart',crescent:'Crescent',sparkles:'Sparkles',book:'Open book',lantern:'Lantern',mosque:'Masjid',kaaba:'Kaaba',aqsa:'Al-Aqsa · Qibli prayer hall',domeRock:'Dome of the Rock',tree:'Leafy tree',mihrab:'Mihrab arch',dates:'Dates',beads:'Prayer beads',prayerMat:'Prayer mat',bookstand:'Book on a stand',palm:'Palm tree',flower:'Flower',sunrise:'Sunrise',mountains:'Mountains',cloud:'Cloud',rosette:'Geometric rosette',gift:'Gift',leaf:'Leaf branch'};
+const STICKERS={arrow:'Arrow',curved:'Curved arrow',circle:'Highlight ring',star:'Gold star',check:'Check mark',heart:'Heart',crescent:'Crescent',sparkles:'Sparkles',book:'Open book',lantern:'Lantern',mosque:'Masjid',kaaba:'Kaaba',aqsa:'Al-Aqsa · Qibli prayer hall',domeRock:'Dome of the Rock',tree:'Leafy tree',mihrab:'Mihrab arch',dates:'Dates',beads:'Prayer beads',prayerMat:'Prayer mat',bookstand:'Book on a stand',palm:'Palm tree',flower:'Flower',sunrise:'Sunrise',mountains:'Mountains',cloud:'Cloud',rosette:'Geometric rosette',gift:'Gift',leaf:'Leaf branch',
+ minaret:'Minaret',quran:'Closed mushaf',eightStar:'Eight-point star',moonStar:'Crescent and star',camel:'Camel',tent:'Tent',tea:'Glass of tea',drop:'Water drop',sun:'Sun',compass:'Qibla compass',pen:'Pen',
+ calendar:'Calendar',clock:'Clock',mic:'Microphone',speech:'Speech bubble',bulb:'Light bulb',trophy:'Trophy',pin:'Location pin',bell:'Bell',thumbs:'Thumbs up',play:'Play button',balloon:'Balloons'};
 function sticker(c,clip,t,W,H){
  const o=clip.sticker||{},local=Math.max(0,t-clip.start),s=Math.min(W,H)*.17*(clip.scale||1);
  const motion=o.motion||'pop',intro=clamp(local/.55,0,1);
- const zoom=motion==='pop'?1-Math.pow(1-intro,3):motion==='pulse'?1+.07*Math.sin(local*4):1;
- c.save();c.translate((clip.x??.5)*W,(clip.y??.5)*H+(motion==='float'?Math.sin(local*2.5)*s*.08:0));
- c.rotate((o.rotation||0)*Math.PI/180+(motion==='wiggle'?Math.sin(local*5)*.09:0));c.scale(s*zoom,s*zoom);
+ const zoom=motion==='pop'?1-Math.pow(1-intro,3):motion==='pulse'?1+.07*Math.sin(local*4):motion==='bounce'?1+.05*Math.abs(Math.sin(local*4)):1;
+ const hop=motion==='bounce'?-Math.abs(Math.sin(local*4))*s*.12:0,drift=motion==='drift'?Math.sin(local*1.6)*s*.18:0;
+ c.save();c.translate((clip.x??.5)*W+drift,(clip.y??.5)*H+(motion==='float'?Math.sin(local*2.5)*s*.08:0)+hop);
+ c.rotate((o.rotation||0)*Math.PI/180+(motion==='wiggle'?Math.sin(local*5)*.09:0)+(motion==='spin'?local*1.6:0)+(motion==='swing'?Math.sin(local*2.4)*.3:0));c.scale(s*zoom,s*zoom);
  c.fillStyle=o.color||'#e5bc55';c.strokeStyle=c.fillStyle;c.lineWidth=.075;c.lineCap='round';c.lineJoin='round';
  const path=(points,fill=false)=>{c.beginPath();points.forEach((p,i)=>i?c.lineTo(...p):c.moveTo(...p));if(fill){c.closePath();c.fill();}else c.stroke();};
  switch(o.kind){
@@ -56,6 +59,28 @@ function sticker(c,clip,t,W,H){
  case 'rosette':for(let i=0;i<8;i++){c.save();c.rotate(i*Math.PI/4);path([[0,0],[-.12,-.24],[0,-.48],[.12,-.24],[0,0]]);c.restore();}break;
  case 'gift':c.strokeRect(-.34,-.08,.68,.49);c.strokeRect(-.4,-.2,.8,.12);path([[0,-.2],[0,.41]]);c.beginPath();c.moveTo(0,-.2);c.bezierCurveTo(-.55,-.26,-.3,-.64,0,-.2);c.bezierCurveTo(.55,-.26,.3,-.64,0,-.2);c.stroke();break;
  case 'leaf':path([[-.3,.45],[.28,-.4]]);for(let i=0;i<4;i++){const x=-.2+i*.12,y=.29-i*.18;for(const sign of [-1,1]){c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x+sign*.3,y-.03,x+sign*.18,y-.22);c.quadraticCurveTo(x,y-.23,x,y);c.stroke();}}break;
+ case 'minaret':path([[-.1,.48],[-.1,-.2],[.1,-.2],[.1,.48]]);c.strokeRect(-.19,-.06,.38,.08);path([[-.1,-.2],[0,-.4],[.1,-.2]]);c.lineWidth=.04;c.beginPath();c.arc(0,-.46,.045,.3*Math.PI,1.7*Math.PI);c.stroke();path([[-.3,.48],[.3,.48]]);c.strokeRect(-.04,.2,.08,.14);break;
+ case 'quran':path([[-.3,-.42],[.32,-.42],[.32,.42],[-.3,.42],[-.3,-.42]]);path([[-.3,-.42],[-.38,-.36],[-.38,.48],[.26,.48],[.32,.42]]);c.lineWidth=.035;c.strokeRect(-.22,-.34,.46,.68);for(const a of [0,Math.PI/4]){c.save();c.translate(.01,0);c.rotate(a);c.strokeRect(-.1,-.1,.2,.2);c.restore();}break;
+ case 'eightStar':c.lineWidth=.06;for(const a of [0,Math.PI/4]){c.save();c.rotate(a);c.strokeRect(-.32,-.32,.64,.64);c.restore();}c.beginPath();c.arc(0,0,.1,0,Math.PI*2);c.fill();break;
+ case 'moonStar':c.beginPath();c.arc(-.08,0,.4,.38*Math.PI,1.62*Math.PI);c.bezierCurveTo(-.22,-.2,-.22,.2,-.08+Math.cos(.38*Math.PI)*.4,Math.sin(.38*Math.PI)*.4);c.fill();{const pts=[];for(let i=0;i<10;i++){const a=i*Math.PI/5-Math.PI/2,r=i%2?.06:.15;pts.push([.3+Math.cos(a)*r,-.12+Math.sin(a)*r]);}path(pts,true);}break;
+ case 'camel':c.lineWidth=.05;c.beginPath();c.moveTo(-.42,.02);c.bezierCurveTo(-.38,-.36,-.08,-.36,-.02,-.06);c.lineTo(.18,-.06);c.quadraticCurveTo(.28,-.1,.3,-.32);c.lineTo(.44,-.3);c.lineTo(.44,-.23);c.lineTo(.36,-.21);c.quadraticCurveTo(.35,.04,.22,.1);c.lineTo(-.34,.1);c.quadraticCurveTo(-.47,.08,-.42,.02);c.stroke();for(const [x0,x1] of [[-.32,-.35],[-.2,-.17],[.06,.03],[.18,.21]])path([[x0,.1],[x1,.46]]);path([[-.42,.02],[-.5,.16]]);break;
+ case 'tent':path([[-.48,.4],[0,-.36],[.48,.4],[-.48,.4]]);path([[-.13,.4],[0,.06],[.13,.4]]);path([[0,-.36],[0,-.5]]);path([[0,-.5],[.14,-.45],[0,-.41]],true);path([[-.48,.4],[-.56,.48]]);path([[.48,.4],[.56,.48]]);break;
+ case 'tea':path([[-.18,-.16],[.18,-.16],[.13,.3],[-.13,.3],[-.18,-.16]]);c.save();c.globalAlpha*=.55;path([[-.155,.02],[.155,.02],[.13,.28],[-.13,.28]],true);c.restore();c.beginPath();c.ellipse(0,.37,.32,.065,0,0,Math.PI*2);c.stroke();c.lineWidth=.04;for(const x of [-.07,.07]){c.beginPath();c.moveTo(x,-.24);c.bezierCurveTo(x-.08,-.32,x+.08,-.38,x,-.47);c.stroke();}break;
+ case 'drop':c.beginPath();c.moveTo(0,-.46);c.bezierCurveTo(.42,0,.36,.43,0,.43);c.bezierCurveTo(-.36,.43,-.42,0,0,-.46);c.stroke();c.lineWidth=.045;c.beginPath();c.arc(0,.14,.17,.9*Math.PI,1.25*Math.PI);c.stroke();break;
+ case 'sun':c.beginPath();c.arc(0,0,.2,0,Math.PI*2);c.fill();for(let i=0;i<12;i++){const a=i*Math.PI/6;path([[Math.cos(a)*.29,Math.sin(a)*.29],[Math.cos(a)*(i%2?.4:.47),Math.sin(a)*(i%2?.4:.47)]]);}break;
+ case 'compass':c.beginPath();c.arc(0,0,.43,0,Math.PI*2);c.stroke();c.lineWidth=.035;c.beginPath();c.arc(0,0,.34,0,Math.PI*2);c.stroke();path([[0,-.3],[.09,0],[0,.3],[-.09,0]],false);path([[0,-.3],[.09,0],[-.09,0]],true);for(let i=0;i<4;i++){const a=i*Math.PI/2;path([[Math.cos(a)*.38,Math.sin(a)*.38],[Math.cos(a)*.43,Math.sin(a)*.43]]);}break;
+ case 'pen':c.rotate(-.75);c.strokeRect(-.42,-.08,.58,.16);path([[.16,-.08],[.4,0],[.16,.08]]);path([[.16,0],[.4,0]]);path([[-.3,-.08],[-.3,.08]]);break;
+ case 'calendar':c.strokeRect(-.38,-.32,.76,.72);path([[-.38,-.14],[.38,-.14]]);path([[-.2,-.44],[-.2,-.25]]);path([[.2,-.44],[.2,-.25]]);for(let r=0;r<3;r++)for(let k=0;k<4;k++){c.beginPath();c.arc(-.24+k*.16,.0+r*.13,.035,0,Math.PI*2);c.fill();}break;
+ case 'clock':c.beginPath();c.arc(0,0,.42,0,Math.PI*2);c.stroke();path([[0,0],[0,-.26]]);path([[0,0],[.19,.09]]);c.lineWidth=.035;for(let i=0;i<12;i++){const a=i*Math.PI/6;path([[Math.cos(a)*.33,Math.sin(a)*.33],[Math.cos(a)*.38,Math.sin(a)*.38]]);}break;
+ case 'mic':c.beginPath();c.arc(0,-.26,.13,Math.PI,0);c.lineTo(.13,-.03);c.arc(0,-.03,.13,0,Math.PI);c.closePath();c.stroke();c.beginPath();c.arc(0,-.06,.24,0,Math.PI);c.stroke();path([[0,.18],[0,.38]]);path([[-.18,.4],[.18,.4]]);c.lineWidth=.03;path([[-.06,-.27],[.06,-.27]]);path([[-.06,-.17],[.06,-.17]]);break;
+ case 'speech':c.beginPath();c.ellipse(0,-.08,.46,.31,0,0,Math.PI*2);c.stroke();path([[-.22,.17],[-.32,.44],[-.02,.22]]);for(const x of [-.17,0,.17]){c.beginPath();c.arc(x,-.08,.045,0,Math.PI*2);c.fill();}break;
+ case 'bulb':c.beginPath();c.arc(0,-.12,.29,.78*Math.PI,.22*Math.PI);c.lineTo(.12,.21);c.lineTo(-.12,.21);c.closePath();c.stroke();path([[-.12,.3],[.12,.3]]);path([[-.08,.39],[.08,.39]]);c.lineWidth=.04;path([[-.07,.2],[-.05,-.06],[0,-.12],[.05,-.06],[.07,.2]]);break;
+ case 'trophy':path([[-.25,-.4],[.25,-.4],[.21,-.06],[0,.08],[-.21,-.06],[-.25,-.4]]);c.beginPath();c.arc(-.27,-.25,.11,.5*Math.PI,1.5*Math.PI);c.stroke();c.beginPath();c.arc(.27,-.25,.11,1.5*Math.PI,.5*Math.PI);c.stroke();path([[0,.08],[0,.27]]);c.strokeRect(-.2,.27,.4,.13);break;
+ case 'pin':c.beginPath();c.moveTo(0,.48);c.bezierCurveTo(-.44,-.04,-.32,-.46,0,-.46);c.bezierCurveTo(.32,-.46,.44,-.04,0,.48);c.stroke();c.beginPath();c.arc(0,-.15,.11,0,Math.PI*2);c.fill();break;
+ case 'bell':c.beginPath();c.moveTo(-.36,.24);c.bezierCurveTo(-.24,.1,-.3,-.38,0,-.38);c.bezierCurveTo(.3,-.38,.24,.1,.36,.24);c.closePath();c.stroke();c.beginPath();c.arc(0,.33,.07,0,Math.PI*2);c.fill();c.beginPath();c.arc(0,-.43,.05,0,Math.PI*2);c.stroke();break;
+ case 'thumbs':path([[-.42,-.02],[-.22,-.02],[-.22,.42],[-.42,.42],[-.42,-.02]]);c.beginPath();c.moveTo(-.22,0);c.lineTo(-.06,-.1);c.lineTo(.02,-.42);c.quadraticCurveTo(.16,-.45,.14,-.25);c.lineTo(.1,-.08);c.lineTo(.36,-.08);c.quadraticCurveTo(.47,-.04,.4,.06);c.quadraticCurveTo(.47,.15,.38,.2);c.quadraticCurveTo(.43,.3,.32,.34);c.quadraticCurveTo(.34,.42,.24,.42);c.lineTo(-.22,.42);c.stroke();break;
+ case 'play':c.beginPath();if(c.roundRect)c.roundRect(-.46,-.3,.92,.6,.16);else c.rect(-.46,-.3,.92,.6);c.fill();c.fillStyle='#ffffff';path([[-.1,-.15],[.18,0],[-.1,.15]],true);break;
+ case 'balloon':for(const [x,y,r] of [[-.17,-.17,.19],[.15,-.25,.17],[.02,.0,.18]]){c.beginPath();c.ellipse(x,y,r*.85,r,0,0,Math.PI*2);c.stroke();c.lineWidth=.03;c.beginPath();c.moveTo(x,y+r);c.quadraticCurveTo(x+.04,y+r+.15,0,.48);c.stroke();c.lineWidth=.075;}break;
  case 'arrow':path([[-.48,-.1],[.12,-.1],[.12,-.3],[.5,0],[.12,.3],[.12,.1],[-.48,.1]],true);break;
  case 'curved':c.beginPath();c.moveTo(-.45,.35);c.bezierCurveTo(-.5,-.35,.1,-.4,.42,-.08);c.stroke();path([[.12,-.12],[.44,-.06],[.38,-.37]]);break;
  case 'circle':c.beginPath();c.ellipse(0,0,.46,.36,0,0,Math.PI*2);c.stroke();break;
@@ -71,7 +96,7 @@ function sticker(c,clip,t,W,H){
 }
 function openStickers(preset){
  app.pause();const existing=typeof preset==='string'?null:T.getClip(app.state.project,app.state.selected),editing=existing?.sticker;
- const kind=select(Object.entries(STICKERS)),motion=select([['pop','Pop in'],['pulse','Pulse'],['float','Float'],['wiggle','Wiggle'],['none','Still']]);
+ const kind=select(Object.entries(STICKERS)),motion=select([['pop','Pop in'],['pulse','Pulse'],['float','Float'],['wiggle','Wiggle'],['bounce','Bounce'],['spin','Spin'],['swing','Swing'],['drift','Drift side to side'],['none','Still']]);
  kind.value=typeof preset==='string'?preset:editing?.kind||'arrow';motion.value=editing?.motion||'pop';
  const color=el('input',{type:'color',value:editing?.color||'#e5bc55'}),rotation=slider(editing?.rotation||0,-180,180),size=slider((existing?.sticker?existing.scale:1)*100,20,300);
  const x=slider(existing?.sticker?existing.x*100:50,0,100),y=slider(existing?.sticker?existing.y*100:50,0,100);

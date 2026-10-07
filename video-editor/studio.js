@@ -13,7 +13,9 @@
         forest:{label:'Forest',colors:['#0f2a1d','#2f5d3a'],ink:'#f4f1e3',accent:'#c9d98a'},
         sunset:{label:'Sunset',colors:['#5a1f2b','#d9733f'],ink:'#fff4e6',accent:'#ffd27a'},
         ocean:{label:'Ocean',colors:['#06283d','#1a6e8e'],ink:'#eefaff',accent:'#7fe0d4'},
-        charcoal:{label:'Charcoal & gold',colors:['#16161a','#34343c'],ink:'#f6f1e1',accent:'#d6b25e'}
+        charcoal:{label:'Charcoal & gold',colors:['#16161a','#34343c'],ink:'#f6f1e1',accent:'#d6b25e'},
+        royal:{label:'Royal purple',colors:['#1f1235','#4b2a73'],ink:'#fbf4ff',accent:'#f0c674'},
+        teal:{label:'Teal & coral',colors:['#063b3f','#0f7173'],ink:'#f2fffd',accent:'#ff9f80'}
     };
     const PACKS=[
         {id:'gratitude',name:'A grateful heart · English',theme:'emerald',lines:['With every dawn, a chance to grow','A kinder word, a seed to sow','Alhamdulillah, hearts awake','Let goodness guide each step we take']},
@@ -50,7 +52,25 @@
         {id:'countdown',name:'Ramadan countdown',tag:'COUNTDOWN',theme:'charcoal',title:'Ramadan is coming',subtitle:'Add how many days are left',lines:['Plan your goals for the month','Start your good habits today'],motif:'lantern',anim:'flip'},
         {id:'hadith-day',name:'Hadith of the day',tag:'HADITH',theme:'sand',title:'Hadith of the day',subtitle:'Add the hadith text and its source',lines:['Add a short explanation','How can we act on it today?'],motif:'rosette',anim:'slide-right'},
         {id:'seerah',name:'Seerah story',tag:'SEERAH',theme:'forest',title:'Stories from the Seerah',subtitle:'Add the title of today’s story',lines:['Add where and when it happened','What lesson can we take from it?'],motif:'palm',anim:'rise'},
-        {id:'thanks',name:'Thanks for watching',tag:'END SCREEN',theme:'emerald',title:'Jazakum Allahu khayran',subtitle:'Thank you for watching',lines:['Like, share and subscribe','See you in the next video, in sha Allah'],motif:'sparkles',anim:'swing'}
+        {id:'thanks',name:'Thanks for watching',tag:'END SCREEN',theme:'emerald',title:'Jazakum Allahu khayran',subtitle:'Thank you for watching',lines:['Like, share and subscribe','See you in the next video, in sha Allah'],motif:'sparkles',anim:'swing'},
+        {id:'hijri',name:'Islamic New Year',tag:'HIJRI NEW YEAR',theme:'midnight',title:'A new Hijri year',subtitle:'Add the year, e.g. 1448 AH',lines:['A fresh page to grow closer to Allah','Add your goal for this year'],motif:'moonStar',anim:'zoom-out'},
+        {id:'arafah',name:'Day of Arafah',tag:'ARAFAH',theme:'sand',title:'The Day of Arafah',subtitle:'Add the date',lines:['A day for du‘a and remembrance','Add your reminder here'],motif:'sunrise',anim:'rise'},
+        {id:'adha',name:'Eid al-Adha',tag:'EID AL-ADHA',theme:'forest',title:'Eid al-Adha Mubarak',subtitle:'From our family to yours',lines:['Celebrate with gratitude','Remember those in need'],motif:'gift',anim:'pop'},
+        {id:'last-ten',name:'The last ten nights',tag:'RAMADAN',theme:'charcoal',title:'The last ten nights',subtitle:'Seek Laylat al-Qadr',lines:['Add your plan for the nights','Pray, give and make du‘a'],motif:'lantern',anim:'blur'},
+        {id:'morning',name:'Morning adhkar',tag:'ADHKAR',theme:'sky',title:'Start your morning with dhikr',subtitle:'Add the adhkar and their source',lines:['Add the words in Arabic','Add the meaning in your language'],motif:'sun',anim:'fade'},
+        {id:'evening',name:'Evening adhkar',tag:'ADHKAR',theme:'royal',title:'Evening adhkar',subtitle:'Add the adhkar and their source',lines:['Add the words in Arabic','Add the meaning in your language'],motif:'moonStar',anim:'fade'},
+        {id:'masjid-appeal',name:'Masjid building appeal',tag:'FUNDRAISER',theme:'teal',title:'Help build our masjid',subtitle:'Add your target and progress',lines:['Add what the masjid will offer','Donate: add your link or details'],motif:'minaret',anim:'drop'},
+        {id:'new-muslim',name:'Welcome to Islam',tag:'NEW MUSLIM',theme:'emerald',title:'Welcome to the family',subtitle:'Add a warm welcome message',lines:['You are not alone on this journey','Add classes or contacts for support'],motif:'heart',anim:'zoom-in'},
+        {id:'podcast',name:'Podcast episode',tag:'PODCAST',theme:'charcoal',title:'New episode',subtitle:'Add the episode title and guest',lines:['In this episode: add the topic','Listen now: add where to find it'],motif:'mic',anim:'slide-right'},
+        {id:'announcements',name:'Weekly announcements',tag:'ANNOUNCEMENTS',theme:'ocean',title:'This week at our masjid',subtitle:'Add the dates',lines:['Add your first announcement','Add your second announcement'],motif:'bell',anim:'drop'},
+        {id:'book-club',name:'Book club',tag:'BOOK CLUB',theme:'paper',title:'This month’s book',subtitle:'Add the title and author',lines:['Add why it is worth reading','Join us: add the meeting details'],motif:'book',anim:'flip'},
+        {id:'sisters',name:'Sisters’ circle',tag:'SISTERS',theme:'rose',title:'Sisters’ circle',subtitle:'Add the topic, day and time',lines:['A warm space to learn together','Add the venue or online link'],motif:'flower',anim:'rise'},
+        {id:'youth',name:'Youth halaqa',tag:'YOUTH',theme:'sunset',title:'Youth halaqa',subtitle:'Add the age group and time',lines:['Questions welcome!','Add the venue and how to join'],motif:'bulb',anim:'bounce'},
+        {id:'tips',name:'Three quick tips',tag:'TIPS',theme:'sky',title:'3 quick tips',subtitle:'Add your topic',lines:['Tip 1: add your first tip','Tip 2 and 3: add the rest'],motif:'check',anim:'slide'},
+        {id:'tea-talk',name:'Tea and talk',tag:'COMMUNITY',theme:'sand',title:'Tea & talk',subtitle:'Add the topic and speaker',lines:['Bring a friend, everyone welcome','Add the date, time and place'],motif:'tea',anim:'swing'},
+        {id:'travel',name:'Travel diary',tag:'TRAVEL',theme:'ocean',title:'Our journey',subtitle:'Add where you went',lines:['Day 1: add the highlights','Add a lesson from the trip'],motif:'pin',anim:'zoom-out'},
+        {id:'subscribe',name:'Subscribe reminder',tag:'CHANNEL',theme:'charcoal',title:'Enjoying the videos?',subtitle:'Add your channel name',lines:['Subscribe for more','Turn on the bell for new videos'],motif:'play',anim:'bounce'},
+        {id:'winners',name:'Competition results',tag:'RESULTS',theme:'royal',title:'And the winners are…',subtitle:'Add the competition name',lines:['First place: add the name','Thank you to everyone who took part'],motif:'trophy',anim:'pop'}
     ];
     const TRANSITIONS={crossfade:'Crossfade',dip:'Dip to black',slide:'Slide in',push:'Push',wipe:'Wipe',zoom:'Zoom','slide-up':'Slide up','wipe-right':'Wipe from right',iris:'Circle reveal',blur:'Soft dissolve'};
     function select(options,value){return el('select',{value},options.map(([v,name])=>el('option',{value:v,selected:v===value,text:name})));}
