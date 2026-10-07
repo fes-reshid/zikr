@@ -2291,42 +2291,128 @@
         return el('div', { className: 'field wide' }, [el('label', { for: id, text: label }), input, hint ? el('small', { className: 'hint', text: hint }) : null]);
     }
 
-    /** What each drop-down menu holds. Modules add to Tools with ReelApp.addTool. */
-    function menuItems(which) {
-        if (which === 'help') {
-            return [
-                { section: 'Help', label: 'User guide', run: openGuide },
-                { section: 'Help', label: 'Keyboard shortcuts', run: function () { window.open('help.html#keys', '_blank', 'noopener'); } },
-                { section: 'Help', label: 'About', run: showAbout }
-            ];
-        }
-        return tools.concat([
-            { section: 'Timeline', label: 'Add marker at playhead (M)', run: addMarkerHere },
-            { section: 'Timeline', label: 'Copy chapters for YouTube', run: copyChapters },
-            { section: 'Timeline', label: 'Transition on every cut…', run: transitionEveryCut },
-            { section: 'Timeline', label: 'Select all clips (Ctrl+A)', run: selectAll },
-            // Help is its own menu on wide screens; on phones its button is hidden, so it lives here too.
-            { section: 'Help', label: 'User guide', run: openGuide, narrow: true },
-            { section: 'Help', label: 'About', run: showAbout, narrow: true }
+    /*
+     * The menu bar: File, Edit, View, Create, Tools and Help. Modules add to
+     * Create and Tools with ReelApp.addTool({ section, label, run }): section
+     * 'Create' lands in the Create menu (grouped below), 'Project' in File,
+     * anything else in Tools under its section.
+     */
+    const CREATE_GROUPS = [
+        ['Add', /^Title|written by hand|Drawing \(D\)|gradient card/],
+        ['Islamic videos', /Qur|Hadith|Nasheed/],
+        ['Ready-made designs', /template|Background images|shapes|Drawing images|stickers/i],
+        ['Sound and recording', /Record|Sound library|Sync|pauses/i],
+        ['Share and brand', /Brand|Short/]
+    ];
+
+    function isNarrow() {
+        return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+    }
+
+    function fileItems() {
+        return [
+            { section: 'Project', label: 'New project', run: newProject },
+            { section: 'Project', label: 'New tab', run: newTab },
+            { section: 'Project', label: 'Open a project file…', run: function () { $('open-input').click(); } },
+            { section: 'Project', label: 'Save as a file (Ctrl+S)', run: saveProject }
+        ].concat(tools.filter((t) => t.section === 'Project')).concat([
+            { section: 'Media', label: 'Import video, audio or pictures…', run: function () { $('import').click(); } },
+            { section: 'Media', label: 'Save this frame as a picture', run: snapshot },
+            { section: 'Finish', label: 'Export video…', run: function () { $('export').click(); } }
         ]);
     }
 
-    const MENUS = ['tools', 'help'];
+    function editItems() {
+        const none = !state.selection.length;
+        return [
+            { section: 'History', label: 'Undo (Ctrl+Z)', run: undo, disabled: !state.history.canUndo() },
+            { section: 'History', label: 'Redo (Ctrl+Shift+Z)', run: redo, disabled: !state.history.canRedo() },
+            { section: 'Clips', label: 'Cut (Ctrl+X)', run: cutSelected, disabled: none },
+            { section: 'Clips', label: 'Copy (Ctrl+C)', run: copySelected, disabled: none },
+            { section: 'Clips', label: 'Paste at the playhead (Ctrl+V)', run: paste },
+            { section: 'Clips', label: 'Duplicate (Ctrl+D)', run: duplicateSelected, disabled: none },
+            { section: 'Clips', label: 'Split at the playhead (S)', run: splitSelected },
+            { section: 'Clips', label: 'Delete (Del)', run: function () { deleteSelected(false); }, disabled: none && !state.marker },
+            { section: 'Clips', label: 'Delete and close the gap (Shift+Del)', run: function () { deleteSelected(true); }, disabled: none },
+            { section: 'Clips', label: 'Select all (Ctrl+A)', run: selectAll },
+            { section: 'Timeline', label: 'Add a marker at the playhead (M)', run: addMarkerHere },
+            { section: 'Timeline', label: 'Transition on every cut…', run: transitionEveryCut },
+            { section: 'Timeline', label: 'Copy chapters for YouTube', run: copyChapters }
+        ];
+    }
+
+    function viewItems() {
+        const L = window.ReelLayout;
+        const items = [];
+        if (L) {
+            const tick = (on) => (on ? '✓ ' : '\u2003 ');
+            items.push(
+                { section: 'Preview', label: L.expanded() ? 'Restore the workspace (Esc)' : 'Expand the preview', run: L.toggleExpand },
+                { section: 'Preview', label: L.panelsHidden() ? 'Show the side panels' : 'Hide the side panels', run: L.togglePanels }
+            );
+            [['Small', 45], ['Medium', 64], ['Large', 85]].forEach(function (o) {
+                items.push({ section: 'Preview size', label: tick(L.space() === o[1]) + o[0], run: function () { L.setSpace(o[1]); } });
+            });
+        }
+        items.push(
+            { section: 'Timeline', label: 'Fit the whole project', run: zoomToFit },
+            { section: 'Timeline', label: (state.snap ? '✓ ' : '\u2003 ') + 'Snap to edges and the playhead', run: function () { $('snap').click(); } }
+        );
+        return items;
+    }
+
+    function createItems() {
+        const made = tools.filter((t) => t.section === 'Create');
+        const items = [{ section: 'Add', label: 'Title (T)', run: function () { addTitle(); } }];
+        const used = new Set();
+        CREATE_GROUPS.forEach(function (g) {
+            made.forEach(function (t) {
+                if (used.has(t) || !g[1].test(t.label)) return;
+                used.add(t);
+                items.push(Object.assign({}, t, { section: g[0] }));
+            });
+        });
+        made.filter((t) => !used.has(t)).forEach((t) => items.push(Object.assign({}, t, { section: 'More' })));
+        return items;
+    }
+
+    function helpItems() {
+        return [
+            { section: 'Help', label: 'User guide', run: openGuide },
+            { section: 'Help', label: 'Keyboard shortcuts', run: function () { window.open('help.html#keys', '_blank', 'noopener'); } },
+            { section: 'Help', label: 'About', run: showAbout }
+        ];
+    }
+
+    /** What each drop-down menu holds. */
+    function menuItems(which) {
+        if (which === 'file') return fileItems();
+        if (which === 'edit') return editItems();
+        if (which === 'view') return viewItems();
+        if (which === 'create') return createItems();
+        if (which === 'help') return helpItems();
+        const list = tools.filter((t) => t.section !== 'Create' && t.section !== 'Project');
+        if (!isNarrow()) return list;
+        // On a phone File, Edit, View and Help have no buttons of their own, so they live here.
+        const as = (section) => (t) => Object.assign({}, t, { section: section });
+        return fileItems().map(as('File')).concat(editItems().map(as('Edit')), viewItems().map(as('View')), list, helpItems());
+    }
+
+    const MENUS = ['file', 'edit', 'view', 'create', 'tools', 'help'];
 
     function openMenu(which) {
         closeMenus();
         const menu = $(which + '-menu');
         const button = $(which);
-        const narrow = window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
         menu.textContent = '';
         let last = null;
-        menuItems(which).filter((it) => !it.narrow || narrow).forEach(function (it) {
+        menuItems(which).forEach(function (it) {
             if (it.section !== last) {
                 menu.append(el('div', { className: 'menu-section', text: it.section }));
                 last = it.section;
             }
             menu.append(el('button', {
-                role: 'menuitem', className: 'menu-item', text: it.label,
+                role: 'menuitem', className: 'menu-item', text: it.label, disabled: !!it.disabled,
                 onclick: function () { closeMenus(); it.run(); }
             }));
         });
@@ -2336,6 +2422,7 @@
         menu.hidden = false;
         // Keep it on screen, measured now that it has a size.
         menu.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8))) + 'px';
+        menu.style.maxHeight = Math.max(200, window.innerHeight - r.bottom - 16) + 'px';
         button.setAttribute('aria-expanded', 'true');
         const first = menu.querySelector('.menu-item');
         if (first) first.focus();
@@ -2346,7 +2433,7 @@
             const menu = $(which + '-menu');
             if (!menu) return;
             menu.hidden = true;
-            $(which).setAttribute('aria-expanded', 'false');
+            if ($(which)) $(which).setAttribute('aria-expanded', 'false');
         });
     }
 
@@ -4241,6 +4328,12 @@
         e.target.value = '';
     });
     MENUS.forEach(function (which) {
+        if (!$(which)) return;
+        $(which).addEventListener('mouseenter', function () {
+            // Like a desktop menu bar: once one menu is open, pointing at another opens it.
+            const open = openMenuName();
+            if (open && open !== which) openMenu(which);
+        });
         $(which).addEventListener('click', function (e) {
             e.stopPropagation();
             if (openMenuName() === which) closeMenus(); else openMenu(which);
@@ -4362,6 +4455,18 @@
         const openName = openMenuName();
         if (openName) {
             if (e.key === 'Escape') { closeMenus(); $(openName).focus(); }
+            else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const items = Array.from($(openName + '-menu').querySelectorAll('.menu-item:not([disabled])'));
+                const i = items.indexOf(document.activeElement);
+                const next = items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
+                if (next) next.focus();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                const shown = MENUS.filter((m) => $(m) && $(m).offsetParent);
+                const i = shown.indexOf(openName);
+                openMenu(shown[(i + (e.key === 'ArrowRight' ? 1 : shown.length - 1)) % shown.length]);
+            }
             return;
         }
         const target = e.target;

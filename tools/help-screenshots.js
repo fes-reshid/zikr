@@ -156,6 +156,10 @@ async function makePhotos(page) {
     const closeDialog = async () => { await page.keyboard.press('Escape'); await page.waitForSelector('.modal.generic', { state: 'detached' }).catch(() => null); };
     const seek = (t) => page.evaluate((x) => { window.Reel.seek(x); }, t);
     const settle = () => page.waitForTimeout(500);
+    const menu = async (which, name) => {
+        await page.click('#' + which);
+        await page.locator('#' + which + '-menu').getByRole('menuitem', { name: name, exact: typeof name === 'string' }).click();
+    };
 
     await page.goto(base + '/index.html');
     await page.check('#consentCheck');
@@ -174,6 +178,10 @@ async function makePhotos(page) {
     });
     await settle();
     await shot('first-photos');
+    await page.click('#create');
+    await settle();
+    await shot('menus-create', null, { clip: { x: 640, y: 0, width: 800, height: 880 } });
+    await page.keyboard.press('Escape');
     await page.evaluate(function () {
         const p = window.Reel.project;
         window.ReelApp.addToTimeline(p.media.find((m) => m.name === 'Talk.wav').id);
@@ -201,7 +209,7 @@ async function makePhotos(page) {
         window.ReelApp.zoomToFit();
         window.Reel.select(p.clips[0].id);
     });
-    await page.click('#studio-pauses');
+    await menu('create', /Pictures on the pauses/);
     await dialog().locator('.sync-found', { hasText: /Found/ }).waitFor();
     await dialog().getByRole('spinbutton', { name: 'Shortest scene (seconds)' }).fill('2');
     await dialog().getByRole('spinbutton', { name: 'Shortest scene (seconds)' }).dispatchEvent('input');
@@ -214,8 +222,7 @@ async function makePhotos(page) {
     await shot('pauses-result');
 
     /* 3. Captions in Afaan Oromoo, Amharic and Somali */
-    await page.click('#tools');
-    await page.getByRole('menuitem', { name: /Auto captions/ }).click();
+    await menu('tools', /Auto captions/);
     await dialog().getByRole('combobox', { name: 'Language' }).selectOption('oromo');
     await dialog().getByRole('textbox', { name: 'What is said' }).fill('Assalaamu alaykum, akkam jirtu?\nHar’a waa’ee obsaa haa dubbannu.\nRabbiin obsitoota wajjin jira.\nObsi furtuu gammachuu ti.\nGalatoomaa.\nNagaan turaa.');
     await settle();
@@ -226,8 +233,7 @@ async function makePhotos(page) {
     await seek(3.6);
     await settle();
     await shot('captions-result', page.locator('.viewer'));
-    await page.click('#tools');
-    await page.getByRole('menuitem', { name: /Auto captions/ }).click();
+    await menu('tools', /Auto captions/);
     await dialog().getByRole('combobox', { name: 'Language' }).selectOption('amharic');
     await settle();
     await shot('captions-amharic', dialog());
@@ -269,7 +275,7 @@ async function makePhotos(page) {
     await settle();
 
     /* 6. Qur'an verse video with each word highlighted */
-    await page.click('#quran-video');
+    await menu('create', /Qur’ān verse video/);
     await dialog().getByRole('combobox', { name: 'Recitation' }).locator('option[value="rec:7"]').waitFor({ state: 'attached' });
     await dialog().getByRole('combobox', { name: 'Recitation' }).selectOption('rec:7');
     await dialog().getByRole('spinbutton', { name: 'To ayah' }).fill('3');
@@ -291,7 +297,7 @@ async function makePhotos(page) {
     await shot('quran-frame', page.locator('.viewer'));
 
     /* 7. Templates, brand kit and Shorts */
-    await page.click('#studio-templates');
+    await menu('create', 'Templates…');
     await settle();
     await page.waitForTimeout(800);
     await page.evaluate(function () {
@@ -300,12 +306,12 @@ async function makePhotos(page) {
     });
     await shot('templates', dialog());
     await closeDialog();
-    await page.click('#studio-brand');
+    await menu('create', 'Brand kit…');
     await settle();
     await shot('brand-kit', dialog());
     await closeDialog();
     await seek(0);
-    await page.click('#studio-short');
+    await menu('create', /Make a Short/);
     await settle();
     await dialog().getByRole('textbox', { name: 'Title' }).fill('Be patient — Allah is with the patient');
     await shot('short-dialog', dialog());

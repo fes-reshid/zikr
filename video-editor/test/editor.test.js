@@ -227,6 +227,11 @@ function serve() {
 const project = (page) => page.evaluate(() => JSON.parse(JSON.stringify(window.Reel.project)));
 const onTrack = (p, track) => p.clips.filter((c) => c.track === track).sort((a, b) => a.start - b.start);
 const approx = (a, b, tol) => Math.abs(a - b) <= (tol || 0.05);
+/** Opens a menu in the menu bar (file, edit, view, create, tools, help) and picks an item. */
+async function menu(page, which, name) {
+    await page.click('#' + which);
+    await page.locator('#' + which + '-menu').getByRole('menuitem', { name: name, exact: typeof name === 'string' }).click();
+}
 
 async function pixel(page, t, fx, fy) {
     await page.evaluate((time) => window.Reel.seek(time), t);
@@ -615,7 +620,7 @@ async function probeFile(page, bytes) {
         check('ducking lowers the music while the video speaks', duck[0] < 0.5 && duck[1] > duck[0], duck.map((x) => x.toFixed(2)).join(' → '));
 
         /* ----------------------------------------------------------- saves */
-        const [saved] = await Promise.all([page.waitForEvent('download'), page.click('#save-project')]);
+        const [saved] = await Promise.all([page.waitForEvent('download'), menu(page, 'file', /Save as a file/)]);
         const savedJson = JSON.parse(fs.readFileSync(await saved.path(), 'utf8'));
         check('Save downloads a project file with markers', savedJson.format === 'reel-project' && savedJson.markers.length === 1, savedJson.format + ' ' + JSON.stringify(savedJson.markers));
 
@@ -700,7 +705,7 @@ async function probeFile(page, bytes) {
         /* ------------------------------------------------- Qur'an video */
         const before = await project(page);
         const beforeEnd = before.clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0);
-        await page.click('#quran-video');
+        await menu(page, 'create', /Qur’ān verse video/);
         const dlg = page.locator('.modal.generic');
         await dlg.getByRole('combobox', { name: 'Recitation' }).locator('option[value="rec:7"]').waitFor({ state: 'attached' });
         await dlg.getByRole('spinbutton', { name: 'To ayah' }).fill('3');
@@ -888,8 +893,7 @@ async function probeFile(page, bytes) {
 
         // Colour card.
         await page.evaluate((t) => window.Reel.seek(t), fxAt.at + 5);
-        await page.click('#tools');
-        await page.getByRole('menuitem', { name: /Colour or gradient card/ }).click();
+        await menu(page, 'create', /Colour or gradient card/);
         await page.locator('.modal.generic').getByRole('combobox', { name: 'Style' }).selectOption('solid');
         await page.locator('.modal.generic').getByLabel('Colour', { exact: true }).evaluate((i) => { i.value = '#00ff00'; });
         await page.locator('.modal.generic').getByRole('button', { name: 'Add card' }).click();
@@ -905,6 +909,31 @@ async function probeFile(page, bytes) {
         await page.getByRole('button', { name: 'Normalise loudness' }).click();
         const louder = (await project(page)).clips.find((c) => c.id === toneNow.id);
         check('Normalise loudness raises a quiet clip', louder.volume > toneNow.volume, toneNow.volume + ' → ' + louder.volume);
+
+        // The menu bar.
+        check('a clean menu bar on the right: File, Edit, View, Create, Tools, Help', (await page.locator('.menubar button:visible').allTextContents()).map((t) => t.trim()).join('|') === 'File|Edit|View|Create|Tools|Help' &&
+            await page.locator('.studio-bar').isHidden() && await page.locator('.workspace-size-bar').isHidden() && !(await page.locator('#quran-video').isVisible()));
+        await page.click('#file');
+        const fileItems = await page.locator('#file-menu .menu-item').allTextContents();
+        check('File has new, open, save, my projects, import and export', ['New project', 'Open a project file…', 'Save as a file (Ctrl+S)', 'My projects…', 'Export video…']
+            .every((t) => fileItems.includes(t)), fileItems.join('|'));
+        await page.hover('#edit');
+        check('pointing at the next menu opens it, like a desktop menu bar', await page.locator('#edit-menu').isVisible() && await page.locator('#file-menu').isHidden());
+        await page.keyboard.press('ArrowRight');
+        check('arrow keys move between menus', await page.locator('#view-menu').isVisible());
+        await page.keyboard.press('Escape');
+        const beforeUndo = (await project(page)).clips.length;
+        await page.click('#add-text');
+        await page.keyboard.press('Escape');
+        await menu(page, 'edit', /^Undo/);
+        check('Edit ▸ Undo undoes', (await project(page)).clips.length === beforeUndo);
+        await menu(page, 'view', 'Hide the side panels');
+        check('View ▸ Hide the side panels gives the picture the room', await page.locator('.workspace > .bin').isHidden());
+        await menu(page, 'view', 'Show the side panels');
+        check('and View ▸ Show the side panels brings them back', await page.locator('.workspace > .bin').isVisible());
+        const createSections = await page.locator('#create').click().then(() => page.locator('#create-menu .menu-section').allTextContents());
+        await page.keyboard.press('Escape');
+        check('Create groups everything you can make', createSections.join('|') === 'Add|Islamic videos|Ready-made designs|Sound and recording|Share and brand', createSections.join('|'));
 
         // Help ▸ About.
         await page.click('#help');
@@ -961,7 +990,7 @@ async function probeFile(page, bytes) {
         const previewBefore = await page.locator('#preview').boundingBox();
         await page.click('#add-draw');
         const board = await page.locator('#draw-layer').boundingBox();
-        check('the picture is bigger while drawing', board.width > previewBefore.width * 1.15 && await page.locator('.studio-bar').isHidden(),
+        check('the picture is bigger while drawing', board.width > previewBefore.width * 1.15 && await page.locator('.preview-edit-bar').isHidden(),
             Math.round(previewBefore.width) + ' → ' + Math.round(board.width) + ' px wide');
         const drawBar = await page.locator('#draw-bar').boundingBox();
         check('the drawing toolbar sits above the picture, not over it', drawBar.y + drawBar.height <= board.y + 1,
@@ -989,7 +1018,7 @@ async function probeFile(page, bytes) {
         await shot('draw-board');
         await page.getByRole('button', { name: 'Done', exact: true }).click();
         check('and back to normal afterwards', Math.abs((await page.locator('#preview').boundingBox()).width - previewBefore.width) < 2 &&
-            await page.locator('.studio-bar').isVisible() && await page.locator('.inspector').isVisible());
+            await page.locator('.preview-edit-bar').isVisible() && await page.locator('.inspector').isVisible());
         p = await project(page);
         const drawing = p.clips.find((c) => c.type === 'draw');
         check('Done adds the drawing at the playhead on a titles track', drawing && Math.abs(drawing.start - drawAt) < 0.01 &&
@@ -1214,7 +1243,7 @@ async function probeFile(page, bytes) {
             await page.getByRole('combobox', { name: 'Exit', exact: true }).isVisible());
 
         /* ------------------------------------------------------------ templates */
-        await page.click('#studio-templates');
+        await menu(page, 'create', 'Templates…');
         const cardCount = await page.locator('.modal.generic .studio-card').count();
         check('there are many templates to start from', cardCount >= 46, cardCount);
         await page.locator('.modal.generic .studio-card', { hasText: 'Quiz time' }).click();
@@ -1226,7 +1255,7 @@ async function probeFile(page, bytes) {
 
         /* -------------------------------------------------------------- stickers */
         await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); }, animAt + 20);
-        await page.click('#studio-stickers');
+        await menu(page, 'create', /Animated stickers/);
         const stickerBox = page.locator('.modal.generic');
         const kinds = await stickerBox.getByRole('combobox', { name: 'Sticker' }).locator('option').count();
         await stickerBox.getByRole('combobox', { name: 'Sticker' }).selectOption('minaret');
@@ -1283,7 +1312,7 @@ async function probeFile(page, bytes) {
 
         /* ------------------------------------------------------------- brand kit */
         const logoPng = await makePng(page);
-        await page.click('#studio-brand');
+        await menu(page, 'create', 'Brand kit…');
         const kitBox = page.locator('.modal.generic');
         await kitBox.getByPlaceholder('Your channel or organisation').fill('Noor Studio');
         await kitBox.locator('input[type=file]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: logoPng });
@@ -1308,7 +1337,7 @@ async function probeFile(page, bytes) {
 
         /* ------------------------------------------------------------------ Short */
         const tabsBefore = await page.locator('.project-tab').count();
-        await page.click('#studio-short');
+        await menu(page, 'create', /Make a Short/);
         const shortBox = page.locator('.modal.generic');
         await shortBox.getByRole('textbox', { name: 'From' }).fill('00:00.00');
         await shortBox.getByRole('textbox', { name: 'To' }).fill('00:05.00');
@@ -1325,7 +1354,7 @@ async function probeFile(page, bytes) {
         /* -------------------------------------------------------------- sounds */
         const soundAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
         await page.evaluate((t) => window.Reel.seek(t), soundAt);
-        await page.click('#studio-sounds');
+        await menu(page, 'create', /Sound library/);
         const soundBox = page.locator('.modal.generic');
         await soundBox.getByRole('combobox', { name: 'Length of nature sounds' }).selectOption('15');
         await soundBox.getByRole('button', { name: 'Add Rain' }).click();
@@ -1335,13 +1364,13 @@ async function probeFile(page, bytes) {
         const rainClip = rain && p.clips.find((c) => c.mediaId === rain.id);
         check('the sound library adds rain at the playhead on an audio track', rain && approx(rain.duration, 15, 0.1) && rainClip &&
             approx(rainClip.start, soundAt, 0.01) && p.tracks.find((t) => t.id === rainClip.track).kind === 'audio', rain && rain.duration);
-        await page.click('#studio-sounds');
+        await menu(page, 'create', /Sound library/);
         await page.locator('.modal.generic').getByRole('button', { name: 'Add Whoosh' }).click();
         await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
         check('and sound effects next to it on a free track', (await project(page)).media.some((m) => /^Whoosh/.test(m.name)));
 
         /* ------------------------------------------------------------ recording */
-        await page.click('#studio-screen');
+        await menu(page, 'create', /Record screen/);
         const recBox = page.locator('.modal.generic');
         await recBox.getByRole('combobox', { name: 'Record' }).selectOption('camera');
         await recBox.getByRole('button', { name: '● Start recording' }).click();
@@ -1356,7 +1385,7 @@ async function probeFile(page, bytes) {
 
         /* -------------------------------------------------------------- library */
         await page.waitForTimeout(1800);
-        await page.click('#library-open');
+        await menu(page, 'file', 'My projects…');
         const libBox = page.locator('.modal.generic');
         const cards = await libBox.locator('.library-card').count();
         check('My projects lists your projects with a picture of each', cards >= 1 && await libBox.locator('.library-card.current img').count() === 1, cards);
@@ -1379,7 +1408,7 @@ async function probeFile(page, bytes) {
             return c.id;
         });
         const talk = (await project(page)).clips.find((c) => c.id === talkId);
-        await page.click('#studio-pauses');
+        await menu(page, 'create', /Pictures on the pauses/);
         const syncBox = page.locator('.modal.generic');
         await syncBox.locator('.sync-found', { hasText: /Found 3 pauses/ }).waitFor({ timeout: 15000 }).catch(async () => {
             throw new Error('sync: ' + await page.locator('.toast').allTextContents());
@@ -1397,7 +1426,7 @@ async function probeFile(page, bytes) {
             scenes[1].transition && scenes[1].transition.type === 'crossfade' && !!scenes[0].motion, scenes.map((c) => c.start.toFixed(2)).join(','));
         await page.keyboard.press('Control+z');
         check('one undo takes the scenes off', !(await project(page)).tracks.some((t) => t.name === 'Scenes on the pauses'));
-        await page.click('#studio-pauses');
+        await menu(page, 'create', /Pictures on the pauses/);
         await syncBox.locator('.sync-found', { hasText: /Found 3 pauses/ }).waitFor({ timeout: 15000 });
         await syncBox.getByRole('combobox', { name: 'Do this' }).selectOption('cut');
         await syncBox.getByRole('spinbutton', { name: 'Shortest scene (seconds)' }).fill('1');
@@ -1407,7 +1436,7 @@ async function probeFile(page, bytes) {
         check('cut at the pauses splits the clip into pieces', p.clips.filter((c) => c.mediaId === talk.mediaId).length === 4);
         await page.keyboard.press('Control+z');
         await page.evaluate((id) => window.Reel.select(id), talkId);
-        await page.click('#studio-pauses');
+        await menu(page, 'create', /Pictures on the pauses/);
         await syncBox.locator('.sync-found', { hasText: /Found 3 pauses/ }).waitFor({ timeout: 15000 });
         await syncBox.getByRole('combobox', { name: 'Do this' }).selectOption('remove');
         await syncBox.getByRole('button', { name: 'Apply' }).click();

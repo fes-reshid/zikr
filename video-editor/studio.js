@@ -276,6 +276,6 @@
     app.addTool({section:'Create',label:'Nasheed lyrics…',run:()=>openLyrics()});
     app.addTool({section:'Timeline',label:'Transition gallery…',run:openTransitions});
     const hint=document.getElementById('stage-hint');
-    hint.textContent='Your next video starts here. Import clips, or choose a template above.';
+    hint.textContent='Your next video starts here. Import clips, or pick a template from the Create menu.';
     window.ReelStudio={openTemplates,openLyrics,openTransitions,makeTemplate,TEMPLATES,PACKS,paintTransition,background,importBackground};
 }());

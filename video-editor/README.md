@@ -58,6 +58,7 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **Qur'an word highlighting** | Arabic words light up as recited, from Quran.com word timings or estimated by word length; more reciters (EveryAyah) and every translation in 30+ languages. |
 | **Pictures on the pauses** | Finds the pauses in a voice from its sound and puts chosen photos on them as scenes (transitions, slow zoom), cuts a clip at them, removes them as jump cuts, or marks them (`pauses.js`; `findPauses`, `pauseCuts`, `removeTime`, `removePauses` in `timeline.js`). |
 | **Captions in Afaan Oromoo, Amharic, Somali** | Amharic and Somali through Whisper's most accurate model; Afaan Oromoo (or any language) by timing a pasted text to the speech by its pauses, one caption per line (`alignWords`, `alignLines`). |
+| **Menu bar** | File, Edit, View, Create, Tools and Help on the right of the top bar; Create groups everything that adds to a video, Tools holds captions and the rest; arrow keys and hover move between menus; on phones + and ☰. |
 | **Help ▸ About** | A pop-up like the audio editor's: name, author, version, privacy note, contact and credits. |
 
 Keyboard shortcuts and a user guide are in [help.html](help.html).

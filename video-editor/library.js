@@ -142,8 +142,6 @@
         });
     }
 
-    const top = document.getElementById('new-project');
-    if (top) top.after(el('button', { type: 'button', id: 'library-open', className: 'ghost hide-narrow', text: 'Projects', title: 'All your saved projects', onclick: openLibrary }));
     app.addTool({ section: 'Project', label: 'My projects…', run: openLibrary });
 
     window.ReelLibrary = { list, remember, rememberNow, mediaIds, open, duplicate, remove, openLibrary };

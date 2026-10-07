@@ -224,7 +224,7 @@
 
     const bar = document.querySelector('.studio-bar');
     if (bar) bar.append(el('button', { type: 'button', id: 'studio-pauses', text: 'Pictures on pauses', onclick: openSync }));
-    app.addTool({ section: 'Create', label: 'Sync to the voice (pictures on pauses, jump cuts)…', run: openSync });
+    app.addTool({ section: 'Create', label: 'Pictures on the pauses & jump cuts…', run: openSync });
 
     window.ReelPauses = { openSync, soundPeaks, pausesOf, picturesOnCuts, voiceClips };
 }());

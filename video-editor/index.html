@@ -421,7 +421,18 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .menu-section { padding: 8px 10px 4px; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
 .menu-item { display: flex; width: 100%; background: transparent; border-color: transparent; padding: 7px 10px; text-align: left; white-space: normal; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--panel-3); border-color: var(--line-2); }
-#quran-video { font-family: "Amiri", serif; font-size: 14px; }
+/* The menu bar, on the right of the top bar. */
+.menubar { display: flex; align-items: center; gap: 2px; }
+.menubar button { background: transparent; border-color: transparent; padding: 6px 11px; font-weight: 500; color: var(--muted); }
+.menubar button:hover, .menubar button[aria-expanded="true"] { background: var(--panel-3); border-color: var(--line-2); color: var(--text); }
+.menubar #create { color: var(--text); }
+.topbar .moved { display: none !important; }
+.menu-item[disabled] { opacity: .4; }
+@media (max-width: 900px) { .menubar button { background: var(--panel-2); border-color: var(--line-2); color: var(--text); min-width: 38px; min-height: 38px; justify-content: center; padding: 6px 8px; } }
+/* The Create buttons now live in the Create menu; modules still register them here. */
+.studio-bar, .workspace-size-bar { display: none !important; }
+.preview-restore { display: none; position: absolute; top: 10px; right: 10px; z-index: 5; }
+body.preview-expanded .preview-restore { display: inline-flex; }
 
 /* ------------------------------------------------------ generic dialogs */
 .dialog.wide { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
@@ -522,8 +533,10 @@ dialog#consentGate h1:focus-visible { outline: none; }
 
 
 #preview {touch-action:none;cursor:move;}
-.preview-edit-bar {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 12px;font-size:11px;color:#c1d3ca;}
-.preview-edit-bar select {max-width:220px;min-width:100px;}
+.preview-edit-bar {display:flex;align-items:center;gap:6px;font-size:11px;margin-right:auto;}
+.preview-edit-bar select {max-width:200px;min-width:110px;font-size:12px;}
+.preview-edit-bar button {font-size:12px;}
+#snapshot {margin-left:auto;}
 .preview-selection {position:absolute;border:2px solid #e8c777;pointer-events:none;box-sizing:border-box;z-index:4;}
 .preview-resize {position:absolute;right:-8px;bottom:-8px;width:17px;height:17px;padding:0;border:2px solid #fff;background:#b18737;pointer-events:auto;touch-action:none;cursor:nwse-resize;}
 .preview-text-editor {position:absolute;z-index:8;background:#182421;padding:10px;border:1px solid #e8c777;border-radius:8px;box-shadow:0 8px 25px #0008;}
@@ -544,6 +557,7 @@ body.drawing-focus .workspace>.bin,body.drawing-focus .workspace>.inspector,
 body.drawing-focus .workspace-size-bar,body.drawing-focus .studio-bar,body.drawing-focus .preview-edit-bar,
 body.drawing-focus .preview-selection {display:none !important;}
 body.drawing-focus .workspace .viewer {visibility:visible;}
+@media (min-width:901px) { body.drawing-focus { --timeline-h: 200px !important; } }
 body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px;}
 @media (min-width:901px) {
     body.drawing-focus .draw-bar {top:6px;left:8px;right:8px;transform:none;max-width:calc(100% - 16px);width:fit-content;margin:0 auto;padding:4px 6px;gap:3px;}
@@ -696,18 +710,22 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
     <span class="sep hide-narrow"></span>
     <button id="undo" class="icon ghost" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
     <button id="redo" class="icon ghost" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></svg></button>
-    <span class="sep hide-narrow"></span>
-    <button id="quran-video" class="ghost" title="Make a Qur’an verse video: recitation, Arabic and translation, timed ayah by ayah">﴿ ﴾ <span class="hide-narrow" style="font-family: system-ui, sans-serif; font-size: 13px">Qur’ān video</span></button>
-    <div class="menu-wrap">
-        <button id="tools" class="ghost" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="Tools"><svg class="show-narrow" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="hide-narrow">Tools</span> <svg class="hide-narrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
-    </div>
     <span class="spacer"></span>
-    <button id="help" class="ghost hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="help-menu">Help <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    <nav class="menubar" aria-label="Menu">
+        <button id="file" class="hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu">File</button>
+        <button id="edit" class="hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="edit-menu">Edit</button>
+        <button id="view" class="hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu">View</button>
+        <button id="create" aria-haspopup="menu" aria-expanded="false" aria-controls="create-menu" aria-label="Create" title="Templates, Qur’ān and hadith videos, stickers, recording, Shorts…"><svg class="show-narrow" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="hide-narrow">Create</span></button>
+        <button id="tools" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="Tools"><svg class="show-narrow" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="hide-narrow">Tools</span></button>
+        <button id="help" class="hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="help-menu">Help</button>
+    </nav>
+    <!-- Reached from the menus; kept for their keyboard shortcuts and handlers. -->
+    <button id="quran-video" class="moved" tabindex="-1" aria-hidden="true">Qur’ān video</button>
     <button id="toggle-bin" class="show-narrow icon" title="Media" aria-label="Show media"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
     <button id="toggle-inspector" class="show-narrow icon" title="Details" aria-label="Show details"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
-    <button id="new-project" class="ghost hide-narrow" title="Start a new project">New</button>
-    <button id="open-project" class="ghost hide-narrow" title="Open a saved project (.json)">Open</button>
-    <button id="save-project" class="ghost hide-narrow" title="Save the project as a file">Save</button>
+    <button id="new-project" class="moved" tabindex="-1" aria-hidden="true">New</button>
+    <button id="open-project" class="moved" tabindex="-1" aria-hidden="true">Open</button>
+    <button id="save-project" class="moved" tabindex="-1" aria-hidden="true">Save</button>
     <input id="open-input" type="file" accept=".json,application/json" hidden>
     <button id="export" class="primary"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span class="hide-narrow">Export</span></button>
 </header>
@@ -806,6 +824,10 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
     </div>
 </div>
 
+<div id="file-menu" class="menu" role="menu" aria-label="File" hidden></div>
+<div id="edit-menu" class="menu" role="menu" aria-label="Edit" hidden></div>
+<div id="view-menu" class="menu" role="menu" aria-label="View" hidden></div>
+<div id="create-menu" class="menu" role="menu" aria-label="Create" hidden></div>
 <div id="tools-menu" class="menu" role="menu" aria-label="Tools" hidden></div>
 <div id="help-menu" class="menu" role="menu" aria-label="Help" hidden></div>
 <div id="drop-overlay" class="drop-overlay" hidden>Drop to import</div>

@@ -320,10 +320,10 @@
         });
     }
 
-    app.addTool({ section: 'Create', label: 'Auto captions (speech to text)…', run: openAutoCaptions });
-    app.addTool({ section: 'Create', label: 'Timed captions from your text (Afaan Oromoo, any language)…', run: openTextCaptions });
-    app.addTool({ section: 'Subtitles', label: 'Import subtitles (.srt, .vtt)…', run: importSubtitles });
-    app.addTool({ section: 'Subtitles', label: 'Save a titles track as subtitles…', run: exportSubtitles });
+    app.addTool({ section: 'Captions', label: 'Auto captions (speech to text)…', run: openAutoCaptions });
+    app.addTool({ section: 'Captions', label: 'Timed captions from your text (Afaan Oromoo, any language)…', run: openTextCaptions });
+    app.addTool({ section: 'Captions', label: 'Import subtitles (.srt, .vtt)…', run: importSubtitles });
+    app.addTool({ section: 'Captions', label: 'Save a titles track as subtitles…', run: exportSubtitles });
 
     function cancelTranscription() {
         if (worker) worker.terminate();

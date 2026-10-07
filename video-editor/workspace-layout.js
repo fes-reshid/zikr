@@ -11,6 +11,10 @@ const focus=on=>{document.body.classList.toggle('preview-expanded',on);expand.te
 expand.onclick=()=>focus(!document.body.classList.contains('preview-expanded'));
 panels.onclick=()=>{const on=document.body.classList.toggle('preview-wide');panels.textContent=on?'Show side panels':'Hide side panels';panels.setAttribute('aria-pressed',String(on));window.dispatchEvent(new Event('resize'));};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('preview-expanded'))focus(false);});
+// The controls live in the View menu; this bar stays as their home (hidden by the stylesheet).
 viewer.prepend(el('div',{className:'workspace-size-bar'},[el('label',{text:'Preview space',style:{whiteSpace:'nowrap'}},[size]),value,expand,panels]));
+document.getElementById('stage').append(el('button',{type:'button',className:'preview-restore',text:'Restore workspace',onclick:()=>focus(false)}));
+window.ReelLayout={space:()=>Number(size.value),setSpace:n=>{size.value=n;apply();},expanded:()=>document.body.classList.contains('preview-expanded'),
+ toggleExpand:()=>expand.click(),panelsHidden:()=>document.body.classList.contains('preview-wide'),togglePanels:()=>panels.click()};
 const divider=document.getElementById('resizer');divider.tabIndex=0;divider.setAttribute('aria-label','Resize preview and timeline. Drag or use arrow keys.');divider.style.touchAction='none';divider.addEventListener('keydown',e=>{if(!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();size.value=Math.max(30,Math.min(85,Number(size.value)+(e.key==='ArrowDown'?5:-5)));apply();});
 }());

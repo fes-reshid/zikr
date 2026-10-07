@@ -5,7 +5,8 @@ const app=window.ReelApp,T=app.T,el=app.el,canvas=document.getElementById('previ
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const box=el('div',{className:'preview-selection',hidden:true}),handle=el('button',{type:'button',className:'preview-resize','aria-label':'Drag to resize selected object',title:'Drag to resize'});box.append(handle);stage.append(box);
 const pick=el('select',{'aria-label':'Select preview layer'}),edit=el('button',{type:'button',text:'Edit text',disabled:true,onclick:openText});
-const bar=el('div',{className:'preview-edit-bar'},[el('span',{text:'Drag to move · double-click text to edit'}),pick,edit]);stage.before(bar);
+pick.title='Pick a layer to edit. On the picture: drag to move, double-click text to edit.';
+const bar=el('div',{className:'preview-edit-bar'},[pick,edit]);document.querySelector('.transport').prepend(bar);
 let drag=null,editor=null,lastKey='',tap=null,lastProject=null;
 function layers(){return T.renderLayers(app.state.project,app.state.time).filter(l=>l.kind!=='audio'&&!l.clip.audioOnly&&l.alpha>0).reverse();}
 function usable(){return !app.state.playing&&!app.state.exporting&&!stage.classList.contains('drawing');}
