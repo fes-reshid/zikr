@@ -48,6 +48,14 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **Watermark** | A small nooreditor.com mark in the corner of the preview and exports; it can be turned off per project or in the Export window. |
 | **Templates** | Forty-six templates, including Jumu‘ah, Hajj & Umrah, Arafah, both Eids, the last ten nights, Hijri new year, morning and evening adhkar, hifz class, du‘a, charity and masjid appeals, nikah, aqiqah, quiz, podcast, announcements, book club, sisters' circle, youth halaqa, hadith of the day, Seerah, competition results and end screens. |
 | **Stickers** | About fifty canvas-drawn animated stickers (Islamic, everyday and social-media icons) with nine motions. |
+| **Keyframes** | Animate position, scale, turn and opacity of any clip between keyframes, eased; quick animations; diamonds on the timeline. |
+| **Brand kit** | Name, logo, colours, font, intro and outro words kept in the browser; applied to a video (logo overlay, title styles, intro/outro) in one undo step, or used by templates and Shorts (`brand.js`). |
+| **Shorts** | Turns part of a long video into a 9:16 Short in a new tab, with a title, progress bar, end card, brand kit and optional captions (`short.js`). |
+| **Sound library** | Nature sounds and sound effects synthesised on the device, with no music or instruments (`sounds.js`, tested under Node). |
+| **Screen & camera recording** | Screen with a camera bubble, screen only or camera only, with the microphone, recorded in the browser (`record.js`). |
+| **My projects** | Every project kept with a thumbnail; open in a tab, duplicate or delete; their stored media is kept (`library.js`). |
+| **Sharing** | After export: the Web Share API sends the file to WhatsApp, Telegram and other apps, with link fallbacks. |
+| **Qur'an word highlighting** | Arabic words light up as recited, from Quran.com word timings or estimated by word length; more reciters (EveryAyah) and every translation in 30+ languages. |
 | **Help ▸ About** | A pop-up like the audio editor's: name, author, version, privacy note, contact and credits. |
 
 Keyboard shortcuts and a user guide are in [help.html](help.html).

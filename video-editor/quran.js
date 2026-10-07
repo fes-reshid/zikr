@@ -70,7 +70,27 @@
         { code: 'swahili', label: 'Swahili' },
         { code: 'french', label: 'French', patterns: [/hamidullah/i] },
         { code: 'urdu', label: 'Urdu' },
-        { code: 'indonesian', label: 'Indonesian' }
+        { code: 'indonesian', label: 'Indonesian' },
+        { code: 'turkish', label: 'Turkish' }, { code: 'bengali', label: 'Bengali' }, { code: 'malay', label: 'Malay' },
+        { code: 'hausa', label: 'Hausa' }, { code: 'yoruba', label: 'Yoruba' }, { code: 'persian', label: 'Persian' },
+        { code: 'spanish', label: 'Spanish' }, { code: 'german', label: 'German' }, { code: 'italian', label: 'Italian' },
+        { code: 'portuguese', label: 'Portuguese' }, { code: 'dutch', label: 'Dutch' }, { code: 'russian', label: 'Russian' },
+        { code: 'bosnian', label: 'Bosnian' }, { code: 'albanian', label: 'Albanian' }, { code: 'chinese', label: 'Chinese' },
+        { code: 'japanese', label: 'Japanese' }, { code: 'korean', label: 'Korean' }, { code: 'hindi', label: 'Hindi' },
+        { code: 'tamil', label: 'Tamil' }, { code: 'pashto', label: 'Pashto' }, { code: 'kurdish', label: 'Kurdish' },
+        { code: 'uzbek', label: 'Uzbek' }, { code: 'thai', label: 'Thai' }
+    ];
+
+    /** More reciters, straight from EveryAyah (one MP3 per ayah). */
+    const EVERYAYAH_RECITERS = [
+        ['MaherAlMuaiqly128kbps', 'Maher Al-Muaiqly'], ['Ghamadi_40kbps', 'Saad Al-Ghamdi'],
+        ['Muhammad_Ayyoub_128kbps', 'Muhammad Ayyoub'], ['Yasser_Ad-Dussary_128kbps', 'Yasser Ad-Dossari'],
+        ['Nasser_Alqatami_128kbps', 'Nasser Al-Qatami'], ['Abdullah_Basfar_192kbps', 'Abdullah Basfar'],
+        ['Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net', 'Ahmed al-Ajmi'], ['Muhammad_Jibreel_128kbps', 'Muhammad Jibreel'],
+        ['Fares_Abbad_64kbps', 'Fares Abbad'], ['Salah_Al_Budair_128kbps', 'Salah Al-Budair'],
+        ['Abdullah_Matroud_128kbps', 'Abdullah Matroud'], ['Mohammad_al_Tablaway_128kbps', 'Mohammad al-Tablawi'],
+        ['Husary_Muallim_128kbps', 'Al-Husary (teaching, with repetition gaps)'], ['Minshawy_Mujawwad_192kbps', 'Al-Minshawi (mujawwad)'],
+        ['Khaalid_Abdullaah_al-Qahtaanee_192kbps', 'Khalid Al-Qahtani']
     ];
 
     const BACKGROUNDS = {
@@ -134,8 +154,12 @@
             const out = [];
             LANGUAGES.forEach(function (l) {
                 const list = byLang[l.code] || [];
+                // The recommended translation first, then every other one in that language.
                 const hit = (l.patterns && list.find((t) => l.patterns.some((re) => re.test(t.name) || re.test(t.author_name || '')))) || list[0];
-                if (hit) out.push({ id: hit.id, label: l.label + ' — ' + (hit.author_name || hit.name) });
+                if (!hit) return;
+                [hit].concat(list.filter((t) => t !== hit)).forEach(function (t) {
+                    out.push({ id: t.id, language: l.label, label: l.label + ' — ' + (t.author_name || t.name) });
+                });
             });
             return out;
         }).catch(function (err) { delete cache.translations; throw err; }));
@@ -172,6 +196,68 @@
     }
 
     function pad3(n) { return String(n).padStart(3, '0'); }
+
+    /** How long a word takes to recite, roughly: its letters (not its vowel marks) and a breath between words. */
+    function wordWeight(word) {
+        if (/^﴿.*﴾$/.test(word)) return 0;
+        const letters = word.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '').length;
+        return letters + 1.5;
+    }
+
+    /**
+     * When each word of `text` starts, in seconds from the start of a clip
+     * `duration` long: from Quran.com's word timings (`segments`, ms from the
+     * start of the ayah, offset by `offset` seconds for later pages of a long
+     * ayah) when there are as many as there are words, otherwise estimated
+     * from the length of each word. The ayah number, if any, comes last.
+     */
+    function wordTimes(text, duration, segments, offset) {
+        const words = String(text).trim().split(/\s+/).filter(Boolean);
+        if (segments && segments.length) {
+            const real = words.filter((w) => wordWeight(w) > 0).length;
+            if (segments.length >= real) {
+                let k = 0;
+                let last = 0;
+                return words.map(function (w) {
+                    // The ayah number lights up last, after the final word.
+                    if (!wordWeight(w)) return Math.max(last, Math.min(duration - 0.05, duration * 0.9));
+                    const at = segments[k] / 1000 - (offset || 0);
+                    k += 1;
+                    last = Math.max(last, Math.max(0, Math.min(duration - 0.05, at)));
+                    return last;
+                });
+            }
+        }
+        const weights = words.map(wordWeight);
+        const total = weights.reduce((a, b) => a + b, 0) || 1;
+        let acc = 0;
+        let last = 0;
+        return words.map(function (w, i) {
+            const at = weights[i] ? acc / total * duration * 0.96 : Math.max(last, Math.min(duration - 0.05, duration * 0.9));
+            acc += weights[i];
+            last = Math.round(at * 1000) / 1000;
+            return last;
+        });
+    }
+
+    /**
+     * Quran.com's word timings for each ayah of a chapter, as start times in
+     * ms: { '1:2': [0, 640, …] }. Not every reciter has them; then {}.
+     */
+    async function loadSegments(recitationId, chapter) {
+        try {
+            const files = await allPages((page) => API + '/recitations/' + recitationId + '/by_chapter/' + chapter + '?fields=segments&per_page=' + PAGE + '&page=' + page, 'audio_files');
+            const out = {};
+            files.forEach(function (f) {
+                if (!f || !f.verse_key || !Array.isArray(f.segments)) return;
+                // Each segment is [word position, …, start ms, end ms].
+                const starts = f.segments.filter((sg) => Array.isArray(sg) && sg.length >= 3)
+                    .map((sg) => [sg[0], sg[sg.length - 2]]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+                if (starts.length) out[f.verse_key] = starts;
+            });
+            return out;
+        } catch (err) { return {}; }
+    }
 
     /** Downloads one ayah's recitation, trying Quran.com, then EveryAyah for the well-known reciters. */
     async function fetchAyah(url, backup) {
@@ -293,6 +379,16 @@
      * Lays pieces of text across [start, start + duration), each as long as
      * its share of the characters.
      */
+    /** How many recited words come before clip `c` among the pages of one ayah. */
+    function arabicWordsBefore(pages, c) {
+        let n = 0;
+        for (const pg of pages) {
+            if (pg === c) break;
+            n += String(pg.text).trim().split(/\s+/).filter((w) => wordWeight(w) > 0).length;
+        }
+        return n;
+    }
+
     function addPieces(p, track, start, duration, pieces, style) {
         const total = pieces.reduce((n, s) => n + s.length, 0) || 1;
         let t = start;
@@ -320,6 +416,8 @@
         const background = el('select');
         const font = el('select', null, Object.keys(app.FONTS).filter((k) => app.FONTS[k].arabic).map((k) => option(k, app.FONTS[k].label)));
         const anim = el('select', null, [option('fade', 'Fade in'), option('words', 'Word by word'), option('rise', 'Rise up'), option('none', 'None')]);
+        const highlight = el('input', { type: 'checkbox' });
+        highlight.checked = true;
         const numbers = el('input', { type: 'checkbox', checked: true });
         const title = el('input', { type: 'checkbox', checked: true });
         const bism = el('input', { type: 'checkbox', checked: true });
@@ -361,10 +459,11 @@
             reciter.textContent = '';
             if (list.suggested.length) reciter.append(el('optgroup', { label: 'Suggested' }, list.suggested.map((r) => option('rec:' + r.id, r.label))));
             reciter.append(el('optgroup', { label: 'All reciters' }, list.rest.map((r) => option('rec:' + r.id, r.label))));
+            reciter.append(el('optgroup', { label: 'More reciters (from EveryAyah)' }, EVERYAYAH_RECITERS.map((r) => option('ea:' + r[0], r[1]))));
             fillOwnRecitations('Other');
         }).catch(function () {
             reciter.textContent = '';
-            reciter.append(option('', 'Could not reach Quran.com'));
+            reciter.append(el('optgroup', { label: 'Reciters from EveryAyah' }, EVERYAYAH_RECITERS.map((r) => option('ea:' + r[0], r[1]))));
             fillOwnRecitations('Other');
         });
         translations().then(function (list) {
@@ -403,7 +502,8 @@
                     field('Captions appear', anim),
                     field('Place it', where)
                 ]),
-                el('div', { className: 'row-buttons' }, [check(numbers, 'Ayah numbers ﴿١﴾'), check(title, 'Surah title card'), check(bism, 'Bismillah card')])
+                el('div', { className: 'row-buttons' }, [check(numbers, 'Ayah numbers ﴿١﴾'), check(title, 'Surah title card'), check(bism, 'Bismillah card')]),
+                el('div', { className: 'row-buttons' }, [check(highlight, 'Highlight each word as it is recited')])
             ],
             actions: [
                 { label: 'Cancel', always: true },
@@ -415,7 +515,7 @@
                             await build({
                                 chapter: Number(surah.value), from: Number(from.value), to: Number(to.value),
                                 reciter: reciter.value, translationId: translation.value && translation.value !== 'loading' ? Number(translation.value) : null,
-                                frame: frame.value, background: background.value, font: font.value, anim: anim.value,
+                                frame: frame.value, background: background.value, font: font.value, anim: anim.value, highlight: highlight.checked,
                                 numbers: numbers.checked, title: title.checked, bismillah: bism.checked && !bism.disabled,
                                 where: where.value
                             }, d.status);
@@ -449,10 +549,29 @@
 
         // Recitation: one file per ayah.
         let recitation = null;
-        if (o.reciter.startsWith('rec:')) {
+        let segments = {};
+        if (o.reciter.startsWith('ea:')) {
+            const folder = o.reciter.slice(3);
+            const named = EVERYAYAH_RECITERS.find((r) => r[0] === folder);
+            recitation = { name: named ? named[1] : 'Reciter' };
+            const blobs = [];
+            for (let i = 0; i < verses.length; i += 1) {
+                status('Downloading the recitation… ' + (i + 1) + ' of ' + verses.length);
+                try {
+                    blobs.push(await fetchAyah(EVERYAYAH + folder + '/' + pad3(o.chapter) + pad3(verses[i].n) + '.mp3'));
+                } catch (err) {
+                    const e = new Error(err.message);
+                    e.userMessage = 'The browser could not download this recitation (' + err.message + '). Try another reciter, choose “No recitation — captions only”, or import a recitation file.';
+                    throw e;
+                }
+            }
+            const safe = recitation.name.replace(/[^\w\- ]+/g, '').trim();
+            recitation.files = blobs.map((b, i) => new File([b], safe + ' ' + pad3(o.chapter) + '-' + pad3(verses[i].n) + '.mp3', { type: b.type || 'audio/mpeg', lastModified: Date.now() }));
+        } else if (o.reciter.startsWith('rec:')) {
             const id = Number(o.reciter.slice(4));
             status('Finding the recitation…');
             const urls = await loadAudioUrls(id, o.chapter);
+            if (o.highlight) segments = await loadSegments(id, o.chapter);
             let backupFolder = null;
             try {
                 const list = await reciters();
@@ -602,7 +721,20 @@
                 p.clips.push(clip);
             }
             const arabic = v.arabic + (o.numbers ? ' ﴿' + T.arabicDigits(v.n) + '﴾' : '');
+            const before = p.clips.length;
             addPieces(p, arTrack, t, d, chunk(arabic, vertical ? 120 : 170), arabicStyle);
+            if (o.highlight) {
+                // Each word lights up as it is recited.
+                const ayahSegments = ayahMedia ? segments[v.key] : null;
+                p.clips.slice(before).forEach(function (c) {
+                    const offset = c.start - t;
+                    const pageSegments = ayahSegments ? ayahSegments.slice(arabicWordsBefore(p.clips.slice(before), c)) : null;
+                    Object.assign(c, {
+                        lyricStyle: 'karaoke', lyricHighlight: '#f2d27a', lyricSourceText: c.text,
+                        lyricWordTimes: wordTimes(c.text, c.duration, pageSegments, offset)
+                    });
+                });
+            }
             if (hasTranslation && v.translation) {
                 const tr = v.translation + (o.numbers ? ' (' + v.n + ')' : '');
                 addPieces(p, trTrack, t, d, chunk(tr, vertical ? 160 : 220), translationStyle);
@@ -660,5 +792,5 @@
     const button = document.getElementById('quran-video');
     if (button) button.addEventListener('click', openVerseDialog);
 
-    window.ReelQuran = { open: openVerseDialog, chunk: chunk, plainText: plainText };
+    window.ReelQuran = { wordTimes: wordTimes, wordWeight: wordWeight, open: openVerseDialog, chunk: chunk, plainText: plainText };
 }());

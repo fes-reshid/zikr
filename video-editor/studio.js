@@ -73,6 +73,7 @@
         {id:'winners',name:'Competition results',tag:'RESULTS',theme:'royal',title:'And the winners are…',subtitle:'Add the competition name',lines:['First place: add the name','Thank you to everyone who took part'],motif:'trophy',anim:'pop'}
     ];
     const TRANSITIONS={crossfade:'Crossfade',dip:'Dip to black',slide:'Slide in',push:'Push',wipe:'Wipe',zoom:'Zoom','slide-up':'Slide up','wipe-right':'Wipe from right',iris:'Circle reveal',blur:'Soft dissolve'};
+    function shade(hex){const n=parseInt(hex.slice(1),16),f=v=>Math.round(v*.55).toString(16).padStart(2,'0');return '#'+f(n>>16)+f((n>>8)&255)+f(n&255);}
     function select(options,value){return el('select',{value},options.map(([v,name])=>el('option',{value:v,selected:v===value,text:name})));}
     function button(text,run,attrs){return el('button',Object.assign({type:'button',text,onclick:run},attrs));}
     function field(label,input,hint){return app.dialogField(label,input,hint);}
@@ -107,7 +108,10 @@
         return T.addClip(p,c);
     }
     async function makeTemplate(id,options){
-        const item=TEMPLATES.find(t=>t.id===id);if(!item) throw new Error('Unknown template');
+        let item=TEMPLATES.find(t=>t.id===id);if(!item) throw new Error('Unknown template');
+        // With the brand kit, the template takes your colours, font and logo.
+        const kit=options.brand&&window.ReelBrand?window.ReelBrand.get():null;
+        if(kit&&!item.art){THEMES.brand={label:kit.name||'My brand',colors:[kit.primary,kit.secondary===kit.primary?kit.primary:shade(kit.primary)],ink:kit.text,accent:kit.secondary};item=Object.assign({},item,{theme:'brand'});}
         if(item.lyrics){openLyrics('gratitude');return;}
         if(item.art)return window.ReelGallery.makePoster(item,options);
         app.pause();
@@ -128,11 +132,12 @@
             const bg=Object.assign(T.clipFromMedia(T.getMedia(p,mediaId),bgTrack.id,at),{duration:scene,fit:'cover',transition:i?{type:'crossfade',duration:.8}:null});
             p=T.addClip(p,bg);
             p=addTitle(p,titleTrack.id,at,text,{duration:scene,y:.44,fontSize:portrait?34:58,color:palette.ink,shadow:false,
-                font:T.isArabic(text)?'amiri':item.hand?'hand':'marcellus',anim:item.hand?'handwrite':(item.anim||'rise'),hand:item.hand?'pen':'none',handStyle:'realistic',writeDuration:4.4,handSize:1});
+                font:T.isArabic(text)?'amiri':item.hand?'hand':kit?kit.font:'marcellus',anim:item.hand?'handwrite':(item.anim||'rise'),hand:item.hand?'pen':'none',handStyle:'realistic',writeDuration:4.4,handSize:1});
             p=addTitle(p,detailTrack.id,at,i===0?(options.subtitle.trim()||item.subtitle):['','One small action can make a difference.','Create something worth sharing.'][i],
                 {duration:scene,y:.69,font:'sans',fontSize:portrait?14:23,color:palette.ink,shadow:false,anim:'fade',opacity:.85});
         });
         if(item.motif){const st=newTrack(p,'text','Template decoration');p=st.p;const deco=Object.assign(T.drawClip(st.id,start,[]),{duration:scene*texts.length,anim:'none',hand:'none',x:.5,y:.17,scale:.55,sticker:{kind:item.motif,motion:'float',color:palette.accent,rotation:0}});p=T.addClip(p,deco);}
+        if(kit&&kit.logo)p.brandLogo=window.ReelBrand.logoOverlay(kit);
         app.apply(p);app.seek(start+1.3);app.zoomToFit();
         const first=p.clips.find(c=>c.track===titleTrack.id);app.selectOnly(first.id);
         app.toast('Template added. Select any title to edit it. Undo removes the whole template.');
@@ -155,13 +160,15 @@
             card.append(item.art?el('img',{src:'assets/'+item.art+'.webp',alt:item.name,loading:'lazy',style:{width:'100%',height:'150px',objectFit:'cover',objectPosition:'center 25%'}}):image,el('span',{className:'studio-tag',text:item.tag}),el('strong',{text:item.name}));cards.push(card);grid.append(card);
         });
         posterFields.hidden=!chosen.art;
-        preview.append(field('Opening title',title),field('Subtitle',subtitle),posterFields,field('Format',size,app.state.project.clips.length?'Uses your current project’s frame size and adds scenes at the end.':'Choose the shape of your new video.'));
+        const useBrand=el('input',{type:'checkbox'});useBrand.checked=!!(window.ReelBrand&&window.ReelBrand.get());
+        const brandRow=el('label',{className:'check',hidden:!(window.ReelBrand&&window.ReelBrand.get())},[useBrand,'Use my brand kit (colours, font and logo)']);
+        preview.append(field('Opening title',title),field('Subtitle',subtitle),brandRow,posterFields,field('Format',size,app.state.project.clips.length?'Uses your current project’s frame size and adds scenes at the end.':'Choose the shape of your new video.'));
         app.openDialog({title:'Start with a template',wide:true,intro:'A little inspiration, ready to make your own. Every title, scene and transition stays editable.',
             body:[grid,preview],actions:[{label:'Cancel'},{label:'Use template',primary:true,run:async d=>{
                 if(chosen.lyrics){d.close();openLyrics('gratitude');return false;}
                 const before=app.state.project;
                 d.busy(true);d.status('Creating your scenes…');
-                try{await makeTemplate(chosen.id,{title:title.value,subtitle:subtitle.value,size:size.value,topic:topic.value,speaker:speaker.value,date:date.value,venue:venue.value});return true;}
+                try{await makeTemplate(chosen.id,{brand:useBrand.checked,title:title.value,subtitle:subtitle.value,size:size.value,topic:topic.value,speaker:speaker.value,date:date.value,venue:venue.value});return true;}
                 catch(e){app.state.project=before;app.afterChange();d.status(e.message);d.busy(false);return false;}
             }}]});
     }

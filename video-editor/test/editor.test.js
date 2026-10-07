@@ -164,7 +164,20 @@ function quranApi(url) {
         };
     }
     if (p === '/recitations/7/by_chapter/1') {
-        return { audio_files: VERSES.map((v, i) => ({ verse_key: '1:' + (i + 1), url: 'Alafasy/mp3/00100' + (i + 1) + '.mp3' })), pagination: { next_page: null } };
+        const withSegments = /segments/.test(u.searchParams.get('fields') || '');
+        return {
+            audio_files: VERSES.map(function (v, i) {
+                const f = { verse_key: '1:' + (i + 1), url: 'Alafasy/mp3/00100' + (i + 1) + '.mp3' };
+                if (withSegments) {
+                    // Word timings: [word position, start ms, end ms], evenly through the ayah.
+                    const words = v[0].split(/\s+/);
+                    const each = AYAH_SECONDS[i] * 1000 / words.length;
+                    f.segments = words.map((w, k) => [k + 1, Math.round(k * each), Math.round((k + 1) * each)]);
+                }
+                return f;
+            }),
+            pagination: { next_page: null }
+        };
     }
     return null;
 }
@@ -265,8 +278,9 @@ async function exportWith(page, pickOption) {
     const file = path.join(os.tmpdir(), 'reel-export-' + process.pid + '-' + Date.now() + path.extname(download.suggestedFilename()));
     await download.saveAs(file);
     const seconds = (Date.now() - t0) / 1000;
+    const shareButtons = await page.locator('#export-result .share-row button').allTextContents();
     await page.click('#export-cancel');
-    return { options: options, choice: choice, file: file, seconds: seconds };
+    return { options: options, choice: choice, file: file, seconds: seconds, shareButtons: shareButtons };
 }
 
 async function probeFile(page, bytes) {
@@ -296,7 +310,7 @@ async function probeFile(page, bytes) {
     const URL_ = base + '/video-editing/?nosw';
     const browser = await chromium.launch({
         executablePath: CHROMIUM_PATH,
-        args: ['--autoplay-policy=no-user-gesture-required']
+        args: ['--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
     });
     const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 900 } });
     await context.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
@@ -603,6 +617,7 @@ async function probeFile(page, bytes) {
             check('fast export makes a playable file at the project size', probe.w === 1280 && probe.h === 720, probe.w + 'x' + probe.h);
             check('with the full length', approx(probe.d, expected, 0.15), probe.d.toFixed(2) + ' vs ' + expected.toFixed(2));
             check('and sound in it', bytes.includes(Buffer.from('A_OPUS')) || bytes.includes(Buffer.from('mp4a')) || bytes.includes(Buffer.from('Opus')));
+            check('a finished export offers sharing to WhatsApp and Telegram', fast.shareButtons.includes('WhatsApp') && fast.shareButtons.includes('Telegram'), fast.shareButtons.join(', '));
             check('fast export ran', true, fast.choice.text + ', ' + bytes.length + ' bytes in ' + fast.seconds.toFixed(1) + 's for ' + expected.toFixed(1) + 's of video');
             fs.unlinkSync(fast.file);
         }
@@ -680,6 +695,10 @@ async function probeFile(page, bytes) {
         const recitationPick = await dlg.getByRole('combobox', { name: 'Recitation' }).inputValue();
         const translationPick = await dlg.getByRole('combobox', { name: 'Translation' }).evaluate((s) => s.options[s.selectedIndex].textContent);
         check('the verse dialog suggests the reciter and Saheeh by name', recitationPick === 'rec:7' && /Saheeh/.test(translationPick), recitationPick + ' / ' + translationPick);
+        const reciterValues = await dlg.getByRole('combobox', { name: 'Recitation' }).locator('option').evaluateAll((os) => os.map((o) => o.value));
+        const translationLabels = await dlg.getByRole('combobox', { name: 'Translation' }).locator('option').allTextContents();
+        check('more reciters, and every translator in a language', reciterValues.filter((v) => v.startsWith('ea:')).length >= 10 &&
+            translationLabels.filter((l) => /^English/.test(l)).length === 2 && translationLabels.some((l) => /^Afaan Oromoo/.test(l)), translationLabels.join(' | '));
         await dlg.getByRole('button', { name: 'Make video' }).click();
         await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
         p = await project(page);
@@ -694,6 +713,11 @@ async function probeFile(page, bytes) {
             arabicClips[0].text.includes('﴿١﴾') && arabicClips[0].font === 'amiri');
         check('the translation is timed the same, footnotes stripped', englishClips.length === 3 && !englishClips.some((c) => /<|foot/.test(c.text)) &&
             approx(englishClips[1].start, recit[1].start, 0.01));
+        const times = arabicClips.map((c) => c.lyricWordTimes || []);
+        const words1 = arabicClips[1].text.trim().split(/\s+/);
+        check('each word of the Arabic lights up as it is recited', arabicClips.every((c, i) => c.lyricStyle === 'karaoke' && c.lyricSourceText === c.text &&
+            times[i].length === c.text.trim().split(/\s+/).length && times[i].every((v, k) => k === 0 || v >= times[i][k - 1])), JSON.stringify(times[1]));
+        check('using Quran.com’s word timings when there are some', approx(times[1][1], 1.4 / (words1.length - 1), 0.02), times[1][1] + ' s');
         check('a title card and Bismillah come first', texts.some((c) => c.text === 'سورة الفاتحة') && texts.some((c) => /Sūrah Al-Fatihah/.test(c.text)));
         const bg = p.clips.find((c) => { const m = p.media.find((x) => x.id === c.mediaId); return m && /^Background/.test(m.name); });
         check('a gradient background covers it all, with a slow zoom', bg && approx(bg.start, beforeEnd, 0.01) && approx(bg.start + bg.duration, recit[2].start + recit[2].duration, 0.01) && bg.motion.type === 'zoom-in');
@@ -1222,6 +1246,113 @@ async function probeFile(page, bytes) {
             (await project(page)).clips.some((c) => c.text === 'Second video'));
         await page.locator('.project-tab .tab-close').nth(1).click();
         check('a tab can be closed, leaving the first project', await page.locator('.project-tab').count() === 1 && (await project(page)).clips.length === firstClips);
+
+        /* ------------------------------------------------------------- keyframes */
+        const kfAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
+        await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); }, kfAt);
+        await page.click('#add-text');
+        await page.keyboard.type('Moving');
+        await page.locator('#timeline').focus();
+        const moving = (await project(page)).clips.find((c) => c.text === 'Moving');
+        await page.getByRole('button', { name: '◆ Add keyframe here' }).click();
+        await page.evaluate((t) => window.Reel.seek(t), kfAt + 3);
+        await page.evaluate((id) => window.Reel.select(id), moving.id);
+        await page.getByRole('slider', { name: 'Position X', exact: true }).fill('85');
+        await page.getByRole('slider', { name: 'Turn', exact: true }).fill('90');
+        const kfClip = (await project(page)).clips.find((c) => c.id === moving.id);
+        const kfMid = await page.evaluate((a) => window.TimelineCore.keyframeAt(window.Reel.project.clips.find((c) => c.id === a.id), a.t), { id: moving.id, t: kfAt + 1.5 });
+        check('keyframes move and turn a title smoothly between two moments', kfClip.keys.length === 2 && kfClip.keys[1].x === 0.85 &&
+            kfClip.keys[1].rotate === 90 && kfMid.x > 0.55 && kfMid.x < 0.8 && kfMid.rotate > 20 && kfMid.rotate < 70, JSON.stringify(kfMid));
+        check('the timeline shows the keyframes', await page.locator('.clip[data-id="' + moving.id + '"] .clip-key').count() === 2);
+        await page.getByRole('combobox', { name: 'Quick animation', exact: true }).selectOption({ label: 'Spin' });
+        const spinKeys = (await project(page)).clips.find((c) => c.id === moving.id).keys;
+        check('a quick animation sets keyframes in one go', spinKeys.length === 2 && spinKeys[1].rotate === 360);
+
+        /* ------------------------------------------------------------- brand kit */
+        const logoPng = await makePng(page);
+        await page.click('#studio-brand');
+        const kitBox = page.locator('.modal.generic');
+        await kitBox.getByPlaceholder('Your channel or organisation').fill('Noor Studio');
+        await kitBox.locator('input[type=file]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: logoPng });
+        await kitBox.locator('img[alt="Logo"]').waitFor({ state: 'visible' });
+        await kitBox.getByRole('combobox', { name: 'Brand font' }).selectOption('marcellus');
+        await kitBox.getByLabel('Add my intro at the start (3 s)').check();
+        await kitBox.getByLabel('Add my outro at the end (4 s)').check();
+        const beforeKit = await project(page);
+        const beforeKitLength = beforeKit.clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0);
+        await kitBox.getByRole('button', { name: 'Save and apply' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
+        p = await project(page);
+        const introText = p.clips.find((c) => c.type === 'text' && c.start === 0 && /Noor Studio/.test(c.text));
+        const outroText = p.clips.find((c) => c.type === 'text' && /Thank you for watching/.test(c.text));
+        check('the brand kit puts the logo in the corner and titles in the brand font', p.brandLogo && /^data:image\/png/.test(p.brandLogo.src) &&
+            p.clips.filter((c) => c.type === 'text').every((c) => c.font === 'marcellus' || /[؀-ۿ]/.test(c.text || '')));
+        check('and adds an intro (moving everything 3 s later) and an outro', !!introText && !!outroText &&
+            approx(outroText.start, beforeKitLength + 3, 0.05), outroText && outroText.start);
+        check('the kit is kept for next time', await page.evaluate(() => JSON.parse(localStorage.getItem('reel.brand')).name) === 'Noor Studio');
+        await page.keyboard.press('Control+z');
+        check('and the whole thing is one undo step', !(await project(page)).brandLogo && (await project(page)).clips.length === beforeKit.clips.length);
+
+        /* ------------------------------------------------------------------ Short */
+        const tabsBefore = await page.locator('.project-tab').count();
+        await page.click('#studio-short');
+        const shortBox = page.locator('.modal.generic');
+        await shortBox.getByRole('textbox', { name: 'From' }).fill('00:00.00');
+        await shortBox.getByRole('textbox', { name: 'To' }).fill('00:05.00');
+        await shortBox.getByPlaceholder('A big title on top').fill('My first Short');
+        await shortBox.getByRole('button', { name: 'Make Short' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached' });
+        p = await project(page);
+        check('Make a Short opens a 9:16 Short of that part in a new tab', await page.locator('.project-tab').count() === tabsBefore + 1 &&
+            p.width === 1080 && p.height === 1920 && approx(p.clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0), 7.5, 0.05) &&
+            p.clips.some((c) => c.text === 'My first Short') && p.progressBar && !!p.brandLogo, p.width + 'x' + p.height);
+        await page.locator('.project-tab .tab-close').last().click();
+        check('closing it goes back to the original video', (await project(page)).width === 1280);
+
+        /* -------------------------------------------------------------- sounds */
+        const soundAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
+        await page.evaluate((t) => window.Reel.seek(t), soundAt);
+        await page.click('#studio-sounds');
+        const soundBox = page.locator('.modal.generic');
+        await soundBox.getByRole('combobox', { name: 'Length of nature sounds' }).selectOption('15');
+        await soundBox.getByRole('button', { name: 'Add Rain' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
+        p = await project(page);
+        const rain = p.media.find((m) => /^Rain/.test(m.name));
+        const rainClip = rain && p.clips.find((c) => c.mediaId === rain.id);
+        check('the sound library adds rain at the playhead on an audio track', rain && approx(rain.duration, 15, 0.1) && rainClip &&
+            approx(rainClip.start, soundAt, 0.01) && p.tracks.find((t) => t.id === rainClip.track).kind === 'audio', rain && rain.duration);
+        await page.click('#studio-sounds');
+        await page.locator('.modal.generic').getByRole('button', { name: 'Add Whoosh' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
+        check('and sound effects next to it on a free track', (await project(page)).media.some((m) => /^Whoosh/.test(m.name)));
+
+        /* ------------------------------------------------------------ recording */
+        await page.click('#studio-screen');
+        const recBox = page.locator('.modal.generic');
+        await recBox.getByRole('combobox', { name: 'Record' }).selectOption('camera');
+        await recBox.getByRole('button', { name: '● Start recording' }).click();
+        await page.waitForSelector('.record-bar', { timeout: 15000 });
+        await page.waitForTimeout(1500);
+        const mediaBefore = (await project(page)).media.length;
+        await page.locator('.record-bar').getByRole('button', { name: '■ Stop' }).click();
+        await page.waitForFunction((n) => window.Reel.project.media.length > n, mediaBefore, { timeout: 20000 });
+        p = await project(page);
+        const rec = p.media.find((m) => /^Recording/.test(m.name));
+        check('camera recording is added to the media and the timeline', rec && rec.type === 'video' && p.clips.some((c) => c.mediaId === rec.id), rec && rec.name);
+
+        /* -------------------------------------------------------------- library */
+        await page.waitForTimeout(1800);
+        await page.click('#library-open');
+        const libBox = page.locator('.modal.generic');
+        const cards = await libBox.locator('.library-card').count();
+        check('My projects lists your projects with a picture of each', cards >= 1 && await libBox.locator('.library-card.current img').count() === 1, cards);
+        await libBox.locator('.library-card.current').getByRole('button', { name: 'Duplicate' }).click();
+        check('a project can be duplicated', await libBox.locator('.library-card').count() === cards + 1);
+        await libBox.locator('.library-card', { hasText: '(copy)' }).getByRole('button', { name: 'Open in a tab' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached' });
+        check('and opened in a tab', /\(copy\)/.test((await project(page)).name) && await page.locator('.project-tab').count() === tabsBefore + 1);
+        await page.locator('.project-tab .tab-close').last().click();
 
         /* ---------------------------------------------------------- on a phone */
         await page.setViewportSize({ width: 390, height: 844 });

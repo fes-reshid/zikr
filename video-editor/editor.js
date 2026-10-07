@@ -279,6 +279,7 @@
                     items: tabs.map((t, i) => ({ id: t.id, project: T.serialize(i === activeTab ? state.project : t.project) }))
                 }));
             });
+            if (window.ReelLibrary) window.ReelLibrary.remember();
         }, 250);
     }
 
@@ -616,6 +617,8 @@
             c.save();
             c.globalAlpha = layer.alpha;
             if (layer.transition) applyTransition(c, layer.transition, W, H);
+            const kf = T.keyframeAt(layer.clip, t);
+            if (kf) layer = keyframed(c, layer, kf, W, H);
             if (layer.kind !== 'text' || layer.clip.type === 'draw' || layer.clip.sticker) applyMove(c, layer.clip, t, W, H);
             if (layer.clip.sticker && window.ReelEffects) window.ReelEffects.sticker(c, layer.clip, t, W, H);            else if (layer.clip.type === 'draw') drawDrawing(c, layer.clip, t, W, H, source);
             else if (layer.kind === 'text') drawText(c, layer.clip, t, W, H);
@@ -623,8 +626,38 @@
             moveBlur = 0;
             c.restore();
         });
+        if (p.progressBar) {
+            // A thin bar along the bottom that fills as the video plays (for Shorts).
+            const total = T.projectDuration(p);
+            const h = Math.max(4, Math.round(H * 0.007));
+            c.globalAlpha = 1;
+            c.fillStyle = 'rgba(255,255,255,.25)';
+            c.fillRect(0, H - h, W, h);
+            c.fillStyle = p.progressBar.color || '#f2b84b';
+            c.fillRect(0, H - h, total > 0 ? W * T.clamp(t / total, 0, 1) : 0, h);
+        }
+        if (p.brandLogo && p.brandLogo.src) drawBrandLogo(c, p.brandLogo, W, H);
         if (p.watermark !== false) drawWatermark(c, W, H);
         c.restore();
+    }
+
+    /**
+     * A layer as its keyframes have it at this moment: moved, resized and
+     * faded by drawing a copy of its clip with those values, and turned
+     * about its own centre.
+     */
+    function keyframed(c, layer, kf, W, H) {
+        const clip = layer.clip;
+        const own = clip.opacity === undefined ? 1 : clip.opacity;
+        c.globalAlpha = own > 0 ? layer.alpha * kf.opacity / own : layer.alpha * kf.opacity;
+        const copy = Object.assign({}, clip, { x: kf.x, y: kf.y, scale: kf.scale, opacity: kf.opacity });
+        if (kf.rotate || (clip.type === 'text' && kf.scale !== 1)) {
+            c.translate(kf.x * W, kf.y * H);
+            if (kf.rotate) c.rotate(kf.rotate * Math.PI / 180);
+            if (clip.type === 'text') c.scale(kf.scale, kf.scale);
+            c.translate(-kf.x * W, -kf.y * H);
+        }
+        return Object.assign({}, layer, { clip: copy });
     }
 
     /** Blur from a picture's entrance or exit, added to its own filters in drawVisual. */
@@ -642,6 +675,35 @@
         c.scale(m.scale * m.scaleX, m.scale);
         c.translate(-cx, -cy);
         moveBlur = m.blur * H / 720;
+    }
+
+    const brandImages = new Map();
+
+    /** Your logo from the brand kit, in its corner on every frame. */
+    function drawBrandLogo(c, logo, W, H) {
+        let img = brandImages.get(logo.src);
+        if (!img) {
+            img = new Image();
+            img.onload = requestDraw;
+            img.src = logo.src;
+            brandImages.set(logo.src, img);
+        }
+        if (!img.complete || !img.naturalWidth) return;
+        const short = Math.min(W, H);
+        const w = short * (logo.size > 0 ? logo.size : 0.14);
+        const h = w * img.naturalHeight / img.naturalWidth;
+        const m = short * 0.035;
+        const pos = logo.pos || 'tr';
+        const x = pos.indexOf('l') !== -1 ? m : W - m - w;
+        const y = pos.indexOf('t') === 0 ? m : H - m - h - (pos === 'br' && watermarkOn() ? short * 0.05 : 0);
+        c.save();
+        c.globalAlpha = logo.opacity > 0 ? logo.opacity : 0.9;
+        c.drawImage(img, x, y, w, h);
+        c.restore();
+    }
+
+    function watermarkOn() {
+        return state.project.watermark !== false;
     }
 
     const WATERMARK = 'nooreditor.com';
@@ -1822,6 +1884,9 @@
         if (!T.isGenerated(clip) && T.hasFx(clip)) badges.push('fx');
         if (T.handOf(clip)) badges.push('✍');
         if (badges.length) node.append(el('span', { className: 'clip-badge', text: badges.join(' '), title: 'Has pan & zoom, effects or a hand' }));
+        (clip.keys || []).forEach(function (k) {
+            node.append(el('span', { className: 'clip-key', title: 'Keyframe at ' + fmt(clip.start + k.t), style: { left: k.t * pps + 'px' } }));
+        });
         node.append(el('div', { className: 'handle l', 'data-edge': 'start' }));
         node.append(el('div', { className: 'handle r', 'data-edge': 'end' }));
         return node;
@@ -2517,6 +2582,99 @@
         return control(label, input);
     }
 
+    /** The playhead as seconds into a clip, kept inside it. */
+    function localTime(clip) {
+        return T.clamp(state.time - clip.start, 0, clip.duration);
+    }
+
+    /**
+     * A Layout slider (as a percentage). On a clip with keyframes it shows and
+     * changes the keyframe at the playhead instead of the clip's own value.
+     */
+    function layoutSlider(clip, label, prop, opts) {
+        const keyed = clip.keys && clip.keys.length;
+        const now = () => {
+            const c = T.getClip(state.project, clip.id) || clip;
+            const kf = T.keyframeAt(c, state.time);
+            const v = kf ? kf[prop] : (c[prop] === undefined ? (prop === 'x' || prop === 'y' ? 0.5 : 1) : c[prop]);
+            return Math.round(v * 100);
+        };
+        if (!keyed) return slider(clip, label, now, (v) => { const o = {}; o[prop] = v / 100; return o; }, opts);
+        const o = Object.assign({ min: 0, max: 100, step: 1, show: (v) => String(v) }, opts);
+        const out = el('output', { text: o.show(now()) });
+        const input = el('input', { type: 'range', min: o.min, max: o.max, step: o.step, value: now() });
+        input.addEventListener('input', function () {
+            const v = Number(input.value);
+            out.textContent = o.show(v);
+            const patch = {};
+            patch[prop] = v / 100;
+            state.project = T.setKeyframe(state.project, clip.id, localTime(clip), patch);
+            scheduleTimeline();
+            requestDraw();
+        });
+        input.addEventListener('change', function () { commitQuiet(); renderInspector(); });
+        return control(label, input, out);
+    }
+
+    /** Ready-made keyframe animations: [label, keyframes from the clip's current look]. */
+    const KEY_RECIPES = [
+        ['Move left → right', (b, d) => [{ t: 0, x: 0.2 }, { t: d, x: 0.8 }]],
+        ['Move right → left', (b, d) => [{ t: 0, x: 0.8 }, { t: d, x: 0.2 }]],
+        ['Float up', (b, d) => [{ t: 0, y: Math.min(0.9, b.y + 0.15), opacity: 0 }, { t: Math.min(1, d / 2), opacity: b.opacity }, { t: d, y: b.y }]],
+        ['Grow', (b, d) => [{ t: 0, scale: b.scale * 0.6 }, { t: d, scale: b.scale * 1.15 }]],
+        ['Spin', (b, d) => [{ t: 0, rotate: 0 }, { t: d, rotate: 360 }]],
+        ['Swing', (b, d) => [{ t: 0, rotate: -12 }, { t: d / 4, rotate: 12 }, { t: d / 2, rotate: -12 }, { t: 3 * d / 4, rotate: 12 }, { t: d, rotate: 0 }]],
+        ['Fly across', (b, d) => [{ t: 0, x: -0.2, rotate: -10 }, { t: d, x: 1.2, rotate: 10 }]]
+    ];
+
+    /** Keyframes: animate position, size, turn and opacity between moments you choose. */
+    function keyframeGroup(clip) {
+        const keys = clip.keys || [];
+        const items = [];
+        if (!keys.length) {
+            items.push(el('p', { className: 'hint', text: 'Animate anything: move the playhead, set Position, Scale, Turn or Opacity, and add a keyframe. Add another at a later moment with different values — the clip moves smoothly between them.' }));
+        }
+        items.push(el('div', { className: 'row-buttons' }, [
+            button('◆ Add keyframe here', function () {
+                apply(T.setKeyframe(state.project, clip.id, localTime(clip), {}));
+            }, { title: 'Keep the clip’s position, size, turn and opacity at the playhead' }),
+            keys.length ? button('Clear keyframes', function () { apply(T.updateClip(state.project, clip.id, { keys: null })); }) : null
+        ]));
+        // Turning is keyframed only: a turn always goes into the keyframe at the playhead.
+        const kfNow = T.keyframeAt(clip, state.time);
+        const turnOut = el('output', { text: Math.round(kfNow ? kfNow.rotate : 0) + '°' });
+        const turn = el('input', { type: 'range', min: -360, max: 360, step: 1, value: Math.round(kfNow ? kfNow.rotate : 0) });
+        turn.addEventListener('input', function () {
+            turnOut.textContent = turn.value + '°';
+            state.project = T.setKeyframe(state.project, clip.id, localTime(clip), { rotate: Number(turn.value) });
+            scheduleTimeline();
+            requestDraw();
+        });
+        turn.addEventListener('change', function () { commitQuiet(); renderInspector(); });
+        items.push(control('Turn', turn, turnOut));
+        if (keys.length) {
+            items.push(el('div', { className: 'key-list' }, keys.map(function (k, i) {
+                return el('span', { className: 'key-chip' }, [
+                    el('button', { className: 'ghost', text: '◆ ' + fmt(clip.start + k.t), title: 'Go to this keyframe', onclick: function () { seek(clip.start + k.t + 1e-4); renderInspector(); } }),
+                    el('button', { className: 'ghost', text: '×', 'aria-label': 'Delete keyframe at ' + fmt(clip.start + k.t), onclick: function () { apply(T.removeKeyframe(state.project, clip.id, i)); } })
+                ]);
+            })));
+        }
+        items.push(chooser('Quick animation', 'none', [['none', 'Choose…']].concat(KEY_RECIPES.map((r, i) => [String(i), r[0]])), function (v) {
+            if (v === 'none') return state.project;
+            const c = T.getClip(state.project, clip.id);
+            const base = { x: c.x === undefined ? 0.5 : c.x, y: c.y === undefined ? 0.5 : c.y, scale: c.scale || 1, opacity: c.opacity === undefined ? 1 : c.opacity };
+            let p = T.updateClip(state.project, clip.id, { keys: null });
+            KEY_RECIPES[Number(v)][1](base, c.duration).forEach(function (k) {
+                const vals = Object.assign({}, k);
+                delete vals.t;
+                p = T.setKeyframe(p, clip.id, k.t, vals);
+            });
+            return p;
+        }));
+        return group('Keyframes', items);
+    }
+
     /** How a clip leaves: its exit movement and how long it takes. */
     function exitControls(clip) {
         const on = EXIT_LABELS[clip.exit] && clip.exit !== 'none';
@@ -2703,11 +2861,12 @@
                 if (clip.fit !== 'cover') layout.push(select_(clip, 'Bars', 'bgFill', [['none', 'Plain background'], ['blur', 'Blurred copy (for Reels)']]));
             }
             if (clip.type !== 'text') {
-                layout.push(slider(clip, 'Scale', (c) => Math.round((c.scale || 1) * 100), (v) => ({ scale: v / 100 }), { min: 10, max: 300, show: pct }));
+                layout.push(layoutSlider(clip, 'Scale', 'scale', { min: 10, max: 300, show: pct }));
             }
-            layout.push(slider(clip, 'Position X', (c) => Math.round(c.x * 100), (v) => ({ x: v / 100 }), { show: pct }));
-            layout.push(slider(clip, 'Position Y', (c) => Math.round(c.y * 100), (v) => ({ y: v / 100 }), { show: pct }));
-            layout.push(slider(clip, 'Opacity', (c) => Math.round((c.opacity === undefined ? 1 : c.opacity) * 100), (v) => ({ opacity: v / 100 }), { show: pct }));
+            layout.push(layoutSlider(clip, 'Position X', 'x', { show: pct }));
+            layout.push(layoutSlider(clip, 'Position Y', 'y', { show: pct }));
+            layout.push(layoutSlider(clip, 'Opacity', 'opacity', { show: pct }));
+            if (clip.keys && clip.keys.length) layout.push(el('p', { className: 'hint', text: 'This clip has keyframes: these sliders change the keyframe at the playhead (adding one if needed).' }));
             layout.push(el('div', { className: 'row-buttons' }, [
                 ['Full', { scale: 1, x: 0.5, y: 0.5 }],
                 ['Corner', clip.type === 'text' ? { x: 0.8, y: 0.12 } : { scale: 0.3, x: 0.82, y: 0.18 }],
@@ -2716,6 +2875,7 @@
                 return button(preset[0], function () { apply(T.updateClip(state.project, clip.id, preset[1])); });
             })));
             box.append(group('Layout', layout));
+            box.append(keyframeGroup(clip));
         }
 
         if (kind === 'video' || kind === 'image') {
@@ -3558,11 +3718,19 @@
         } catch (err) { /* a broken save: keep the single project */ }
     }
 
-    /** Media ids used by the tabs that are not active, so their stored files are kept. */
+    /** Media ids used by the tabs that are not active and by the project library, so their stored files are kept. */
     function otherTabsMedia() {
         const ids = [];
         tabs.forEach(function (t, i) { if (i !== activeTab && t.project) t.project.media.forEach((m) => ids.push(m.id)); });
-        return ids;
+        return window.ReelLibrary ? ids.concat(window.ReelLibrary.mediaIds()) : ids;
+    }
+
+    /** Switches to the tab holding the library project `id`, if one does. */
+    function focusLibraryProject(id) {
+        const i = tabs.findIndex((t, k) => (k === activeTab ? state.project : t.project).libraryId === id);
+        if (i === -1) return false;
+        switchTab(i);
+        return true;
     }
 
     function stashTab() {
@@ -3599,6 +3767,15 @@
         tabs.push({ id: T.newId('tab'), project: p, history: new T.History(p), time: 0, selection: [], selected: null });
         switchTab(tabs.length - 1);
         toast('New project in a new tab. Your other project is still open in its tab.');
+    }
+
+    /** Opens `project` in a new tab (it may share media with the others) and switches to it. */
+    function openProjectInTab(project) {
+        if (tabs.length >= MAX_TABS) { toast('Up to ' + MAX_TABS + ' projects can be open at once. Close one first.'); return false; }
+        stashTab();
+        tabs.push({ id: T.newId('tab'), project: project, history: new T.History(project), time: 0, selection: [], selected: null });
+        switchTab(tabs.length - 1);
+        return true;
     }
 
     function closeTab(i) {
@@ -3965,13 +4142,48 @@
         result.textContent = '';
         result.append(
             el('p', { text: 'Done — ' + formatBytes(blob.size) + '. Your download should start; if not, use the link.' }),
-            el('a', { href: url, download: name, id: 'export-download', text: 'Download ' + name })
+            el('a', { href: url, download: name, id: 'export-download', text: 'Download ' + name }),
+            shareRow(blob, name)
         );
         $('export-progress').hidden = true;
         result.hidden = false;
         $('export-cancel').textContent = 'Close';
         result.querySelector('a').click();
         renderAll();
+    }
+
+    /**
+     * Ways to share a finished video. Where the browser can share files (most
+     * phones, and Chrome or Edge on a computer) the video itself goes to
+     * WhatsApp, Telegram, email or any other app; otherwise WhatsApp or
+     * Telegram opens with a message, and the downloaded file is attached there.
+     */
+    function shareRow(blob, name) {
+        const file = new File([blob], name, { type: blob.type || 'video/mp4' });
+        const canShareFile = !!(navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
+        const text = state.project.name + ' — made with nooreditor.com';
+        const share = async function () {
+            try {
+                await navigator.share({ files: [file], title: state.project.name, text: text });
+            } catch (err) {
+                if (err && err.name !== 'AbortError') toast('Sharing did not work here. Use the downloaded file instead.');
+            }
+        };
+        const open = function (url, app) {
+            window.open(url, '_blank', 'noopener');
+            toast('Attach the downloaded video in ' + app + ' to send it.');
+        };
+        const buttons = [];
+        if (canShareFile) buttons.push(el('button', { type: 'button', className: 'primary', text: 'Share video…', onclick: share }));
+        buttons.push(el('button', {
+            type: 'button', text: 'WhatsApp', title: 'Send the video on WhatsApp',
+            onclick: canShareFile ? share : function () { open('https://wa.me/?text=' + encodeURIComponent(text), 'WhatsApp'); }
+        }));
+        buttons.push(el('button', {
+            type: 'button', text: 'Telegram', title: 'Send the video on Telegram',
+            onclick: canShareFile ? share : function () { open('https://t.me/share/url?url=' + encodeURIComponent('https://nooreditor.com') + '&text=' + encodeURIComponent(text), 'Telegram'); }
+        }));
+        return el('div', { className: 'share-row' }, [el('span', { className: 'hint', text: 'Share:' })].concat(buttons));
     }
 
     function cancelExport() {
@@ -4238,6 +4450,10 @@
         duckFn: duckFn,
         waitFor: waitFor,
         imageFor: imageFor,
+        makeCard: makeCard,
+        openProjectInTab: openProjectInTab,
+        focusLibraryProject: focusLibraryProject,
+        addTitleTrack: function (p, name) { const id = T.nextTrackId(p, 'text'); return { project: T.addTrack(p, 'text', name), id: id }; },
         showAbout: showAbout,
         /** Adds a command to the Tools menu: { section, label, run }. */
         addTool: function (tool) { tools.push(tool); }

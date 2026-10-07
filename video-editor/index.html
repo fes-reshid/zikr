@@ -124,6 +124,30 @@ input[type="range"] { accent-color: var(--accent); min-width: 0; }
     min-height: 0;
     position: relative;
 }
+/* Sound library, recording bar, project library, sharing */
+.sound-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; margin-bottom: 10px; }
+.sound-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.sound-row span { flex: 1; }
+.record-bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 14px; background: var(--panel); border: 1px solid #e5484d; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.record-thumb { width: 128px; height: 72px; border-radius: 6px; background: #000; }
+.record-dot { width: 12px; height: 12px; border-radius: 50%; background: #e5484d; animation: rec-blink 1s infinite; }
+.record-bar.paused .record-dot { animation: none; opacity: .4; }
+@keyframes rec-blink { 50% { opacity: .25; } }
+.record-time { font-family: var(--mono); min-width: 120px; }
+.record-countdown { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; font-size: 160px; font-weight: 800; color: #fff; background: rgba(0,0,0,.55); pointer-events: none; }
+.library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.library-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--panel-2, var(--panel)); min-width: 0; }
+.library-card.current { border-color: var(--accent); }
+.library-card img, .library-blank { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; border-radius: 8px; }
+.library-blank { display: grid; place-items: center; color: var(--muted); font-size: 28px; }
+.library-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+/* Keyframes */
+.clip-key { position: absolute; bottom: 4px; width: 9px; height: 9px; margin-left: -4px; background: #ffd27a; border: 1px solid #5a3d00; transform: rotate(45deg); pointer-events: none; z-index: 2; }
+.key-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.key-chip { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; }
+.key-chip button { padding: 3px 6px; font-size: 12px; }
 /* Project tabs: several videos open at once. */
 .project-tabs { display: flex; align-items: center; gap: 3px; min-width: 0; max-width: 46vw; overflow-x: auto; scrollbar-width: none; }
 .project-tab { display: flex; align-items: center; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel-2, var(--panel)); flex: none; max-width: 170px; }
@@ -802,6 +826,11 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
 <script src="hadith.js?v=dev"></script>
 <script src="workspace-layout.js?v=dev"></script>
 <script src="workspace-resize.js?v=dev"></script>
+<script src="brand.js?v=dev"></script>
+<script src="short.js?v=dev"></script>
+<script src="sounds.js?v=dev"></script>
+<script src="record.js?v=dev"></script>
+<script src="library.js?v=dev"></script>
 <script>
 // Works offline after the first visit (http only; the service worker cannot run from a file).
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {

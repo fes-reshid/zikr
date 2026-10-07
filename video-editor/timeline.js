@@ -426,6 +426,18 @@
         const p = clone(project);
         const c = p.clips.find((x) => x.id === id);
         if (!c) return project;
+        if (c.keys && c.keys.length && !('keys' in patch)) {
+            // Moving or resizing a clip with keyframes moves or resizes its whole path.
+            const dx = 'x' in patch ? patch.x - (c.x === undefined ? 0.5 : c.x) : 0;
+            const dy = 'y' in patch ? patch.y - (c.y === undefined ? 0.5 : c.y) : 0;
+            const ks = 'scale' in patch && (c.scale || 1) ? patch.scale / (c.scale || 1) : 1;
+            if (dx || dy || ks !== 1) {
+                c.keys = c.keys.map((k) => Object.assign({}, k, {
+                    x: k.x === undefined ? k.x : round(k.x + dx), y: k.y === undefined ? k.y : round(k.y + dy),
+                    scale: k.scale === undefined ? k.scale : round(k.scale * ks)
+                }));
+            }
+        }
         Object.keys(patch).forEach(function (k) {
             if (k === 'filters') c.filters = Object.assign({}, c.filters || DEFAULT_FILTERS, patch.filters);
             else if (k === 'fx') c.fx = mergeFx(c.fx, patch.fx);
@@ -516,6 +528,8 @@
             c.start = s;
             c.duration = round(end - s);
             if (!isGenerated(clip) && !clip.freeze) c.in = round(Math.max(0, (clip.in || 0) + delta * speed));
+            // Keyframes stay where they were in time.
+            if (c.keys) c.keys = c.keys.map((k) => Object.assign({}, k, { t: round(k.t - delta) }));
         } else if (edge === 'end') {
             const nextStart = others.filter((o) => o.start >= end - EPS)
                 .reduce((m, o) => Math.min(m, o.start), Infinity);
@@ -555,7 +569,49 @@
         right.fadeOut = Math.min(right.fadeOut || 0, right.duration);
         right.transition = null;
         if (!isGenerated(right) && !right.freeze) right.in = round((clip.in || 0) + offset * speedOf(clip));
+        if (clip.keys && clip.keys.length) {
+            // Each half keeps its part of the animation, with a keyframe at the cut so nothing jumps.
+            const atCut = Object.assign({ t: offset }, keyframeAt(clip, time));
+            left.keys = clip.keys.filter((k) => k.t < offset - EPS).concat([atCut]);
+            right.keys = [Object.assign({}, atCut, { t: 0 })].concat(clip.keys.filter((k) => k.t > offset + EPS)
+                .map((k) => Object.assign({}, k, { t: round(k.t - offset) })));
+        }
         p.clips.splice(p.clips.indexOf(left) + 1, 0, right);
+        return p;
+    }
+
+    /**
+     * The part of a project between `from` and `to`, as a project of its own
+     * starting at 0: clips are trimmed to the range (their source, keyframes
+     * and fades with them) and markers outside it are dropped.
+     */
+    function excerpt(project, from, to) {
+        const p = clone(project);
+        const a = Math.max(0, from);
+        const b = Math.max(a + MIN_DURATION, to);
+        p.clips = p.clips.filter((c) => c.start < b - EPS && clipEnd(c) > a + EPS).map(function (c) {
+            const cut = Math.max(0, a - c.start);
+            const end = Math.min(clipEnd(c), b);
+            if (cut > 0) {
+                if (!isGenerated(c) && !c.freeze) c.in = round((c.in || 0) + cut * speedOf(c));
+                if (c.keys) c.keys = c.keys.map((k) => Object.assign({}, k, { t: round(k.t - cut) }));
+                c.transition = null;
+                c.fadeIn = 0;
+            }
+            c.start = round(Math.max(c.start, a) - a);
+            c.duration = round(end - a - c.start);
+            if (end < clipEnd(project.clips.find((x) => x.id === c.id))) c.fadeOut = Math.min(c.fadeOut || 0, 0.3);
+            return c;
+        });
+        p.markers = (p.markers || []).filter((m) => m.time >= a && m.time < b).map((m) => Object.assign({}, m, { time: round(m.time - a) }));
+        return p;
+    }
+
+    /** Opens a gap: every clip and marker from `at` on moves `seconds` later. */
+    function insertTime(project, at, seconds) {
+        const p = clone(project);
+        p.clips.forEach(function (c) { if (c.start >= at - EPS) c.start = round(c.start + seconds); });
+        (p.markers || []).forEach(function (m) { if (m.time >= at - EPS) m.time = round(m.time + seconds); });
         return p;
     }
 
@@ -995,6 +1051,86 @@
             out.exit = handExit(local - span);
         }
         return out;
+    }
+
+    /* ------------------------------------------------------------- keyframes */
+
+    /** What keyframes animate: position, size, turn (degrees) and opacity. */
+    const KEY_PROPS = ['x', 'y', 'scale', 'rotate', 'opacity'];
+
+    /** A clip's own values for the keyframed properties. */
+    function keyBase(clip) {
+        return {
+            x: clip.x === undefined ? 0.5 : clip.x, y: clip.y === undefined ? 0.5 : clip.y,
+            scale: clip.scale === undefined ? 1 : clip.scale, rotate: 0,
+            opacity: clip.opacity === undefined ? 1 : clip.opacity
+        };
+    }
+
+    function easeInOut(u) {
+        return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    }
+
+    /**
+     * The keyframed values at `time`, eased between neighbouring keyframes and
+     * held before the first and after the last; null for a clip without any.
+     * Keyframe times (`t`) are seconds from the start of the clip.
+     */
+    function keyframeAt(clip, time) {
+        const keys = clip.keys;
+        if (!keys || !keys.length) return null;
+        const base = keyBase(clip);
+        const full = (k) => {
+            const o = {};
+            KEY_PROPS.forEach((prop) => { o[prop] = k[prop] === undefined ? base[prop] : k[prop]; });
+            return o;
+        };
+        const t = time - clip.start;
+        if (t <= keys[0].t) return full(keys[0]);
+        const last = keys[keys.length - 1];
+        if (t >= last.t) return full(last);
+        let i = 0;
+        while (i < keys.length - 2 && keys[i + 1].t <= t) i += 1;
+        const a = full(keys[i]);
+        const b = full(keys[i + 1]);
+        const span = keys[i + 1].t - keys[i].t;
+        const u = easeInOut(span > 0 ? clamp((t - keys[i].t) / span, 0, 1) : 1);
+        const o = {};
+        KEY_PROPS.forEach((prop) => { o[prop] = a[prop] + (b[prop] - a[prop]) * u; });
+        return o;
+    }
+
+    /**
+     * Adds a keyframe at `t` seconds into the clip, or changes the one already
+     * there: it starts from what the clip looks like at that moment, with
+     * `values` on top.
+     */
+    function setKeyframe(project, id, t, values) {
+        const clip = getClip(project, id);
+        if (!clip) return project;
+        const at = round(clamp(t, 0, clip.duration));
+        const p = clone(project);
+        const c = p.clips.find((x) => x.id === id);
+        const keys = (c.keys || []).slice();
+        const near = keys.findIndex((k) => Math.abs(k.t - at) < 1 / 60);
+        const now = keyframeAt(clip, clip.start + at) || keyBase(clip);
+        const v = {};
+        Object.keys(values || {}).forEach((k) => { if (KEY_PROPS.indexOf(k) !== -1) v[k] = round(values[k]); });
+        if (near !== -1) keys[near] = Object.assign({}, keys[near], v);
+        else keys.push(Object.assign({ t: at }, now, v));
+        keys.sort((a, b) => a.t - b.t);
+        c.keys = keys;
+        return p;
+    }
+
+    function removeKeyframe(project, id, index) {
+        const clip = getClip(project, id);
+        if (!clip || !clip.keys || !clip.keys[index]) return project;
+        const p = clone(project);
+        const c = p.clips.find((x) => x.id === id);
+        c.keys = c.keys.filter((k, i) => i !== index);
+        if (!c.keys.length) delete c.keys;
+        return p;
     }
 
     const IDENTITY_MOVE = { alpha: 1, dx: 0, dy: 0, scale: 1, rotate: 0, scaleX: 1, blur: 0 };
@@ -1635,12 +1771,12 @@
         createProject, addMedia, getMedia, getClip, getTrack, addTrack, nextTrackId, updateTrack, removeTrack,
         isGenerated, clipKind, trackKindFor, isTimed, speedOf, clipEnd, trackClips, trackEnd, projectDuration, lowestTrack,
         isFree, findFreeStart, clipFromMedia, textClip, drawClip, addClip, appendMedia, updateClip, updateClips,
-        moveClip, moveClips, trimClip, splitClip, splitAt, deleteClips, duplicateClip, copyClips, pasteClips,
+        moveClip, moveClips, trimClip, splitClip, insertTime, excerpt, splitAt, deleteClips, duplicateClip, copyClips, pasteClips,
         sourceLength, setSpeed, freezeFrame, detachAudio,
         previousAdjacent, transitionWindow, transitionAt, setTransition, transitionAllCuts, transitionMix,
         activeClips, sourceTime, fadeAt, edgeFade, renderLayers, mediaAt, audibleClips, placeRect,
         nextAdjacent, soundWindow, clipGainAt,
-        motionAt, textAnimAt, moveAt, combineMoves, isStill, exitAt, clipMoveAt, handOf, drawAnimAt, strokeLengths, revealStrokes, simplifyPoints, shapeStrokes, filterString, duckEnvelope, envelopeAt,
+        motionAt, textAnimAt, keyframeAt, setKeyframe, removeKeyframe, KEY_PROPS, moveAt, combineMoves, isStill, exitAt, clipMoveAt, handOf, drawAnimAt, strokeLengths, revealStrokes, simplifyPoints, shapeStrokes, filterString, duckEnvelope, envelopeAt,
         addMarker, updateMarker, removeMarker, chaptersText,
         snapTime, rulerStep, formatTime, parseTime, toFrame,
         isArabic, arabicDigits, wordsToCaptions, toSRT, toVTT, parseSubtitles, trackCues,

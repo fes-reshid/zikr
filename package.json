@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node build.js",
     "icons": "node tools/make-icons.js",
-    "test": "node build.js --check && node --test test/core.test.js video-editor/test/timeline.test.js video-editor/test/timeline-features.test.js video-editor/test/audio-core.test.js video-editor/test/webm.test.js video-editor/test/effects.test.js video-editor/test/draw.test.js video-editor/test/creator-tools.test.js video-editor/test/creative-effects.test.js video-editor/test/moves.test.js",
+    "test": "node build.js --check && node --test test/core.test.js video-editor/test/timeline.test.js video-editor/test/timeline-features.test.js video-editor/test/audio-core.test.js video-editor/test/webm.test.js video-editor/test/effects.test.js video-editor/test/draw.test.js video-editor/test/creator-tools.test.js video-editor/test/creative-effects.test.js video-editor/test/moves.test.js video-editor/test/batch.test.js",
     "test:e2e": "node test/tracker.test.js && node test/reader.test.js && node test/pwa.test.js && node test/account.test.js && node test/admin-report.test.js && node test/menu.test.js && node video-editor/test/editor.test.js",
     "test:tracker": "node test/tracker.test.js",
     "test:reader": "node test/reader.test.js",
