@@ -12,7 +12,7 @@ SRC="$HERE/video-editor"
 DEST=${1:-"$HERE/../barnoota/video-editing"}
 V=$(date -u +%Y%m%d%H%M)
 
-FILES="index.html help.html manifest.webmanifest sw.js consent.js timeline.js hands.js handwriting.js studio.js workspace-layout.js hadith.js art-gallery.js preview-edit.js creator-tools.js creative-effects.js audio-core.js webm.js editor.js
+FILES="index.html help.html manifest.webmanifest sw.js consent.js timeline.js hands.js handwriting.js studio.js workspace-layout.js workspace-resize.js hadith.js art-gallery.js preview-edit.js creator-tools.js creative-effects.js audio-core.js webm.js editor.js
 media-store.js audio-mix.js export-fast.js quran.js captions.js transcribe-worker.js"
 
 rm -rf "$DEST"

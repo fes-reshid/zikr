@@ -501,6 +501,9 @@ async function probeFile(page, bytes) {
 
         /* ------------------------------------------- pan & zoom, blur fill */
         await clickClip(page, overlay.id);
+        const fresh = (await project(page)).clips.find((c) => c.id === overlay.id);
+        check('a photo put on the timeline starts animated: it fades in and slowly zooms', fresh.enter === 'fade' && fresh.motion && fresh.motion.type === 'zoom-in');
+        await page.getByRole('combobox', { name: 'Pan & zoom' }).selectOption('none');
         await page.getByRole('combobox', { name: 'Pan & zoom' }).selectOption('zoom-in');
         const ov = (await project(page)).clips.find((c) => c.id === overlay.id);
         // At 50% the square spans x 460–820; zoomed to 1.15× by the end it reaches 433.
@@ -510,6 +513,7 @@ async function probeFile(page, bytes) {
         await page.getByRole('combobox', { name: 'Bars' }).selectOption('blur');
         px = await pixel(page, ov.start + 1, 0.03, 0.5);
         check('blurred fill covers the bars with the picture', px[2] > 60 && px[2] > px[0] + 30, px.join(','));
+        await page.keyboard.press('Control+z');
         await page.keyboard.press('Control+z');
         await page.keyboard.press('Control+z');
 
@@ -586,7 +590,7 @@ async function probeFile(page, bytes) {
         /* ----------------------------------------------------------- saves */
         const [saved] = await Promise.all([page.waitForEvent('download'), page.click('#save-project')]);
         const savedJson = JSON.parse(fs.readFileSync(await saved.path(), 'utf8'));
-        check('Save downloads a project file with markers', savedJson.format === 'reel-project' && savedJson.markers.length === 1);
+        check('Save downloads a project file with markers', savedJson.format === 'reel-project' && savedJson.markers.length === 1, savedJson.format + ' ' + JSON.stringify(savedJson.markers));
 
         /* ---------------------------------------------------------- export */
         p = await project(page);
@@ -1067,6 +1071,144 @@ async function probeFile(page, bytes) {
         const quick = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'Written');
         check('the Write button adds a title written by a hand with a pen', !!quick && quick.anim === 'handwrite' && quick.hand === 'pen' &&
             await page.getByRole('combobox', { name: 'Hand', exact: true }).isVisible());
+
+        /* ------------------------------------- hand size, workspace, watermark */
+        // The drawing board's hand size.
+        const sizeAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
+        await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); }, sizeAt);
+        await page.click('#add-draw');
+        await page.locator('#draw-bar select[aria-label="Hand size"]').selectOption('1.9');
+        const board2 = await page.locator('#draw-layer').boundingBox();
+        await page.mouse.move(board2.x + board2.width * 0.3, board2.y + board2.height * 0.5);
+        await page.mouse.down();
+        await page.mouse.move(board2.x + board2.width * 0.6, board2.y + board2.height * 0.5, { steps: 6 });
+        await page.mouse.up();
+        await page.getByRole('button', { name: 'Done', exact: true }).click();
+        const bigHand = (await project(page)).clips.find((c) => c.type === 'draw' && Math.abs(c.start - sizeAt) < 0.01);
+        check('the drawing board can make the hand huge', bigHand && bigHand.handSize === 1.9);
+        await page.keyboard.press('Control+z');
+
+        // Dragging the edges and corner of the video area.
+        const viewerW = async () => (await page.locator('.viewer').boundingBox()).width;
+        const w0 = await viewerW();
+        const edge = await page.locator('.col-resizer.right').boundingBox();
+        await page.mouse.move(edge.x + edge.width / 2, edge.y + 200);
+        await page.mouse.down();
+        await page.mouse.move(edge.x + edge.width / 2 + 120, edge.y + 200, { steps: 5 });
+        await page.mouse.up();
+        const w1 = await viewerW();
+        check('dragging the right edge of the video area makes it wider', w1 > w0 + 80, Math.round(w0) + ' → ' + Math.round(w1));
+        const h0 = (await page.locator('.viewer').boundingBox()).height;
+        const grip = await page.locator('.stage-grip').boundingBox();
+        await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(grip.x + grip.width / 2 - 100, grip.y + grip.height / 2 - 80, { steps: 5 });
+        await page.mouse.up();
+        const after = await page.locator('.viewer').boundingBox();
+        check('the corner grip makes the video area smaller both ways', after.width < w1 - 80 && after.height < h0 - 60,
+            Math.round(w1) + '×' + Math.round(h0) + ' → ' + Math.round(after.width) + '×' + Math.round(after.height));
+        await page.evaluate(() => { ['reel.binWidth', 'reel.inspectorWidth', 'reel.timelineHeight'].forEach((k) => localStorage.removeItem(k)); document.body.style.removeProperty('--insp-w'); document.body.style.removeProperty('--timeline-h'); window.dispatchEvent(new Event('resize')); });
+
+        // The nooreditor.com watermark.
+        const markPixels = () => page.evaluate(function () {
+            window.Reel.drawFrame();
+            const c = document.getElementById('preview');
+            const d = c.getContext('2d').getImageData(Math.floor(c.width * 0.7), Math.floor(c.height * 0.9), Math.floor(c.width * 0.3), Math.floor(c.height * 0.1)).data;
+            let n = 0;
+            for (let i = 0; i < d.length; i += 4) if (d[i] > 150 && Math.abs(d[i] - d[i + 2]) < 12) n += 1;
+            return n;
+        });
+        await page.evaluate((t) => window.Reel.seek(t), sizeAt + 30);
+        const marked = await markPixels();
+        await page.evaluate(() => window.ReelApp.selectOnly(null));
+        await page.locator('.inspector-body label.check', { hasText: 'nooreditor.com' }).click();
+        const unmarked = await markPixels();
+        check('the nooreditor.com watermark is in the corner, and can be turned off', marked > 150 && unmarked === 0 &&
+            (await project(page)).watermark === false, marked + ' → ' + unmarked);
+        await page.keyboard.press('Control+z');
+        check('it is on again after undo', (await project(page)).watermark !== false);
+
+        /* ---------------------------------------------------------- animations */
+        const animAt = sizeAt + 2;
+        await page.evaluate((t) => { window.Reel.seek(t); window.ReelApp.selectOnly(null); }, animAt);
+        await page.click('#add-text');
+        await page.keyboard.type('Spin');
+        await page.locator('#timeline').focus();
+        await page.getByRole('combobox', { name: 'Entrance', exact: true }).selectOption('spin');
+        await page.getByRole('combobox', { name: 'Exit', exact: true }).selectOption('fade');
+        const spun = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'Spin');
+        const spinState = await page.evaluate((id) => {
+            const c = window.Reel.project.clips.find((x) => x.id === id);
+            const T = window.TimelineCore;
+            return [T.textAnimAt(c, c.start + 0.15), T.textAnimAt(c, c.start + c.duration - 0.1), T.textAnimAt(c, c.start + 2)];
+        }, spun.id);
+        check('new title entrances turn the title in, and exits fade it out', spinState[0].rotate < -0.5 && spinState[1].alpha < 0.3 &&
+            spinState[2].alpha === 1 && !spinState[2].rotate, spinState[0].rotate.toFixed(2) + ' / ' + spinState[1].alpha.toFixed(2));
+        const entranceList = await page.getByRole('combobox', { name: 'Entrance', exact: true }).locator('option').allTextContents();
+        check('titles have many entrances', entranceList.length >= 15 && entranceList.includes('Bounce') && entranceList.includes('Blur in'), entranceList.length);
+        // A picture's own entrance.
+        const pic = p.media.find((m) => m.type === 'image') || (await project(page)).media.find((m) => m.type === 'image');
+        const picClip = await page.evaluate(function (a) {
+            const app = window.ReelApp;
+            const T = app.T;
+            let p = app.state.project;
+            const id = T.nextTrackId(p, 'video');
+            p = T.addTrack(p, 'video');
+            const clip = Object.assign(T.clipFromMedia(T.getMedia(p, a.media), id, a.at), { duration: 3, enter: 'zoom-in', enterDuration: 1 });
+            app.state.project = T.addClip(p, clip);
+            app.commit();
+            return clip.id;
+        }, { media: pic.id, at: animAt + 6 });
+        const coverage = (t) => page.evaluate(async function (time) {
+            window.Reel.seek(time);
+            await new Promise((r) => setTimeout(r, 200));
+            window.Reel.drawFrame();
+            const c = document.getElementById('preview');
+            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+            let n = 0;
+            for (let i = 0; i < d.length; i += 4) if (d[i + 2] > 25 && d[i + 2] > d[i] + 20) n += 1;
+            return n;
+        }, t);
+        const zoomStart = await coverage(animAt + 6.2);
+        const zoomEnd = await coverage(animAt + 7.5);
+        check('a picture can zoom in as it appears', zoomStart > 0 && zoomEnd > zoomStart * 1.6, zoomStart + ' → ' + zoomEnd + ' blue pixels');
+        await page.evaluate((id) => window.Reel.select(id), picClip);
+        check('pictures have entrance and exit choices', await page.getByRole('combobox', { name: 'Entrance', exact: true }).isVisible() &&
+            await page.getByRole('combobox', { name: 'Exit', exact: true }).isVisible());
+
+        /* ------------------------------------------------------------ templates */
+        await page.click('#studio-templates');
+        const cardCount = await page.locator('.modal.generic .studio-card').count();
+        check('there are many templates to start from', cardCount >= 28, cardCount);
+        await page.locator('.modal.generic .studio-card', { hasText: 'Quiz time' }).click();
+        await page.locator('.modal.generic').getByRole('button', { name: 'Use template' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
+        const quiz = (await project(page)).clips.filter((c) => c.type === 'text' && c.anim === 'spin');
+        check('a new template adds its scenes with its own animation', quiz.length >= 3, quiz.length);
+        await page.keyboard.press('Control+z');
+
+        /* ------------------------------------------------------------------ tabs */
+        page.on('dialog', (d) => d.accept());
+        const firstClips = (await project(page)).clips.length;
+        await page.click('.tab-add');
+        check('+ opens a second project in a new tab', await page.locator('.project-tab').count() === 2 && (await project(page)).clips.length === 0);
+        await page.click('#add-text');
+        await page.keyboard.type('Second video');
+        await page.locator('#timeline').focus();
+        await page.locator('.project-tab .tab-name').first().click();
+        check('switching back shows the first project untouched', (await project(page)).clips.length === firstClips);
+        await page.locator('.project-tab .tab-name').nth(1).click();
+        check('and the second keeps its own work', (await project(page)).clips.some((c) => c.text === 'Second video'));
+        await page.keyboard.press('Control+z');
+        check('each tab has its own undo', !(await project(page)).clips.some((c) => c.text === 'Second video'));
+        await page.keyboard.press('Control+y');
+        await page.waitForTimeout(600);
+        await page.reload();
+        await page.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+        check('both tabs come back after a reload', await page.locator('.project-tab').count() === 2 &&
+            (await project(page)).clips.some((c) => c.text === 'Second video'));
+        await page.locator('.project-tab .tab-close').nth(1).click();
+        check('a tab can be closed, leaving the first project', await page.locator('.project-tab').count() === 1 && (await project(page)).clips.length === firstClips);
 
         /* ---------------------------------------------------------- on a phone */
         await page.setViewportSize({ width: 390, height: 844 });

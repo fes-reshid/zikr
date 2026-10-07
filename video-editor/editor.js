@@ -21,6 +21,9 @@
     const $ = (id) => document.getElementById(id);
 
     const STORAGE_KEY = 'reel.project';
+    /** The open project tabs: { active, items: [{ id, project }] }, with each project serialised. */
+    const TABS_KEY = 'reel.tabs';
+    const MAX_TABS = 5;
     const LAYOUT_KEY = 'reel.timelineHeight';
     const MIN_PPS = 5;
     const MAX_PPS = 500;
@@ -58,7 +61,19 @@
     };
     const ANIM_LABELS = {
         none: 'None', fade: 'Fade in', rise: 'Rise up', pop: 'Pop', slide: 'Slide in',
-        typewriter: 'Typewriter', words: 'Word by word', handwrite: 'Handwriting'
+        typewriter: 'Typewriter', words: 'Word by word', handwrite: 'Handwriting',
+        drop: 'Drop in (bounce)', 'slide-right': 'Slide in from right', 'zoom-in': 'Zoom in', 'zoom-out': 'Zoom out (from big)',
+        spin: 'Spin in', flip: 'Flip in', blur: 'Blur in', bounce: 'Bounce', swing: 'Swing'
+    };
+    /** Entrances for pictures, videos and the like: the movements, without the text-only reveals. */
+    const ENTER_LABELS = {
+        none: 'None', fade: 'Fade in', 'zoom-in': 'Zoom in', 'zoom-out': 'Zoom out (from big)', pop: 'Pop', bounce: 'Bounce',
+        rise: 'Rise up', drop: 'Drop in (bounce)', slide: 'Slide in from left', 'slide-right': 'Slide in from right',
+        spin: 'Spin in', flip: 'Flip in', blur: 'Blur in', swing: 'Swing'
+    };
+    const EXIT_LABELS = {
+        none: 'None', fade: 'Fade out', 'zoom-in': 'Shrink away', 'zoom-out': 'Grow and fade', rise: 'Sink down',
+        slide: 'Slide out left', 'slide-right': 'Slide out right', spin: 'Spin out', flip: 'Flip out', blur: 'Blur out', pop: 'Pop out'
     };
     const DRAW_ANIM_LABELS = { draw: 'Draw on', fade: 'Fade in', none: 'Appear at once' };
 
@@ -257,7 +272,13 @@
     function persist() {
         clearTimeout(saveTimer);
         saveTimer = setTimeout(function () {
-            storage(function (s) { s.setItem(STORAGE_KEY, T.serialize(state.project)); });
+            storage(function (s) {
+                s.setItem(STORAGE_KEY, T.serialize(state.project));
+                s.setItem(TABS_KEY, JSON.stringify({
+                    active: activeTab,
+                    items: tabs.map((t, i) => ({ id: t.id, project: T.serialize(i === activeTab ? state.project : t.project) }))
+                }));
+            });
         }, 250);
     }
 
@@ -595,12 +616,59 @@
             c.save();
             c.globalAlpha = layer.alpha;
             if (layer.transition) applyTransition(c, layer.transition, W, H);
+            if (layer.kind !== 'text' || layer.clip.type === 'draw' || layer.clip.sticker) applyMove(c, layer.clip, t, W, H);
             if (layer.clip.sticker && window.ReelEffects) window.ReelEffects.sticker(c, layer.clip, t, W, H);            else if (layer.clip.type === 'draw') drawDrawing(c, layer.clip, t, W, H, source);
             else if (layer.kind === 'text') drawText(c, layer.clip, t, W, H);
             else drawVisual(c, layer.clip, layer.kind, t, W, H, source);
+            moveBlur = 0;
             c.restore();
         });
+        if (p.watermark !== false) drawWatermark(c, W, H);
         c.restore();
+    }
+
+    /** Blur from a picture's entrance or exit, added to its own filters in drawVisual. */
+    let moveBlur = 0;
+
+    /** Moves, turns, scales and fades a picture, video, drawing or sticker for its entrance and exit. */
+    function applyMove(c, clip, t, W, H) {
+        const m = T.clipMoveAt(clip, t);
+        if (T.isStill(m)) return;
+        c.globalAlpha *= m.alpha;
+        const cx = (clip.x === undefined ? 0.5 : clip.x) * W;
+        const cy = (clip.y === undefined ? 0.5 : clip.y) * H;
+        c.translate(cx + m.dx * W, cy + m.dy * H);
+        if (m.rotate) c.rotate(m.rotate);
+        c.scale(m.scale * m.scaleX, m.scale);
+        c.translate(-cx, -cy);
+        moveBlur = m.blur * H / 720;
+    }
+
+    const WATERMARK = 'nooreditor.com';
+
+    /** The nooreditor.com mark in the bottom-right corner; it can be turned off per project. */
+    function drawWatermark(c, W, H) {
+        const size = Math.max(10, Math.round(Math.min(W, H) * 0.034));
+        const m = Math.round(size * 0.9);
+        c.save();
+        c.globalAlpha = 0.78;
+        c.font = '700 ' + size + 'px ' + FONTS.sans.css;
+        c.textAlign = 'right';
+        c.textBaseline = 'alphabetic';
+        c.direction = 'ltr';
+        c.shadowColor = 'rgba(0,0,0,.55)';
+        c.shadowBlur = size * 0.35;
+        c.shadowOffsetY = size * 0.06;
+        c.fillStyle = '#ffffff';
+        c.fillText(WATERMARK, W - m, H - m);
+        c.restore();
+    }
+
+    function setWatermark(on) {
+        if ((state.project.watermark !== false) === on) return;
+        const next = T.clone(state.project);
+        next.watermark = on;
+        apply(next);
     }
 
     /** Moves, clips or scales a transition's layer on its way in or out. */
@@ -763,7 +831,8 @@
         c.clip(frame);
         c.save();
         c.scale(fx.flipH ? -1 : 1, fx.flipV ? -1 : 1);
-        c.filter = T.filterString(clip.filters);
+        const looks = T.filterString(clip.filters);
+        c.filter = moveBlur > 0.2 ? (looks === 'none' ? '' : looks + ' ') + 'blur(' + moveBlur.toFixed(1) + 'px)' : looks;
         c.drawImage(s.src, cr.sx, cr.sy, cr.sw, cr.sh, -hw, -hh, r.w, r.h);
         c.filter = 'none';
         if (fx.hide) drawHidden(c, s, cr, fx.hide, -hw, -hh, r.w, r.h, source === liveSource && clip.id === state.selected);
@@ -898,11 +967,13 @@
         const cy = (clip.y + anim.dy) * H;
         const top = cy - blockH / 2;
 
-        if (anim.scale !== 1) {
+        if (anim.scale !== 1 || anim.rotate || (anim.scaleX !== undefined && anim.scaleX !== 1)) {
             c.translate(cx, cy);
-            c.scale(anim.scale, anim.scale);
+            if (anim.rotate) c.rotate(anim.rotate);
+            c.scale(anim.scale * (anim.scaleX === undefined ? 1 : anim.scaleX), anim.scale);
             c.translate(-cx, -cy);
         }
+        if (anim.blur > 0.2) c.filter = 'blur(' + (anim.blur * H / 720).toFixed(1) + 'px)';
         if (clip.box) {
             const padX = size * 0.4;
             const padY = size * 0.2;
@@ -1102,6 +1173,9 @@
         return { x: clip.x * W + (x * W - W / 2) * sc, y: clip.y * H + (y * H - H / 2) * sc };
     }
 
+    /** How big the drawing hand is at 100%, as a share of the frame's height. */
+    const DRAW_HAND = 0.5;
+
     /** A drawing clip, drawn on stroke by stroke, with the hand at the pen's point. */
     function drawDrawing(c, clip, t, W, H, source) {
         if (drawMode && drawMode.clipId === clip.id && source === liveSource) return;
@@ -1120,7 +1194,7 @@
             const at = drawingToFrame(clip, r.tip.x, r.tip.y, W, H);
             const local = Math.max(0, t - clip.start);
             const inking = r.strokes[r.strokes.length - 1];
-            drawHand(c, hand, at.x, at.y, H * 0.3 * hand.size, anim.exit, W, H,
+            drawHand(c, hand, at.x, at.y, H * DRAW_HAND * hand.size, anim.exit, W, H,
                 { angle: anim.reveal < 1 ? Math.sin(local * 7) * 0.04 : 0, ink: inking && inking.color });
         }
     }
@@ -1444,14 +1518,28 @@
     function addToTimeline(mediaId) {
         const before = new Set(state.project.clips.map((c) => c.id));
         const wasEmpty = !state.project.clips.length;
-        if (!apply(T.appendMedia(state.project, mediaId))) {
+        let next = T.appendMedia(state.project, mediaId);
+        const added = next.clips.find((c) => !before.has(c.id));
+        if (added) next = animateNewPicture(next, added.id);
+        if (!apply(next)) {
             toast('There is no track for that kind of media.');
             return null;
         }
-        const clip = state.project.clips.find((c) => !before.has(c.id));
-        if (clip) selectOnly(clip.id);
+        if (added) selectOnly(added.id);
         if (wasEmpty) zoomToFit();
-        return clip ? clip.id : null;
+        return added ? added.id : null;
+    }
+
+    /**
+     * A photo added to the timeline starts animated: it fades in and slowly
+     * zooms (the Ken Burns effect). Both can be changed or turned off in the
+     * inspector, under Animation and Motion.
+     */
+    function animateNewPicture(project, clipId) {
+        const clip = T.getClip(project, clipId);
+        if (!clip || T.clipKind(project, clip) !== 'image' || clip.freeze) return project;
+        if (clip.enter || clip.motion) return project;
+        return T.updateClip(project, clipId, { enter: 'fade', enterDuration: 0.6, motion: { type: 'zoom-in', amount: 0.12 } });
     }
 
     /** Adds a media item at `time` on `trackId`, or its kind's main track. */
@@ -1465,7 +1553,7 @@
         const clip = T.clipFromMedia(media, track.id, time);
         const next = T.addClip(state.project, clip);
         if (next === state.project) return null;
-        state.project = next;
+        state.project = animateNewPicture(next, clip.id);
         return clip.id;
     }
 
@@ -1484,6 +1572,7 @@
     /* ----------------------------------------------------------------- render */
 
     function renderAll() {
+        renderTabs();
         renderMedia();
         renderTimeline();
         renderInspector();
@@ -2428,6 +2517,16 @@
         return control(label, input);
     }
 
+    /** How a clip leaves: its exit movement and how long it takes. */
+    function exitControls(clip) {
+        const on = EXIT_LABELS[clip.exit] && clip.exit !== 'none';
+        return [
+            chooser('Exit', on ? clip.exit : 'none', Object.keys(EXIT_LABELS).map((k) => [k, EXIT_LABELS[k]]),
+                (v) => T.updateClip(state.project, clip.id, { exit: v === 'none' ? null : v })),
+            on ? slider(clip, 'Exit time', (c) => c.exitDuration || 0.6, (v) => ({ exitDuration: v }), { min: 0.1, max: 3, step: 0.1, show: secs }) : null
+        ];
+    }
+
     /** Which hand a title or drawing shows while it appears, its skin colour and size. */
     function handControls(clip, tools) {
         const H = window.ReelHands;
@@ -2577,10 +2676,10 @@
             ]));
             box.append(group('Animation', [
                 select_(clip, 'Entrance', 'anim', Object.keys(ANIM_LABELS).map((k) => [k, ANIM_LABELS[k]])),
-                clip.anim && ['fade', 'rise', 'pop', 'slide'].indexOf(clip.anim) !== -1
+                clip.anim && T.MOVES.indexOf(clip.anim) !== -1
                     ? slider(clip, 'Duration', (c) => c.animDuration || 0.6, (v) => ({ animDuration: v }), { min: 0.1, max: 3, step: 0.1, show: secs })
                     : null
-            ]));
+            ].concat(exitControls(clip))));
         } else if (clip.sticker) {
             box.append(group('Animated sticker', [button('Edit sticker / arrow', function () { window.ReelEffects.openStickers(); })]));
         } else if (clip.type === 'draw') {
@@ -2595,7 +2694,7 @@
                 clip.anim === 'draw'
                     ? slider(clip, 'Drawing time', (c) => c.animDuration || 3, (v) => ({ animDuration: v }), { min: 0.5, max: 30, step: 0.5, show: secs })
                     : null
-            ].concat(clip.anim === 'draw' ? handControls(clip, ['pen', 'pencil']) : [])));
+            ].concat(clip.anim === 'draw' ? handControls(clip, ['pen', 'pencil']) : [], exitControls(clip))));
         }
         if (kind !== 'audio') {
             const layout = [];
@@ -2620,6 +2719,13 @@
         }
 
         if (kind === 'video' || kind === 'image') {
+            box.append(group('Animation', [
+                chooser('Entrance', ENTER_LABELS[clip.enter] ? clip.enter : 'none', Object.keys(ENTER_LABELS).map((k) => [k, ENTER_LABELS[k]]),
+                    (v) => T.updateClip(state.project, clip.id, { enter: v === 'none' ? null : v })),
+                ENTER_LABELS[clip.enter] && clip.enter !== 'none'
+                    ? slider(clip, 'Duration', (c) => c.enterDuration || 0.6, (v) => ({ enterDuration: v }), { min: 0.1, max: 3, step: 0.1, show: secs })
+                    : null
+            ].concat(exitControls(clip))));
             const motion = clip.motion || { type: 'none', amount: 0.15 };
             box.append(group('Motion', [
                 chooser('Pan & zoom', motion.type || 'none', Object.keys(MOTION_LABELS).map((k) => [k, MOTION_LABELS[k]]),
@@ -2849,6 +2955,15 @@
                 control('Background', bg),
                 el('div', { className: 'check', text: p.width + '×' + p.height + ' · ' + p.fps + ' fps · ' + fmt(duration()) }),
                 el('div', { className: 'check', text: p.clips.length + ' clip' + (p.clips.length === 1 ? '' : 's') + ' on ' + p.tracks.length + ' tracks' })
+            ]),
+            group('Watermark', [
+                (function () {
+                    const box = el('input', { type: 'checkbox' });
+                    box.checked = p.watermark !== false;
+                    box.addEventListener('change', function () { setWatermark(box.checked); });
+                    return el('label', { className: 'check' }, [box, 'Show the ' + WATERMARK + ' watermark']);
+                }()),
+                el('p', { className: 'hint', text: 'It appears in the bottom-right corner of the preview and of exported videos.' })
             ]),
             group('Ducking', [
                 control('Duck to', duck, duckOut),
@@ -3080,12 +3195,20 @@
             paintDrawLayer();
             syncDrawClip();
         });
+        const HAND_SIZES = [['0.7', 'Small hand'], ['1', 'Medium hand'], ['1.4', 'Large hand'], ['1.9', 'Huge hand']];
+        const handSizeIn = el('select', { 'aria-label': 'Hand size', title: 'How big the hand is' }, HAND_SIZES.map((o) => el('option', { value: o[0], text: o[1] })));
+        handSizeIn.value = HAND_SIZES.reduce((best, o) => Math.abs(o[0] - drawMode.handSize) < Math.abs(best - drawMode.handSize) ? o[0] : best, '1');
+        handSizeIn.addEventListener('change', function () {
+            drawMode.handSize = Number(handSizeIn.value);
+            paintDrawLayer();
+            syncDrawClip();
+        });
         const undoBtn = el('button', { className: 'ghost', text: 'Undo', title: 'Undo the last stroke (Ctrl+Z)', onclick: undoStroke });
         const clearBtn = el('button', { className: 'ghost', text: 'Clear', onclick: function () { if (drawMode.strokes.length) { drawMode.undo.push(drawMode.strokes); drawMode.strokes = []; paintDrawLayer(); } } });
         const cancelBtn = el('button', { className: 'ghost', text: 'Cancel', onclick: function () { closeDrawMode(false); } });
         const doneBtn = el('button', { className: 'primary', text: 'Done', onclick: function () { closeDrawMode(true); } });
         const bar = el('div', { id: 'draw-bar', className: 'draw-bar', role: 'toolbar', 'aria-label': 'Drawing' }, [
-            tools, el('span', { className: 'draw-sep' }), colourIn, swatches, sizeIn, handIn,
+            tools, el('span', { className: 'draw-sep' }), colourIn, swatches, sizeIn, handIn, handSizeIn,
             el('span', { className: 'draw-sep' }), undoBtn, clearBtn, el('span', { className: 'spacer' }), cancelBtn, doneBtn
         ]);
         $('stage').append(layer, bar);
@@ -3269,7 +3392,7 @@
             const pt = drawMode.cursor;
             const at = { x: (f.x + (pt.x - .5) * f.scale) * W, y: (f.y + (pt.y - .5) * f.scale) * H };
             drawHand(c, { tool: drawMode.hand, style: drawMode.handStyle, skin: drawMode.handSkin, size: drawMode.handSize },
-                at.x, at.y, H * .3 * drawMode.handSize, 0, W, H, { ink: drawMode.color });
+                at.x, at.y, H * DRAW_HAND * drawMode.handSize, 0, W, H, { ink: drawMode.color });
         }
     }
 
@@ -3410,6 +3533,113 @@
         }
     }
 
+    /* ------------------------------------------------------------------- tabs */
+
+    // Several projects can be open at once, one per tab. The active tab's
+    // project, undo history, playhead and selection live in `state`; the
+    // others wait in `tabs` until switched to. All are saved in the browser.
+    let tabs = [{ id: T.newId('tab'), project: null, history: null, time: 0, selection: [], selected: null }];
+    let activeTab = 0;
+
+    function restoreTabs() {
+        const raw = storage((s) => s.getItem(TABS_KEY));
+        if (!raw) return;
+        try {
+            const data = JSON.parse(raw);
+            const items = (data.items || []).map(function (it) {
+                try { return { id: it.id || T.newId('tab'), project: T.deserialize(it.project), history: null, time: 0, selection: [], selected: null }; }
+                catch (err) { return null; }
+            }).filter(Boolean).slice(0, MAX_TABS);
+            if (items.length < 2) return;
+            tabs = items;
+            activeTab = T.clamp(Number(data.active) || 0, 0, items.length - 1);
+            state.project = tabs[activeTab].project;
+            state.history = new T.History(state.project);
+        } catch (err) { /* a broken save: keep the single project */ }
+    }
+
+    /** Media ids used by the tabs that are not active, so their stored files are kept. */
+    function otherTabsMedia() {
+        const ids = [];
+        tabs.forEach(function (t, i) { if (i !== activeTab && t.project) t.project.media.forEach((m) => ids.push(m.id)); });
+        return ids;
+    }
+
+    function stashTab() {
+        Object.assign(tabs[activeTab], {
+            project: state.project, history: state.history, time: state.time,
+            selection: state.selection.slice(), selected: state.selected
+        });
+    }
+
+    function switchTab(i) {
+        if (i === activeTab || !tabs[i]) return;
+        if (drawMode) closeDrawMode(true);
+        pause();
+        stashTab();
+        const t = tabs[i];
+        activeTab = i;
+        state.project = t.project;
+        state.history = t.history || new T.History(t.project);
+        state.time = t.time || 0;
+        state.selection = (t.selection || []).slice();
+        state.selected = t.selected || null;
+        state.marker = null;
+        afterChange();
+        fitCanvas();
+        updateRestoreBanner();
+        reattachStored(false);
+    }
+
+    function newTab() {
+        if (tabs.length >= MAX_TABS) { toast('Up to ' + MAX_TABS + ' projects can be open at once. Close one first.'); return; }
+        stashTab();
+        const p = T.createProject({ width: state.project.width, height: state.project.height, fps: state.project.fps });
+        p.name = 'Project ' + (tabs.length + 1);
+        tabs.push({ id: T.newId('tab'), project: p, history: new T.History(p), time: 0, selection: [], selected: null });
+        switchTab(tabs.length - 1);
+        toast('New project in a new tab. Your other project is still open in its tab.');
+    }
+
+    function closeTab(i) {
+        if (tabs.length < 2) return;
+        const p = i === activeTab ? state.project : tabs[i].project;
+        if (p.clips.length && !window.confirm('Close “' + p.name + '”? It will be removed from this browser — Save it first to keep a copy.')) return;
+        if (i === activeTab) {
+            const next = i === tabs.length - 1 ? i - 1 : i + 1;
+            switchTab(next);
+        }
+        tabs.splice(i, 1);
+        if (activeTab > i) activeTab -= 1;
+        afterChange();
+        if (window.ReelStore) window.ReelStore.keepOnly(state.project.media.map((m) => m.id).concat(otherTabsMedia()));
+    }
+
+    function renderTabs() {
+        const box = $('project-tabs');
+        if (!box) return;
+        box.textContent = '';
+        tabs.forEach(function (t, i) {
+            const p = i === activeTab ? state.project : t.project;
+            const name = (p && p.name) || 'Untitled project';
+            const tab = el('div', { className: 'project-tab' + (i === activeTab ? ' active' : '') }, [
+                el('button', {
+                    className: 'tab-name', role: 'tab', 'aria-selected': String(i === activeTab), title: name, text: name,
+                    onclick: function () { switchTab(i); }
+                }),
+                tabs.length > 1 ? el('button', {
+                    className: 'tab-close', 'aria-label': 'Close ' + name, title: 'Close this project', text: '×',
+                    onclick: function () { closeTab(i); }
+                }) : null
+            ]);
+            box.append(tab);
+        });
+        box.append(el('button', {
+            className: 'tab-add', 'aria-label': 'Open another project in a new tab', title: 'Edit another video at the same time (new tab)',
+            text: '+', onclick: newTab
+        }));
+    }
+
     /* ---------------------------------------------------------------- project */
 
     function newProject() {
@@ -3422,7 +3652,7 @@
         state.time = 0;
         afterChange();
         updateRestoreBanner();
-        if (window.ReelStore) window.ReelStore.keepOnly([]);
+        if (window.ReelStore) window.ReelStore.keepOnly(otherTabsMedia());
     }
 
     function saveProject() {
@@ -3463,6 +3693,8 @@
     }
 
     function restore() {
+        restoreTabs();
+        if (tabs.length > 1) return;
         const saved = storage((s) => s.getItem(STORAGE_KEY));
         if (!saved) return;
         try {
@@ -3526,6 +3758,8 @@
 
     let exportChoices = [];
 
+    $('export-watermark').addEventListener('change', function () { setWatermark($('export-watermark').checked); });
+
     async function openExport() {
         if (!state.project.clips.length) { toast('Add something to the timeline first.'); return; }
         pause();
@@ -3538,6 +3772,7 @@
         $('export-result').hidden = true;
         $('export-start').hidden = false;
         $('export-cancel').textContent = 'Cancel';
+        $('export-watermark').checked = state.project.watermark !== false;
         $('export-dialog').hidden = false;
         const p = state.project;
         $('export-summary').textContent = p.width + '×' + p.height + ' · ' + p.fps + ' fps · ' + fmt(duration()) + ' long';
@@ -4023,7 +4258,7 @@
     // and anything handed over by the audio editor.
     async function afterModules() {
         await reattachStored(false);
-        if (window.ReelStore) window.ReelStore.keepOnly(state.project.media.map((m) => m.id));
+        if (window.ReelStore) window.ReelStore.keepOnly(state.project.media.map((m) => m.id).concat(otherTabsMedia()));
         await takeHandoff();
         checkAudioEditor();
         renderInspector();

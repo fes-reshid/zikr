@@ -42,6 +42,11 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **Projects** | Autosaved in the browser **with the media files**, so the project reopens as you left it. Save and open `.reel.json` files. Once opened, the editor works offline. |
 | **Purpose reminder** | On the first visit, the same halal-use reminder as the audio editor. The editor opens only after **I Agree & Continue**, which stays disabled until the box is ticked. The answer is remembered per browser (`consent.js`). |
 | **Phones** | One-finger pan, tap to seek, pinch to zoom, bigger handles, and a compact layout. A one-time notice suggests a computer for long projects, as in the audio editor. |
+| **Animation** | Thirteen entrance and exit movements (fade, rise, drop, slide either way, pop, zoom in/out, spin, flip, blur, bounce, swing) for titles, pictures, videos, drawings and stickers. A photo put on the timeline fades in and slowly zooms. |
+| **Tabs** | Up to five projects open at once, each with its own timeline, media and undo history, all saved in the browser. |
+| **Workspace** | Drag the edges of the video area, the bar above the timeline, or the corner grip to resize; sizes are remembered. |
+| **Watermark** | A small nooreditor.com mark in the corner of the preview and exports; it can be turned off per project or in the Export window. |
+| **Templates** | Twenty-eight templates, including Jumu‘ah, Hajj & Umrah, hifz class, du‘a, charity, nikah, aqiqah, quiz, Ramadan countdown, hadith of the day, Seerah and an end screen. |
 | **Help ▸ About** | A pop-up like the audio editor's: name, author, version, privacy note, contact and credits. |
 
 Keyboard shortcuts and a user guide are in [help.html](help.html).

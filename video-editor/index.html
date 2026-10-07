@@ -120,9 +120,34 @@ input[type="range"] { accent-color: var(--accent); min-width: 0; }
 /* -------------------------------------------------------------- workspace */
 .workspace {
     display: grid;
-    grid-template-columns: 250px minmax(0, 1fr) 290px;
+    grid-template-columns: var(--bin-w, 250px) minmax(0, 1fr) var(--insp-w, 290px);
     min-height: 0;
+    position: relative;
 }
+/* Project tabs: several videos open at once. */
+.project-tabs { display: flex; align-items: center; gap: 3px; min-width: 0; max-width: 46vw; overflow-x: auto; scrollbar-width: none; }
+.project-tab { display: flex; align-items: center; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel-2, var(--panel)); flex: none; max-width: 170px; }
+.project-tab.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.project-tab button { background: none; border: 0; min-width: 0; color: var(--muted); }
+.project-tab .tab-name { padding: 4px 8px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.project-tab.active .tab-name { color: var(--text); font-weight: 600; }
+.project-tab .tab-close { padding: 2px 7px 2px 0; font-size: 15px; line-height: 1; }
+.project-tab .tab-close:hover { color: #fff; }
+.tab-add { flex: none; width: 28px; height: 28px; min-width: 0; padding: 0; border-radius: 8px; font-size: 17px; line-height: 1; }
+/* Drag handles around the video: see workspace-resize.js. */
+.col-resizer { position: absolute; top: 0; bottom: 0; width: 9px; z-index: 6; cursor: col-resize; touch-action: none; }
+.col-resizer.left { left: calc(var(--bin-w, 250px) - 5px); }
+.col-resizer.right { right: calc(var(--insp-w, 290px) - 4px); }
+.col-resizer::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: transparent; transition: background .15s; }
+.col-resizer:hover::after, .col-resizer.active::after, .col-resizer:focus-visible::after { background: var(--accent); width: 3px; left: 3px; }
+.stage-grip {
+    position: absolute; right: 6px; bottom: 6px; z-index: 4; width: 24px; height: 24px; min-width: 0; padding: 3px;
+    border-radius: 6px; background: rgba(0,0,0,.35); border: 1px solid var(--line-2); color: var(--muted); cursor: nwse-resize; touch-action: none;
+}
+.stage-grip svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.6; fill: none; }
+.stage-grip:hover, .stage-grip.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+body.resizing, body.resizing * { cursor: inherit; user-select: none; }
+body.preview-wide .col-resizer, body.drawing-focus .col-resizer, body.drawing-focus .stage-grip, body.preview-expanded .col-resizer { display: none; }
 .panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
 .panel + .panel { border-left: 1px solid var(--line); }
 .panel-head {
@@ -551,6 +576,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
     .draw-bar .draw-tools,.draw-swatches{flex:none;}
     .draw-bar button,.draw-bar select,.draw-bar input[type=color]{min-width:40px;min-height:40px;}
     .draw-bar .spacer{display:none;}
+    .col-resizer,.stage-grip{display:none;}
     /* While drawing, one swipeable row of tools above the picture. */
     body.drawing-focus .draw-bar{top:4px;bottom:auto;left:4px;right:4px;padding:4px;}
     .draw-sep{height:34px;flex:none;}
@@ -622,6 +648,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
 
 <header class="topbar">
     <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg></span><span class="hide-narrow">Reel</span></div>
+    <div id="project-tabs" class="project-tabs" role="tablist" aria-label="Open projects"></div>
     <input id="project-name" type="text" aria-label="Project name" spellcheck="false">
     <select id="resolution" aria-label="Frame size" title="Frame size">
         <option value="1280x720">1280×720 · 16:9</option>
@@ -733,6 +760,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
                     <option value="12000000">High · 12 Mbps</option>
                 </select>
             </div>
+            <label class="check"><input type="checkbox" id="export-watermark" checked> Add the nooreditor.com watermark</label>
             <p id="export-summary"></p>
             <p id="export-note"></p>
         </div>
@@ -773,6 +801,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
 <script src="preview-edit.js?v=dev"></script>
 <script src="hadith.js?v=dev"></script>
 <script src="workspace-layout.js?v=dev"></script>
+<script src="workspace-resize.js?v=dev"></script>
 <script>
 // Works offline after the first visit (http only; the service worker cannot run from a file).
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {

@@ -73,7 +73,9 @@
 
     const TRANSITIONS = ['crossfade', 'dip', 'slide', 'push', 'wipe', 'zoom', 'slide-up', 'wipe-right', 'iris', 'blur'];
     const MOTIONS = ['zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'pan-up', 'pan-down'];
-    const TEXT_ANIMS = ['fade', 'rise', 'pop', 'slide', 'typewriter', 'words', 'handwrite'];
+    /** Entrance and exit movements any clip can make (titles, pictures, videos, drawings, stickers). */
+    const MOVES = ['fade', 'rise', 'drop', 'slide', 'slide-right', 'pop', 'zoom-in', 'zoom-out', 'spin', 'flip', 'blur', 'bounce', 'swing'];
+    const TEXT_ANIMS = MOVES.concat(['typewriter', 'words', 'handwrite']);
     /** Entrances that reveal a title bit by bit, and so can show a hand doing it. */
     const REVEAL_ANIMS = ['typewriter', 'words', 'handwrite'];
     const HAND_TOOLS = ['pen', 'pencil', 'finger'];
@@ -976,20 +978,13 @@
      * (word by word) shown so far.
      */
     function textAnimAt(clip, time) {
-        const out = { alpha: 1, dx: 0, dy: 0, scale: 1, reveal: 1, unit: 'none' };
+        const out = Object.assign({ reveal: 1, unit: 'none' }, exitAt(clip, time));
         const type = clip.anim;
         if (!type || type === 'none') return out;
         const d = clip.animDuration > 0 ? clip.animDuration : 0.6;
         const local = Math.max(0, time - clip.start);
-        const e = easeOut(local / d);
-        if (type === 'fade') out.alpha = clamp(local / d, 0, 1);
-        else if (type === 'rise') { out.alpha = clamp(local / d, 0, 1); out.dy = 0.05 * (1 - e); }
-        else if (type === 'slide') { out.alpha = clamp(local / d, 0, 1); out.dx = -0.08 * (1 - e); }
-        else if (type === 'pop') {
-            const u = clamp(local / d, 0, 1);
-            const back = 1 + 2.7 * Math.pow(u - 1, 3) + 1.7 * Math.pow(u - 1, 2);
-            out.alpha = clamp(u * 3, 0, 1);
-            out.scale = 0.6 + 0.4 * back;
+        if (MOVES.indexOf(type) !== -1) {
+            Object.assign(out, combineMoves(moveAt(type, local / d), out));
         } else if (REVEAL_ANIMS.indexOf(type) !== -1) {
             // Spread across most of the clip, so the last word lands before it ends.
             const span = type === 'handwrite' && clip.writeDuration > 0
@@ -1000,6 +995,91 @@
             out.exit = handExit(local - span);
         }
         return out;
+    }
+
+    const IDENTITY_MOVE = { alpha: 1, dx: 0, dy: 0, scale: 1, rotate: 0, scaleX: 1, blur: 0 };
+
+    function bounceOut(u) {
+        const n = 7.5625;
+        const d = 2.75;
+        if (u < 1 / d) return n * u * u;
+        if (u < 2 / d) { u -= 1.5 / d; return n * u * u + 0.75; }
+        if (u < 2.5 / d) { u -= 2.25 / d; return n * u * u + 0.9375; }
+        u -= 2.625 / d;
+        return n * u * u + 0.984375;
+    }
+
+    /**
+     * How a clip looks part-way through a movement: `u` runs from 0 (not yet
+     * arrived, or gone) to 1 (in place). Offsets are shares of the frame,
+     * `rotate` is in radians and `blur` in pixels of a 720-line frame.
+     */
+    function moveAt(type, u) {
+        const o = Object.assign({}, IDENTITY_MOVE);
+        u = clamp(u, 0, 1);
+        if (u >= 1 || MOVES.indexOf(type) === -1) return o;
+        const e = easeOut(u);
+        switch (type) {
+        case 'fade': o.alpha = u; break;
+        case 'rise': o.alpha = u; o.dy = 0.05 * (1 - e); break;
+        case 'drop': o.alpha = clamp(u * 3, 0, 1); o.dy = -0.18 * (1 - bounceOut(u)); break;
+        case 'slide': o.alpha = u; o.dx = -0.08 * (1 - e); break;
+        case 'slide-right': o.alpha = u; o.dx = 0.08 * (1 - e); break;
+        case 'pop': {
+            const back = 1 + 2.7 * Math.pow(u - 1, 3) + 1.7 * Math.pow(u - 1, 2);
+            o.alpha = clamp(u * 3, 0, 1);
+            o.scale = 0.6 + 0.4 * back;
+            break;
+        }
+        case 'zoom-in': o.alpha = u; o.scale = 0.3 + 0.7 * e; break;
+        case 'zoom-out': o.alpha = u; o.scale = 1 + 0.6 * (1 - e); break;
+        case 'spin': o.alpha = clamp(u * 2, 0, 1); o.rotate = -Math.PI * (1 - e); o.scale = 0.5 + 0.5 * e; break;
+        case 'flip': o.alpha = clamp(u * 4, 0, 1); o.scaleX = Math.max(0.02, e); break;
+        case 'blur': o.alpha = u; o.blur = 18 * (1 - e); break;
+        case 'bounce':
+            o.alpha = clamp(u * 4, 0, 1);
+            o.scale = 1 - Math.cos(u * Math.PI * 3.5) * Math.exp(-5 * u) * (1 - u);
+            break;
+        case 'swing':
+            o.alpha = clamp(u * 3, 0, 1);
+            o.rotate = 0.45 * Math.cos(u * Math.PI * 3) * Math.exp(-3 * u) * (1 - u);
+            break;
+        default: break;
+        }
+        return o;
+    }
+
+    /** Two movements at once: an entrance still finishing and an exit starting. */
+    function combineMoves(a, b) {
+        return {
+            alpha: a.alpha * b.alpha, dx: a.dx + b.dx, dy: a.dy + b.dy, scale: a.scale * b.scale,
+            rotate: a.rotate + b.rotate, scaleX: a.scaleX * b.scaleX, blur: Math.max(a.blur, b.blur)
+        };
+    }
+
+    /** True when a movement leaves the clip exactly as it is. */
+    function isStill(m) {
+        return m.alpha === 1 && !m.dx && !m.dy && m.scale === 1 && !m.rotate && m.scaleX === 1 && !m.blur;
+    }
+
+    /** A clip's exit movement at `time`, over its last `exitDuration` seconds. */
+    function exitAt(clip, time) {
+        if (MOVES.indexOf(clip.exit) === -1) return Object.assign({}, IDENTITY_MOVE);
+        const d = clip.exitDuration > 0 ? clip.exitDuration : 0.6;
+        return moveAt(clip.exit, (clipEnd(clip) - time) / d);
+    }
+
+    /**
+     * How a picture, video, drawing or sticker moves at `time`: its entrance
+     * (`enter`, over `enterDuration`) combined with its exit.
+     */
+    function clipMoveAt(clip, time) {
+        let m = Object.assign({}, IDENTITY_MOVE);
+        if (MOVES.indexOf(clip.enter) !== -1) {
+            const d = clip.enterDuration > 0 ? clip.enterDuration : 0.6;
+            m = moveAt(clip.enter, (time - clip.start) / d);
+        }
+        return combineMoves(m, exitAt(clip, time));
     }
 
     /** 0 while a hand is still working, rising to 1 as it leaves. */
@@ -1549,7 +1629,7 @@
 
     return {
         FORMAT, VERSION, MIN_DURATION, DEFAULT_STILL, DEFAULT_FILTERS, MIN_SPEED, MAX_SPEED,
-        TRANSITIONS, MOTIONS, TEXT_ANIMS, REVEAL_ANIMS, HAND_TOOLS, DEFAULT_FX, LOOKS, TITLE_STYLES,
+        TRANSITIONS, MOTIONS, MOVES, TEXT_ANIMS, REVEAL_ANIMS, HAND_TOOLS, DEFAULT_FX, LOOKS, TITLE_STYLES,
         fxOf, mergeFx, applyLook, cropRect, hasFx, clipPeak, normalisedVolume,
         newId, clone, clamp,
         createProject, addMedia, getMedia, getClip, getTrack, addTrack, nextTrackId, updateTrack, removeTrack,
@@ -1560,7 +1640,7 @@
         previousAdjacent, transitionWindow, transitionAt, setTransition, transitionAllCuts, transitionMix,
         activeClips, sourceTime, fadeAt, edgeFade, renderLayers, mediaAt, audibleClips, placeRect,
         nextAdjacent, soundWindow, clipGainAt,
-        motionAt, textAnimAt, handOf, drawAnimAt, strokeLengths, revealStrokes, simplifyPoints, shapeStrokes, filterString, duckEnvelope, envelopeAt,
+        motionAt, textAnimAt, moveAt, combineMoves, isStill, exitAt, clipMoveAt, handOf, drawAnimAt, strokeLengths, revealStrokes, simplifyPoints, shapeStrokes, filterString, duckEnvelope, envelopeAt,
         addMarker, updateMarker, removeMarker, chaptersText,
         snapTime, rulerStep, formatTime, parseTime, toFrame,
         isArabic, arabicDigits, wordsToCaptions, toSRT, toVTT, parseSubtitles, trackCues,

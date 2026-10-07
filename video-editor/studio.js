@@ -8,7 +8,12 @@
         paper:{label:'Warm paper',colors:['#faf7ed','#e9e2d0'],ink:'#283c35',accent:'#367866'},
         midnight:{label:'Midnight',colors:['#091b35','#2e456c'],ink:'#f8f6ec',accent:'#e8ca7c'},
         rose:{label:'Rose',colors:['#421f40','#914e63'],ink:'#fff2e9',accent:'#ffd3ab'},
-        sky:{label:'Sky',colors:['#dcefeb','#b8ddd9'],ink:'#143c40',accent:'#ad7435'}
+        sky:{label:'Sky',colors:['#dcefeb','#b8ddd9'],ink:'#143c40',accent:'#ad7435'},
+        sand:{label:'Desert sand',colors:['#f3e3c3','#d9b77e'],ink:'#3d2a12',accent:'#8a5a1c'},
+        forest:{label:'Forest',colors:['#0f2a1d','#2f5d3a'],ink:'#f4f1e3',accent:'#c9d98a'},
+        sunset:{label:'Sunset',colors:['#5a1f2b','#d9733f'],ink:'#fff4e6',accent:'#ffd27a'},
+        ocean:{label:'Ocean',colors:['#06283d','#1a6e8e'],ink:'#eefaff',accent:'#7fe0d4'},
+        charcoal:{label:'Charcoal & gold',colors:['#16161a','#34343c'],ink:'#f6f1e1',accent:'#d6b25e'}
     };
     const PACKS=[
         {id:'gratitude',name:'A grateful heart · English',theme:'emerald',lines:['With every dawn, a chance to grow','A kinder word, a seed to sow','Alhamdulillah, hearts awake','Let goodness guide each step we take']},
@@ -32,7 +37,20 @@
         {id:'lyrics',name:'Words from the heart',tag:'NASHEED LYRICS',theme:'midnight',title:'A grateful heart',subtitle:'Original words, ready for your voice.',lyrics:true},
         {id:'kids',name:'Little learners',tag:'LEARNING',theme:'sky',title:'Let’s learn something new!',subtitle:'Watch • Think • Try',lines:['What does kindness look like?','Try one kind action today']},
         {id:'event',name:'You are invited',tag:'ANNOUNCEMENT',theme:'rose',title:'A special gathering',subtitle:'Add your date, time and venue',lines:['Learn, connect and grow together','Everyone is welcome']},
-        {id:'story',name:'One beautiful thought',tag:'SOCIAL STORY',theme:'emerald',title:'Small steps. Good intentions.',subtitle:'Your next chapter starts here.',lines:['Choose one meaningful goal','Take your first step today']}
+        {id:'story',name:'One beautiful thought',tag:'SOCIAL STORY',theme:'emerald',title:'Small steps. Good intentions.',subtitle:'Your next chapter starts here.',lines:['Choose one meaningful goal','Take your first step today']},
+        // More templates, each with its own entrance so they feel different.
+        {id:'jumuah',name:'Jumu‘ah reminder',tag:'FRIDAY',theme:'forest',title:'Jumu‘ah Mubarak',subtitle:'A blessed Friday to you and your family',lines:['Make time for the Friday prayer','Remember those in need in your du‘a'],motif:'mosque',anim:'drop'},
+        {id:'hajj',name:'Hajj & Umrah journey',tag:'HAJJ',theme:'sand',title:'The journey of a lifetime',subtitle:'Hajj & Umrah • add your group or dates',lines:['Prepare your heart before your bags','Add your talk, tips or itinerary'],motif:'kaaba',anim:'zoom-out'},
+        {id:'hifz',name:'Qur’an memorisation class',tag:'HIFZ CLASS',theme:'emerald',title:'Join our hifz circle',subtitle:'Add the age group, days and time',lines:['Learn with patience and care','Register: add your contact details'],motif:'book',anim:'blur'},
+        {id:'dua',name:'Du‘a of the day',tag:'DU‘A',theme:'midnight',title:'Du‘a of the day',subtitle:'Add the du‘a and where it is from',lines:['Add its meaning in your language','Share it with someone you love'],motif:'crescent',anim:'blur'},
+        {id:'charity',name:'Charity appeal',tag:'SADAQAH',theme:'sunset',title:'Every gift makes a difference',subtitle:'Add your cause and how to give',lines:['Add what the donations will do','Give today: add your link or details'],motif:'heart',anim:'bounce'},
+        {id:'nikah',name:'Nikah announcement',tag:'NIKAH',theme:'rose',title:'A blessed union',subtitle:'Add the names and the date',lines:['Your presence and du‘a are a gift','Venue: add the address and time'],motif:'flower',anim:'zoom-in'},
+        {id:'aqiqah',name:'Welcome, little one',tag:'AQIQAH',theme:'sky',title:'Alhamdulillah, welcome!',subtitle:'Add the baby’s name and the date',lines:['Join us for the aqiqah','Add the time and place'],motif:'gift',anim:'pop'},
+        {id:'quiz',name:'Quiz time',tag:'QUIZ',theme:'ocean',title:'Quiz time!',subtitle:'How much do you know?',lines:['Question 1: add your question','Answer: add the answer here'],motif:'check',anim:'spin'},
+        {id:'countdown',name:'Ramadan countdown',tag:'COUNTDOWN',theme:'charcoal',title:'Ramadan is coming',subtitle:'Add how many days are left',lines:['Plan your goals for the month','Start your good habits today'],motif:'lantern',anim:'flip'},
+        {id:'hadith-day',name:'Hadith of the day',tag:'HADITH',theme:'sand',title:'Hadith of the day',subtitle:'Add the hadith text and its source',lines:['Add a short explanation','How can we act on it today?'],motif:'rosette',anim:'slide-right'},
+        {id:'seerah',name:'Seerah story',tag:'SEERAH',theme:'forest',title:'Stories from the Seerah',subtitle:'Add the title of today’s story',lines:['Add where and when it happened','What lesson can we take from it?'],motif:'palm',anim:'rise'},
+        {id:'thanks',name:'Thanks for watching',tag:'END SCREEN',theme:'emerald',title:'Jazakum Allahu khayran',subtitle:'Thank you for watching',lines:['Like, share and subscribe','See you in the next video, in sha Allah'],motif:'sparkles',anim:'swing'}
     ];
     const TRANSITIONS={crossfade:'Crossfade',dip:'Dip to black',slide:'Slide in',push:'Push',wipe:'Wipe',zoom:'Zoom','slide-up':'Slide up','wipe-right':'Wipe from right',iris:'Circle reveal',blur:'Soft dissolve'};
     function select(options,value){return el('select',{value},options.map(([v,name])=>el('option',{value:v,selected:v===value,text:name})));}
@@ -90,7 +108,7 @@
             const bg=Object.assign(T.clipFromMedia(T.getMedia(p,mediaId),bgTrack.id,at),{duration:scene,fit:'cover',transition:i?{type:'crossfade',duration:.8}:null});
             p=T.addClip(p,bg);
             p=addTitle(p,titleTrack.id,at,text,{duration:scene,y:.44,fontSize:portrait?34:58,color:palette.ink,shadow:false,
-                font:T.isArabic(text)?'amiri':item.hand?'hand':'marcellus',anim:item.hand?'handwrite':'rise',hand:item.hand?'pen':'none',handStyle:'realistic',writeDuration:4.4,handSize:1});
+                font:T.isArabic(text)?'amiri':item.hand?'hand':'marcellus',anim:item.hand?'handwrite':(item.anim||'rise'),hand:item.hand?'pen':'none',handStyle:'realistic',writeDuration:4.4,handSize:1});
             p=addTitle(p,detailTrack.id,at,i===0?(options.subtitle.trim()||item.subtitle):['','One small action can make a difference.','Create something worth sharing.'][i],
                 {duration:scene,y:.69,font:'sans',fontSize:portrait?14:23,color:palette.ink,shadow:false,anim:'fade',opacity:.85});
         });
