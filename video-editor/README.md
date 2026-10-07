@@ -56,6 +56,8 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | **My projects** | Every project kept with a thumbnail; open in a tab, duplicate or delete; their stored media is kept (`library.js`). |
 | **Sharing** | After export: the Web Share API sends the file to WhatsApp, Telegram and other apps, with link fallbacks. |
 | **Qur'an word highlighting** | Arabic words light up as recited, from Quran.com word timings or estimated by word length; more reciters (EveryAyah) and every translation in 30+ languages. |
+| **Pictures on the pauses** | Finds the pauses in a voice from its sound and puts chosen photos on them as scenes (transitions, slow zoom), cuts a clip at them, removes them as jump cuts, or marks them (`pauses.js`; `findPauses`, `pauseCuts`, `removeTime`, `removePauses` in `timeline.js`). |
+| **Captions in Afaan Oromoo, Amharic, Somali** | Amharic and Somali through Whisper's most accurate model; Afaan Oromoo (or any language) by timing a pasted text to the speech by its pauses, one caption per line (`alignWords`, `alignLines`). |
 | **Help ▸ About** | A pop-up like the audio editor's: name, author, version, privacy note, contact and credits. |
 
 Keyboard shortcuts and a user guide are in [help.html](help.html).
@@ -72,11 +74,12 @@ Keyboard shortcuts and a user guide are in [help.html](help.html).
 | `audio-mix.js` | Renders the project's sound offline, and Clean up voice (RNNoise) |
 | `export-fast.js` | Frame-exact export with mediabunny and WebCodecs |
 | `quran.js` | The Qur'ān verse video tool (Quran.com API) |
-| `captions.js` | Auto captions (Whisper) and subtitle import/export |
+| `captions.js` | Auto captions (Whisper), captions timed from a pasted text, and subtitle import/export |
+| `pauses.js` | Sync to the voice: pictures on the pauses, cut at pauses, jump cuts |
 | `transcribe-worker.js` | The Whisper worker, shared with the audio editor |
 | `vendor/mediabunny.min.mjs` | [mediabunny](https://mediabunny.dev) 1.61 (MPL-2.0, licence alongside), loaded only when exporting |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline use and installing as an app |
-| `help.html` | The user guide |
+| `help.html`, `help-img/` | The user guide and its step-by-step tutorials with screenshots (remade with `node tools/help-screenshots.js`) |
 
 ## How it works
 

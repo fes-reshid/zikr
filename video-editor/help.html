@@ -26,7 +26,17 @@ table { width: 100%; border-collapse: collapse; margin: 8px 0; }
 td { padding: 5px 8px; border-bottom: 1px solid var(--line); color: var(--muted); vertical-align: top; }
 td:first-child { white-space: nowrap; width: 1%; }
 .note { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 8px; padding: 10px 14px; }
-@media (max-width: 560px) { nav ul { columns: 1; } }
+figure { margin: 18px 0 22px; }
+figure img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); }
+figure.small img { max-width: 460px; }
+figure.medium img { max-width: 680px; }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; }
+.tutorial { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 18px 8px; margin: 18px 0; }
+.tutorial h3 { font-size: 18px; margin-top: 16px; }
+.tutorial ol { padding-left: 20px; }
+.tutorial .time { font-size: 13px; color: var(--gold); margin: 0; }
+.tutorials-list { columns: 2; padding-left: 18px; }
+@media (max-width: 560px) { nav ul, .tutorials-list { columns: 1; } .tutorial { padding: 2px 12px 6px; } }
 </style>
 </head>
 <body>
@@ -37,6 +47,7 @@ td:first-child { white-space: nowrap; width: 1%; }
 
 <nav aria-label="Contents"><ul>
     <li><a href="#start">Getting started</a></li>
+    <li><a href="#tutorials"><b>Step-by-step tutorials</b></a></li>
     <li><a href="#editing">Cutting and arranging</a></li>
     <li><a href="#look">Layers, motion and colour</a></li>
     <li><a href="#animation">Animation</a></li>
@@ -47,6 +58,7 @@ td:first-child { white-space: nowrap; width: 1%; }
     <li><a href="#brand">Brand kit</a></li>
     <li><a href="#shorts">Shorts</a></li>
     <li><a href="#quran">Qur’ān verse videos</a></li>
+    <li><a href="#pauses">Pictures on the pauses and jump cuts</a></li>
     <li><a href="#sound">Sound and ducking</a></li>
     <li><a href="#sounds">Sound library</a></li>
     <li><a href="#recording">Recording screen and camera</a></li>
@@ -69,6 +81,131 @@ td:first-child { white-space: nowrap; width: 1%; }
     <li>Press <b>Export</b> to make the video file.</li>
 </ol>
 <p>Choose the frame at the top: <b>16:9</b> for YouTube, <b>9:16</b> for Reels, Shorts and TikTok, <b>1:1</b> or <b>4:5</b> for feeds. You can change it at any time.</p>
+
+<h2 id="tutorials">Step-by-step tutorials</h2>
+<p>Follow along with the editor open in another tab. Every picture below is the real editor.</p>
+<ul class="tutorials-list">
+    <li><a href="#t-first">Your first video in five minutes</a></li>
+    <li><a href="#t-pauses">A slideshow that changes on every pause</a></li>
+    <li><a href="#t-captions">Captions in Afaan Oromoo, Amharic and Somali</a></li>
+    <li><a href="#t-quran">A Qur’ān video with each word lit up</a></li>
+    <li><a href="#t-handwrite">A title written by hand</a></li>
+    <li><a href="#t-draw">Draw on your video</a></li>
+    <li><a href="#t-template">An event poster from a template</a></li>
+    <li><a href="#t-short">Your brand on a Short</a></li>
+</ul>
+
+<div class="tutorial" id="t-first">
+<h3>1. Your first video in five minutes</h3>
+<p class="time">You need: a few photos or clips, and a voice or nasheed.</p>
+<ol>
+    <li>Press <b>Import</b> (top left) and choose your photos and sound — or drop them on the page. They appear under <b>Media</b>.</li>
+    <li>Double-click each photo to put it on the timeline, one after another. Each photo gets a gentle fade and zoom by itself.</li>
+</ol>
+<figure><img src="help-img/first-photos.jpg" width="1440" height="900" loading="lazy" alt="Photos in the media list (left) and on the video track V1 (bottom)."><figcaption>Photos in the media list (left) and on the video track V1 (bottom).</figcaption></figure>
+<ol start="3">
+    <li>Double-click the sound too: it goes on the audio track <b>A1</b>, where you can see its waveform.</li>
+    <li>Move the red playhead to where the title should appear and press <b>Title</b> (or <kbd>T</kbd>). Type your words straight away; change the font, size and colour on the right.</li>
+</ol>
+<figure><img src="help-img/first-title.jpg" width="1440" height="900" loading="lazy" alt="A title on track T1. Drag it on the picture to move it; the details are on the right."><figcaption>A title on track T1. Drag it on the picture to move it; the details are on the right.</figcaption></figure>
+<ol start="5">
+    <li>Press <kbd>Space</kbd> to watch it. Drag the ends of a clip to make it longer or shorter.</li>
+    <li>Press <b>Export</b>, choose the quality and press <b>Export</b> again. The video is made on your device and saved to your downloads.</li>
+</ol>
+<figure class="small"><img src="help-img/first-export.jpg" width="440" height="288" loading="lazy" alt="The Export window. Untick the watermark if you do not want it."><figcaption>The Export window. Untick the watermark if you do not want it.</figcaption></figure>
+</div>
+
+<div class="tutorial" id="t-pauses">
+<h3>2. A slideshow that changes on every pause</h3>
+<p class="time">Great for recitations, nasheeds and short reminders.</p>
+<ol>
+    <li>Put the recitation or talk on the timeline and click it once to select it.</li>
+    <li>Press <b>Pictures on pauses</b> in the Create bar. The editor listens to the voice and says how many pauses it found.</li>
+    <li>Tick the photos to use (add more with <b>Add photos</b>), choose a transition, and set <b>Shortest scene</b> so the pictures do not change too fast.</li>
+</ol>
+<figure class="medium"><img src="help-img/pauses-dialog.jpg" width="680" height="634" loading="lazy" alt="Sync to the voice: 5 pauses found, so 6 scenes from 4 photos."><figcaption>Sync to the voice: 5 pauses found, so 6 scenes from 4 photos.</figcaption></figure>
+<ol start="4">
+    <li>Press <b>Apply</b>. The photos go on a new track, each one changing in a pause, with a slow zoom and a crossfade. One <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes them all off again.</li>
+</ol>
+<figure><img src="help-img/pauses-result.jpg" width="1440" height="900" loading="lazy" alt="Each photo on track V3 starts exactly in a pause of the voice on A1."><figcaption>Each photo on track V3 starts exactly in a pause of the voice on A1.</figcaption></figure>
+<p>The same window can also <b>cut</b> a clip at each pause, <b>remove the pauses</b> (jump cuts, for talks and lessons), or add a <b>marker</b> at each one.</p>
+</div>
+
+<div class="tutorial" id="t-captions">
+<h3>3. Captions in Afaan Oromoo, Amharic and Somali</h3>
+<p class="time">Everything happens on your device — nothing is uploaded.</p>
+<ol>
+    <li>Select the clip with the voice, then open <b>Tools ▸ Auto captions</b>.</li>
+    <li>Choose <b>Afaan Oromoo</b> as the language. The speech recogniser does not know Oromo yet, so a box opens: paste or type what is said, one sentence per line.</li>
+</ol>
+<figure class="small"><img src="help-img/captions-oromo.jpg" width="440" height="596" loading="lazy" alt="For Afaan Oromoo you paste the words; they are timed to the voice by its pauses."><figcaption>For Afaan Oromoo you paste the words; they are timed to the voice by its pauses.</figcaption></figure>
+<ol start="3">
+    <li>Press <b>Make captions</b>. Each line becomes a caption on a new <b>Captions</b> track, starting where its phrase starts.</li>
+</ol>
+<figure><img src="help-img/captions-result.jpg" width="900" height="522" loading="lazy" alt="The second line appears as the second phrase begins."><figcaption>The second line appears as the second phrase begins.</figcaption></figure>
+<ol start="4">
+    <li>For <b>Amharic</b> or <b>Somali</b>, choose the language and the editor picks the <b>Most accurate</b> model, which writes the words for you (it downloads once, about 250 MB). If a word comes out wrong, click the caption and fix it — or use <b>Tools ▸ Timed captions from your text</b> and paste the correct words.</li>
+</ol>
+<figure class="small"><img src="help-img/captions-amharic.jpg" width="440" height="460" loading="lazy" alt="Amharic and Somali use the most accurate speech model."><figcaption>Amharic and Somali use the most accurate speech model.</figcaption></figure>
+<p>Tip: drag a caption’s ends on the timeline to fine-tune it, and use <b>Tools ▸ Save a titles track as subtitles</b> to get an .srt file for YouTube.</p>
+</div>
+
+<div class="tutorial" id="t-quran">
+<h3>4. A Qur’ān video with each word lit up</h3>
+<ol>
+    <li>Press <b>﴿ ﴾ Qur’ān video</b> at the top.</li>
+    <li>Choose the sūrah, the first and last āyah, the reciter and a translation (Afaan Oromoo, Amharic, Somali and many more).</li>
+    <li>Tick <b>Highlight each word as it is recited</b>, then press <b>Make video</b>.</li>
+</ol>
+<figure class="medium"><img src="help-img/quran-dialog.jpg" width="680" height="418" loading="lazy" alt="The Qur’ān verse video window."><figcaption>The Qur’ān verse video window.</figcaption></figure>
+<p>The recitation, the Arabic and the translation are placed āyah by āyah, and the word being recited glows gold.</p>
+<figure><img src="help-img/quran-frame.jpg" width="900" height="522" loading="lazy" alt="The word being recited is lit up in gold."><figcaption>The word being recited is lit up in gold.</figcaption></figure>
+</div>
+
+<div class="tutorial" id="t-handwrite">
+<h3>5. A title written by hand</h3>
+<ol>
+    <li>Move the playhead and press <b>Write</b> (or <kbd>W</kbd>) under the picture, then type your words.</li>
+    <li>Play it: a hand writes the words out. On the right choose the hand (real, emoji ✍️ or sketch), its size and skin colour, the pen colour and how long the writing takes.</li>
+</ol>
+<figure><img src="help-img/handwrite.jpg" width="1440" height="900" loading="lazy" alt="A hand writing “Be patient”. Its settings are on the right."><figcaption>A hand writing “Be patient”. Its settings are on the right.</figcaption></figure>
+</div>
+
+<div class="tutorial" id="t-draw">
+<h3>6. Draw on your video</h3>
+<ol>
+    <li>Press <b>Draw</b> (or <kbd>D</kbd>). The picture gets bigger and a drawing bar appears above it.</li>
+    <li>Choose a pen, line, arrow, box or circle, a colour and a size, and draw with the mouse or your finger.</li>
+    <li>Press <b>Done</b>. The drawing becomes a clip on the timeline and, when you play, a hand draws it line by line.</li>
+</ol>
+<figure><img src="help-img/drawing.jpg" width="1440" height="900" loading="lazy" alt="Drawing a circle and an arrow. The drawing is already on the timeline while you draw."><figcaption>Drawing a circle and an arrow. The drawing is already on the timeline while you draw.</figcaption></figure>
+</div>
+
+<div class="tutorial" id="t-template">
+<h3>7. An event poster from a template</h3>
+<ol>
+    <li>Press <b>Templates</b> in the Create bar and pick one — a lecture, halaqa, Ramadan reminder, Zoom class and many more.</li>
+    <li>Fill in the title, speaker, date and place underneath, choose the format (video, poster or story) and press <b>Use template</b>.</li>
+    <li>Everything it adds can be edited like any other clip.</li>
+</ol>
+<figure class="medium"><img src="help-img/templates.jpg" width="680" height="868" loading="lazy" alt="Some of the 46 templates. The details you type go straight into the design."><figcaption>Some of the 46 templates. The details you type go straight into the design.</figcaption></figure>
+</div>
+
+<div class="tutorial" id="t-short">
+<h3>8. Your brand on a Short</h3>
+<ol>
+    <li>Press <b>Brand kit</b>, add your logo, colours, font and intro words, and press <b>Save kit</b>. Use <b>Save and apply</b> to put your logo on this video too.</li>
+</ol>
+<figure class="medium"><img src="help-img/brand-kit.jpg" width="680" height="506" loading="lazy" alt="The brand kit is saved in this browser and used by templates and Shorts."><figcaption>The brand kit is saved in this browser and used by templates and Shorts.</figcaption></figure>
+<ol start="2">
+    <li>Press <b>Make a Short</b>, choose the part of the video (up to 3 minutes), type a big title, and press <b>Make Short</b>.</li>
+</ol>
+<figure class="small"><img src="help-img/short-dialog.jpg" width="440" height="482" loading="lazy" alt="Make a Short: choose the part and a title."><figcaption>Make a Short: choose the part and a title.</figcaption></figure>
+<ol start="3">
+    <li>The vertical 9:16 Short opens in a new tab with the title on top, a progress bar and a “Follow for more” end card. Your original video is left as it was.</li>
+</ol>
+<figure><img src="help-img/short-result.jpg" width="1440" height="900" loading="lazy" alt="The Short in its own tab, ready to export for YouTube Shorts, Reels, TikTok or WhatsApp Status."><figcaption>The Short in its own tab, ready to export for YouTube Shorts, Reels, TikTok or WhatsApp Status.</figcaption></figure>
+</div>
 
 <h2 id="editing">Cutting and arranging</h2>
 <ul>
@@ -184,6 +321,16 @@ td:first-child { white-space: nowrap; width: 1%; }
 <p>Everything it adds is ordinary clips: change the font, colours or timing, add your own intro, then export. It is one step to undo.</p>
 <p class="note">Text, translations and recitations come from <a href="https://quran.com" target="_blank" rel="noopener">Quran.com</a>. If the recitation cannot be downloaded, you can import a recitation file yourself and choose it under <i>Your own recitation</i> — the verses are then spread across it by length and you can adjust them — or make the captions alone.</p>
 
+<h2 id="pauses">Pictures on the pauses and jump cuts</h2>
+<p><b>Pictures on pauses</b> (in the Create bar, or <b>Tools ▸ Sync to the voice</b>) listens to a recitation, talk or nasheed, finds its pauses, and then:</p>
+<ul>
+    <li><b>Pictures on the pauses</b> — puts the photos you tick on a new track, a new one in each pause, with a transition and a slow zoom.</li>
+    <li><b>Cut this clip at the pauses</b> — splits it into pieces you can move, delete or put effects on.</li>
+    <li><b>Remove the pauses</b> — takes the quiet out and closes it up (jump cuts), keeping a little quiet each side so words are not cut. Everything later on the timeline moves up with it.</li>
+    <li><b>Markers at the pauses</b>.</li>
+</ul>
+<p><b>Sensitivity</b> finds more or fewer pauses, <b>Shortest pause</b> ignores short breaths, and <b>Shortest scene</b> stops the pictures changing too quickly. It all happens on your device, and one undo puts it back. See <a href="#t-pauses">the tutorial</a>.</p>
+
 <h2 id="sound">Sound and ducking</h2>
 <ul>
     <li>Set each clip’s <b>volume</b> (up to 200%) and fades, or mute it. Tracks have their own mute buttons.</li>
@@ -202,7 +349,8 @@ td:first-child { white-space: nowrap; width: 1%; }
 
 <h2 id="captions">Captions and subtitles</h2>
 <ul>
-    <li><b>Tools ▸ Auto captions</b> listens to the sound with Whisper, on this device, and writes captions onto a new track. The speech model downloads the first time (40–250 MB). Afaan Oromoo is not yet supported by Whisper.</li>
+    <li><b>Tools ▸ Auto captions</b> listens to the sound with Whisper, on this device, and writes captions onto a new track. The speech model downloads the first time (40–250 MB). For <b>Amharic</b> and <b>Somali</b> it picks the most accurate model, which works best for them.</li>
+    <li><b>Afaan Oromoo</b> (and any language): choose Afaan Oromoo in Auto captions, or use <b>Tools ▸ Timed captions from your text</b>. Paste what is said — one line per caption — and the words are timed to the voice by its pauses. See <a href="#t-captions">the tutorial</a>.</li>
     <li><b>Tools ▸ Import subtitles</b> reads an .srt or .vtt file.</li>
     <li><b>Tools ▸ Save a titles track as subtitles</b> writes any titles track as .srt or .vtt, for uploading beside the video.</li>
 </ul>

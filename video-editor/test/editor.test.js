@@ -65,6 +65,19 @@ function toneWav(seconds, sampleRate, freq, amp) {
     return buf;
 }
 
+/** A "voice": bursts of tone (speech) with silences (pauses) between, as a WAV. */
+function speechWav(parts, sampleRate) {
+    const rate = sampleRate || 16000;
+    const pcm = [];
+    parts.forEach(function (part, k) {
+        const n = Math.floor(part[1] * rate);
+        for (let i = 0; i < n; i += 1) pcm.push(part[0] ? Math.sin(2 * Math.PI * (220 + k * 30) * i / rate) * 0.5 : 0);
+    });
+    const buf = toneWav(pcm.length / rate, rate, 1, 0);
+    pcm.forEach((v, i) => buf.writeInt16LE(Math.round(v * 32767), 44 + i * 2));
+    return buf;
+}
+
 /** Records a 2 s 320×180 WebM in the page: solid red, then solid green, with a tone. */
 async function makeVideo(page) {
     const b64 = await page.evaluate(async function () {
@@ -1353,6 +1366,86 @@ async function probeFile(page, bytes) {
         await page.waitForSelector('.modal.generic', { state: 'detached' });
         check('and opened in a tab', /\(copy\)/.test((await project(page)).name) && await page.locator('.project-tab').count() === tabsBefore + 1);
         await page.locator('.project-tab .tab-close').last().click();
+
+        /* ------------------------------------------------- sync to the voice */
+        await page.setInputFiles('#import-input', [{ name: 'talk.wav', mimeType: 'audio/wav',
+            buffer: speechWav([[1, 1.2], [0, 0.6], [1, 1.2], [0, 0.6], [1, 1.2], [0, 0.6], [1, 1.2]]) }]);
+        await page.waitForFunction(() => window.Reel.project.media.some((m) => m.name === 'talk.wav'), null, { timeout: 15000 });
+        const talkId = await page.evaluate(function () {
+            const m = window.Reel.project.media.find((x) => x.name === 'talk.wav');
+            window.ReelApp.addToTimeline(m.id);
+            const c = window.Reel.project.clips.filter((x) => x.mediaId === m.id).pop();
+            window.Reel.select(c.id);
+            return c.id;
+        });
+        const talk = (await project(page)).clips.find((c) => c.id === talkId);
+        await page.click('#studio-pauses');
+        const syncBox = page.locator('.modal.generic');
+        await syncBox.locator('.sync-found', { hasText: /Found 3 pauses/ }).waitFor({ timeout: 15000 }).catch(async () => {
+            throw new Error('sync: ' + await page.locator('.toast').allTextContents());
+        });
+        check('Sync to voice finds the pauses in a voice', true);
+        const durBefore = await page.evaluate(() => window.ReelApp.T.projectDuration(window.Reel.project));
+        await syncBox.getByRole('spinbutton', { name: 'Shortest scene (seconds)' }).fill('1');
+        await syncBox.getByRole('button', { name: 'Apply' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached' });
+        p = await project(page);
+        const sceneTrack = p.tracks.find((t) => t.name === 'Scenes on the pauses');
+        const scenes = sceneTrack ? onTrack(p, sceneTrack.id) : [];
+        check('pictures go on the pauses, a new scene at each one', scenes.length === 4 && approx(scenes[0].start, talk.start, 0.01) &&
+            approx(scenes[1].start, talk.start + 1.5, 0.08) && approx(scenes[3].start + scenes[3].duration, talk.start + talk.duration, 0.02) &&
+            scenes[1].transition && scenes[1].transition.type === 'crossfade' && !!scenes[0].motion, scenes.map((c) => c.start.toFixed(2)).join(','));
+        await page.keyboard.press('Control+z');
+        check('one undo takes the scenes off', !(await project(page)).tracks.some((t) => t.name === 'Scenes on the pauses'));
+        await page.click('#studio-pauses');
+        await syncBox.locator('.sync-found', { hasText: /Found 3 pauses/ }).waitFor({ timeout: 15000 });
+        await syncBox.getByRole('combobox', { name: 'Do this' }).selectOption('cut');
+        await syncBox.getByRole('spinbutton', { name: 'Shortest scene (seconds)' }).fill('1');
+        await syncBox.getByRole('button', { name: 'Apply' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached' });
+        p = await project(page);
+        check('cut at the pauses splits the clip into pieces', p.clips.filter((c) => c.mediaId === talk.mediaId).length === 4);
+        await page.keyboard.press('Control+z');
+        await page.evaluate((id) => window.Reel.select(id), talkId);
+        await page.click('#studio-pauses');
+        await syncBox.locator('.sync-found', { hasText: /Found 3 pauses/ }).waitFor({ timeout: 15000 });
+        await syncBox.getByRole('combobox', { name: 'Do this' }).selectOption('remove');
+        await syncBox.getByRole('button', { name: 'Apply' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached' });
+        const durAfter = await page.evaluate(() => window.ReelApp.T.projectDuration(window.Reel.project));
+        check('remove the pauses makes jump cuts and shortens the video', durBefore - durAfter > 0.6 && durBefore - durAfter < 1.4, (durBefore - durAfter).toFixed(2));
+        await page.keyboard.press('Control+z');
+
+        /* ------------------------------------- captions for Afaan Oromoo, Amharic */
+        await page.evaluate((id) => window.Reel.select(id), talkId);
+        await page.click('#tools');
+        await page.getByRole('menuitem', { name: /Auto captions/ }).click();
+        const capBox = page.locator('.modal.generic');
+        await capBox.getByRole('combobox', { name: 'Language' }).selectOption('amharic');
+        check('choosing Amharic picks the most accurate speech model', await capBox.getByRole('combobox', { name: 'Model' }).inputValue() === 'onnx-community/whisper-small_timestamped');
+        await capBox.getByRole('combobox', { name: 'Language' }).selectOption('oromo');
+        check('choosing Afaan Oromoo asks for the words instead', await capBox.getByRole('textbox', { name: 'What is said' }).isVisible() &&
+            !(await capBox.getByRole('combobox', { name: 'Model' }).isVisible()));
+        await capBox.getByRole('combobox', { name: 'Listen to' }).selectOption('clip');
+        await capBox.getByRole('textbox', { name: 'What is said' }).fill('Akkam jirtu?\nNagaa dha.\nGalatoomaa.\nNagaan turaa.');
+        await capBox.getByRole('button', { name: 'Make captions' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 15000 });
+        p = await project(page);
+        const oroTrack = p.tracks.find((t) => t.name === 'Captions' && t.id !== capTrack.id);
+        const oro = oroTrack ? onTrack(p, oroTrack.id) : [];
+        check('Afaan Oromoo captions are timed to the voice from the pasted words', oro.length === 4 && oro[0].text === 'Akkam jirtu?' &&
+            approx(oro[0].start, talk.start, 0.1) && approx(oro[1].start, talk.start + 1.8, 0.15) && approx(oro[3].start, talk.start + 5.4, 0.15),
+            oro.map((c) => c.text + '@' + (c.start - talk.start).toFixed(2)).join(' | '));
+        await page.keyboard.press('Control+z');
+        await page.click('#tools');
+        await page.getByRole('menuitem', { name: /Timed captions from your text/ }).click();
+        await capBox.getByRole('textbox', { name: 'What is said' }).fill('ሰላም ነው። እንኳን ደህና መጣችሁ።');
+        await capBox.getByRole('button', { name: 'Make captions' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 15000 });
+        p = await project(page);
+        const amTrack = p.tracks.find((t) => t.name === 'Captions' && t.id !== capTrack.id);
+        check('timed captions from your text work in any script (Amharic)', amTrack && onTrack(p, amTrack.id).some((c) => /ሰላም/.test(c.text)));
+        await page.keyboard.press('Control+z');
 
         /* ---------------------------------------------------------- on a phone */
         await page.setViewportSize({ width: 390, height: 844 });

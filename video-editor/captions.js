@@ -25,9 +25,14 @@
         ['onnx-community/whisper-tiny_timestamped', 'Fast — about 40 MB, less accurate'],
         ['onnx-community/whisper-small_timestamped', 'Most accurate — about 250 MB, slow']
     ];
-    const LANGS = [['', 'Detect automatically'], ['english', 'English'], ['arabic', 'Arabic'], ['somali', 'Somali'],
-        ['swahili', 'Swahili'], ['amharic', 'Amharic'], ['french', 'French'], ['turkish', 'Turkish'], ['urdu', 'Urdu'],
-        ['indonesian', 'Indonesian'], ['malay', 'Malay']];
+    const LANGS = [['', 'Detect automatically'], ['english', 'English'], ['arabic', 'Arabic'], ['oromo', 'Afaan Oromoo'],
+        ['amharic', 'Amharic (አማርኛ)'], ['somali', 'Somali'], ['swahili', 'Swahili'], ['french', 'French'], ['turkish', 'Turkish'],
+        ['urdu', 'Urdu'], ['indonesian', 'Indonesian'], ['malay', 'Malay'], ['hausa', 'Hausa'], ['persian', 'Persian']];
+    /** Languages the recogniser does not know: their captions are timed from a text you paste. */
+    const FROM_TEXT = ['oromo'];
+    /** Languages the smaller models often get wrong. */
+    const NEED_SMALL = ['amharic', 'somali', 'hausa'];
+    const SMALL = 'onnx-community/whisper-small_timestamped';
 
     let worker = null;
     let seq = 0;
@@ -128,18 +133,37 @@
         const model = el('select', null, MODELS.map((m) => el('option', { value: m[0], text: m[1] })));
         const lang = el('select', null, LANGS.map((l) => el('option', { value: l[0], text: l[1] })));
         const box = el('input', { type: 'checkbox', checked: true });
+        const text = el('textarea', { rows: 6, placeholder: 'Paste or type what is said, in order. A new line starts a new caption.', 'aria-label': 'What is said' });
+        const langHint = el('small', { className: 'hint caption-lang-hint' });
+        const modelField = app.dialogField('Model', model);
+        const textField = app.dialogField('What is said', text, 'The words are timed to the speech by its pauses. Check the result and drag captions to fine-tune.');
         try {
             const saved = JSON.parse(localStorage.getItem('ae-transcribe') || '{}');
             if (saved.model) model.value = saved.model;
             if (saved.lang != null) lang.value = saved.lang;
         } catch (err) { /* defaults */ }
+        const langChanged = function (pick) {
+            const fromText = FROM_TEXT.indexOf(lang.value) !== -1;
+            modelField.hidden = fromText;
+            textField.hidden = !fromText;
+            if (pick && NEED_SMALL.indexOf(lang.value) !== -1) model.value = SMALL;
+            langHint.textContent = fromText ? 'Whisper does not know Afaan Oromoo yet, so paste the words below: they are timed to the voice on this device.' :
+                NEED_SMALL.indexOf(lang.value) !== -1 ? (model.value === SMALL ? 'Good: the most accurate model works best for ' + lang.selectedOptions[0].text + '. If some words still come out wrong, use Tools → “Timed captions from your text” and paste the correct words.' :
+                    'The smaller models often get ' + lang.selectedOptions[0].text + ' wrong — “Most accurate” is better.') : '';
+        };
+        lang.addEventListener('change', function () { langChanged(true); });
+        model.addEventListener('change', function () { langChanged(false); });
+        langChanged(false);
+        const langField = app.dialogField('Language', lang);
+        langField.append(langHint);
         app.openDialog({
             title: 'Auto captions',
-            intro: 'Turns speech into captions with Whisper, running on this device — nothing is uploaded. The model downloads the first time, then works offline. For Qur’an recitation use the Qur’ān verse video tool instead: its text is exact.',
+            intro: 'Turns speech into captions on this device — nothing is uploaded. Most languages are recognised by Whisper (the model downloads the first time, then works offline); for Afaan Oromoo you paste the words and they are timed to the voice. For Qur’an recitation use the Qur’ān verse video tool instead: its text is exact.',
             body: [
                 app.dialogField('Listen to', source),
-                app.dialogField('Model', model),
-                app.dialogField('Language', lang, 'Afaan Oromoo is not supported by Whisper yet.'),
+                langField,
+                modelField,
+                textField,
                 el('label', { className: 'check' }, [box, 'Captions on a dark box'])
             ],
             actions: [
@@ -150,7 +174,10 @@
                         d.busy(true);
                         try { localStorage.setItem('ae-transcribe', JSON.stringify({ model: model.value, lang: lang.value })); } catch (err) { /* private mode */ }
                         try {
-                            const n = await autoCaption({ source: source.value, clipId: sel && sel.id, model: model.value, language: lang.value, box: box.checked }, d.status);
+                            const fromText = FROM_TEXT.indexOf(lang.value) !== -1;
+                            if (fromText && !text.value.trim()) { d.busy(false); d.status('Paste the words that are said first.'); return false; }
+                            const o = { source: source.value, clipId: sel && sel.id, model: model.value, language: lang.value, box: box.checked, text: text.value };
+                            const n = fromText ? await textCaption(o, d.status) : await autoCaption(o, d.status);
                             app.toast(n ? 'Added ' + n + ' caption' + (n === 1 ? '' : 's') + ' on a new track. Click one to edit it.' : 'No speech was found.');
                         } catch (err) {
                             console.error(err);
@@ -195,6 +222,65 @@
         return cues.length;
     }
 
+    /**
+     * Captions from a written text, timed to the speech by its pauses — for
+     * Afaan Oromoo and any language the recogniser does not know, or to fix
+     * one it gets wrong. A new line in the text starts a new caption.
+     */
+    async function textCaption(o, status) {
+        const p = app.state.project;
+        status('Listening for the pauses…');
+        let range = { from: 0, to: T.projectDuration(p) };
+        let clipId = '';
+        if (o.source === 'clip' && o.clipId) {
+            const clip = T.getClip(p, o.clipId);
+            range = { from: clip.start, to: T.clipEnd(clip) };
+            clipId = clip.id;
+        }
+        const sound = await window.ReelPauses.soundPeaks(p, clipId, range.from, range.to);
+        if (!sound) throw new Error('There is no sound to listen to.');
+        const pauses = window.ReelPauses.pausesOf(sound, { minPause: 0.25, sensitivity: 0.5 });
+        const segments = T.speechSegments(pauses, range.from, range.to, 0.2);
+        const lines = String(o.text || '').split(/\n+/).map((l) => l.trim()).filter(Boolean);
+        // Each line of the text starts a new caption; a long one is broken up.
+        const words = T.alignLines(lines, segments);
+        const maxChars = Math.max(p.height > p.width ? 28 : 42, lines.length > 1 ? 56 : 0);
+        const cues = [];
+        lines.forEach(function (line, i) {
+            T.wordsToCaptions(words.filter((w) => w.line === i), { maxChars: maxChars, gap: lines.length > 1 ? 99 : 0.6 }).forEach((c) => cues.push(c));
+        });
+        if (!cues.length) return 0;
+        placeCues(cues, 'Captions', Object.assign(styleFor(p), { box: o.box !== false }));
+        return cues.length;
+    }
+
+    function openTextCaptions() {
+        const p = app.state.project;
+        if (!p.clips.some((c) => T.isTimed(p, c))) { app.toast('Add a clip with sound first.'); return; }
+        const sel = app.state.selected ? T.getClip(p, app.state.selected) : null;
+        const source = el('select', null, [el('option', { value: 'mix', text: 'Everything you hear (the whole mix)' })]
+            .concat(sel && T.isTimed(p, sel) ? [el('option', { value: 'clip', text: 'Only the selected clip' })] : []));
+        if (sel && T.isTimed(p, sel)) source.value = 'clip';
+        const text = el('textarea', { rows: 8, placeholder: 'Paste or type what is said, in order — in any language: Afaan Oromoo, Amharic, Somali… A new line starts a new caption.' });
+        const box = el('input', { type: 'checkbox', checked: true });
+        app.openDialog({
+            title: 'Timed captions from your text',
+            intro: 'Paste the words of a talk, khutbah or nasheed and they are timed to the voice by its pauses, on this device. Works in every language and script.',
+            body: [app.dialogField('Listen to', source), app.dialogField('What is said', text), el('label', { className: 'check' }, [box, 'Captions on a dark box'])],
+            actions: [{ label: 'Cancel' }, {
+                label: 'Make captions', primary: true, run: async function (d) {
+                    if (!text.value.trim()) { d.status('Paste the words that are said first.'); return false; }
+                    d.busy(true);
+                    try {
+                        const n = await textCaption({ source: source.value, clipId: sel && sel.id, text: text.value, box: box.checked }, d.status);
+                        app.toast(n ? 'Added ' + n + ' timed caption' + (n === 1 ? '' : 's') + ' on a new track.' : 'No speech was found.');
+                    } catch (err) { d.busy(false); d.status('Failed: ' + err.message); return false; }
+                    return true;
+                }
+            }]
+        });
+    }
+
     function importSubtitles() {
         const input = el('input', { type: 'file', accept: '.srt,.vtt,text/vtt,application/x-subrip' });
         input.addEventListener('change', async function () {
@@ -235,6 +321,7 @@
     }
 
     app.addTool({ section: 'Create', label: 'Auto captions (speech to text)…', run: openAutoCaptions });
+    app.addTool({ section: 'Create', label: 'Timed captions from your text (Afaan Oromoo, any language)…', run: openTextCaptions });
     app.addTool({ section: 'Subtitles', label: 'Import subtitles (.srt, .vtt)…', run: importSubtitles });
     app.addTool({ section: 'Subtitles', label: 'Save a titles track as subtitles…', run: exportSubtitles });
 
@@ -244,5 +331,5 @@
         Array.from(pending.values()).forEach(p => p({ error: 'Transcription cancelled.' }));
         pending.clear();
     }
-    window.ReelCaptions = { open: openAutoCaptions, autoCaption: autoCaption, placeCues: placeCues, transcribe, progressText, cancelTranscription };
+    window.ReelCaptions = { open: openAutoCaptions, openTextCaptions, textCaption, autoCaption: autoCaption, placeCues: placeCues, transcribe, progressText, cancelTranscription };
 }());

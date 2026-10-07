@@ -136,6 +136,12 @@ input[type="range"] { accent-color: var(--accent); min-width: 0; }
 @keyframes rec-blink { 50% { opacity: .25; } }
 .record-time { font-family: var(--mono); min-width: 120px; }
 .record-countdown { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; font-size: 160px; font-weight: 800; color: #fff; background: rgba(0,0,0,.55); pointer-events: none; }
+.sync-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; max-height: 190px; overflow: auto; margin: 6px 0; }
+.sync-photo { display: flex; align-items: center; gap: 6px; font-size: 12px; background: var(--panel-2, rgba(255,255,255,.05)); border-radius: 6px; padding: 4px; cursor: pointer; min-width: 0; }
+.sync-photo img { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; flex: none; }
+.sync-photo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-group { border-top: 1px solid rgba(255,255,255,.1); padding-top: 8px; margin-top: 6px; }
+.sync-found { font-weight: 600; }
 .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
 .library-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--panel-2, var(--panel)); min-width: 0; }
 .library-card.current { border-color: var(--accent); }
@@ -831,6 +837,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
 <script src="sounds.js?v=dev"></script>
 <script src="record.js?v=dev"></script>
 <script src="library.js?v=dev"></script>
+<script src="pauses.js?v=dev"></script>
 <script>
 // Works offline after the first visit (http only; the service worker cannot run from a file).
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {

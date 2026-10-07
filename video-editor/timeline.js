@@ -615,6 +615,169 @@
         return p;
     }
 
+    /**
+     * Closes the time between `from` and `to`: what lies there is removed and
+     * everything after moves left. A clip crossing the span is cut in two and
+     * joined up (a jump cut); one starting or ending inside it is trimmed.
+     */
+    function removeTime(project, from, to) {
+        const a = Math.max(0, Math.min(from, to));
+        const b = Math.max(from, to);
+        const gap = round(b - a);
+        if (!(gap > EPS)) return project;
+        let p = project;
+        p.clips.filter((c) => c.start < a - EPS && clipEnd(c) > b + EPS && !isGenerated(c))
+            .forEach(function (c) { p = splitClip(p, c.id, b); });
+        p = clone(p);
+        const out = [];
+        p.clips.forEach(function (c) {
+            const end = clipEnd(c);
+            if (end <= a + EPS) { out.push(c); return; }
+            if (c.start >= b - EPS) { c.start = round(c.start - gap); out.push(c); return; }
+            if (c.start < a - EPS) {
+                // Starts before: keep up to the span, or shorten a title across it.
+                c.duration = round(end > b ? c.duration - gap : a - c.start);
+                c.fadeOut = Math.min(c.fadeOut || 0, c.duration);
+                if (c.keys) c.keys = c.keys.filter((k) => k.t <= c.duration + EPS);
+                out.push(c);
+                return;
+            }
+            if (end > b + EPS) {
+                // Starts inside: its first part goes.
+                const cut = b - c.start;
+                if (!isGenerated(c) && !c.freeze) c.in = round((c.in || 0) + cut * speedOf(c));
+                if (c.keys) c.keys = c.keys.filter((k) => k.t >= cut - EPS).map((k) => Object.assign({}, k, { t: round(k.t - cut) }));
+                c.start = round(a);
+                c.duration = round(end - b);
+                c.fadeIn = 0;
+                c.transition = null;
+                out.push(c);
+            }
+            // Wholly inside: removed.
+        });
+        p.clips = out;
+        p.markers = (p.markers || []).filter((m) => m.time < a - EPS || m.time >= b - EPS)
+            .map((m) => (m.time >= b - EPS ? Object.assign({}, m, { time: round(m.time - gap) }) : m));
+        return p;
+    }
+
+    /* ---------------------------------------------------------------- pauses */
+
+    /**
+     * Quiet stretches in a sound, from its waveform `peaks` (`rate` per
+     * second): [{ start, end }] in source seconds. A pause is at least
+     * `minPause` long; quiet means under `threshold`, which by default sits a
+     * little above the sound's own background level, so it works for a quiet
+     * room and a noisy one. `sensitivity` 0–1 raises it (more pauses).
+     */
+    function findPauses(peaks, rate, options) {
+        const o = Object.assign({ minPause: 0.3, sensitivity: 0.5, from: 0, to: Infinity }, options);
+        if (!peaks || !peaks.length || !rate) return [];
+        const i0 = Math.max(0, Math.floor(o.from * rate));
+        const i1 = Math.min(peaks.length, Math.ceil(Math.min(o.to, peaks.length / rate) * rate));
+        if (i1 - i0 < 2) return [];
+        // Smooth over ~40 ms so the gaps between syllables don't count.
+        const win = Math.max(1, Math.round(rate * 0.04));
+        const level = new Float32Array(i1 - i0);
+        for (let i = i0; i < i1; i += 1) {
+            let m = 0;
+            for (let k = Math.max(i0, i - win); k <= Math.min(i1 - 1, i + win); k += 1) if (peaks[k] > m) m = peaks[k];
+            level[i - i0] = m;
+        }
+        let thr = o.threshold;
+        if (thr == null) {
+            const sorted = Array.from(level).sort((x, y) => x - y);
+            const floor = sorted[Math.floor(sorted.length * 0.05)];
+            const loud = sorted[Math.floor(sorted.length * 0.9)];
+            thr = Math.max(0.005, floor + (loud - floor) * (0.06 + 0.24 * clamp(o.sensitivity, 0, 1)));
+        }
+        const pauses = [];
+        let runStart = -1;
+        for (let i = 0; i <= level.length; i += 1) {
+            const quiet = i < level.length && level[i] < thr;
+            if (quiet && runStart < 0) runStart = i;
+            if (!quiet && runStart >= 0) {
+                const s = (i0 + runStart) / rate;
+                const e = (i0 + i) / rate;
+                if (e - s >= o.minPause - EPS) pauses.push({ start: round(s), end: round(e) });
+                runStart = -1;
+            }
+        }
+        return pauses;
+    }
+
+    /** The stretches with sound between the pauses, within `from`–`to`: [{ start, end }]. */
+    function speechSegments(pauses, from, to, minLength) {
+        const out = [];
+        let at = from;
+        pauses.forEach(function (q) {
+            if (q.end <= from || q.start >= to) return;
+            if (q.start > at) out.push({ start: round(at), end: round(Math.min(q.start, to)) });
+            at = Math.max(at, q.end);
+        });
+        if (to > at) out.push({ start: round(at), end: round(to) });
+        return out.filter((s) => s.end - s.start >= (minLength || 0.15));
+    }
+
+    /**
+     * Where to cut between `from` and `to`: the middle of each pause, keeping
+     * every piece at least `minScene` long (a short piece joins the next).
+     */
+    function pauseCuts(pauses, from, to, minScene) {
+        const min = minScene || 1;
+        const cuts = [];
+        let last = from;
+        pauses.forEach(function (q) {
+            const t = round((q.start + q.end) / 2);
+            if (t - last >= min - EPS && to - t >= Math.min(min, 0.5) - EPS && t > from && t < to) {
+                cuts.push(t);
+                last = t;
+            }
+        });
+        return cuts;
+    }
+
+    /** Pauses of a clip's source, as timeline times (clipped to the clip). */
+    function clipPauses(clip, peaks, rate, options) {
+        const sp = speedOf(clip);
+        const inPt = clip.in || 0;
+        const srcTo = inPt + clip.duration * sp;
+        return findPauses(peaks, rate, Object.assign({}, options, { from: inPt, to: srcTo, minPause: ((options && options.minPause) || 0.3) * sp }))
+            .map((q) => ({ start: round(clip.start + (q.start - inPt) / sp), end: round(clip.start + (q.end - inPt) / sp) }));
+    }
+
+    /** Splits a clip at each of `times` (timeline seconds). Returns { project, ids } of the pieces. */
+    function cutAt(project, id, times) {
+        let p = project;
+        let cur = id;
+        const ids = [id];
+        times.slice().sort((x, y) => x - y).forEach(function (t) {
+            const before = p;
+            p = splitClip(p, cur, t);
+            if (p !== before) {
+                cur = p.clips[p.clips.findIndex((c) => c.id === cur) + 1].id;
+                ids.push(cur);
+            }
+        });
+        return { project: p, ids: ids };
+    }
+
+    /**
+     * Jump cuts: takes the pauses out of a clip and closes them up across the
+     * whole project, keeping `pad` seconds of quiet each side so words are not
+     * clipped. Pauses shorter than 2 × pad + `minPause` stay.
+     */
+    function removePauses(project, pauses, pad) {
+        const keep = pad == null ? 0.12 : pad;
+        let p = project;
+        pauses.slice().sort((x, y) => y.start - x.start).forEach(function (q) {
+            const a = q.start + keep;
+            const b = q.end - keep;
+            if (b - a > MIN_DURATION) p = removeTime(p, a, b);
+        });
+        return p;
+    }
+
     /** Splits every clip under the playhead, or only those listed. */
     function splitAt(project, time, ids) {
         let p = project;
@@ -1636,6 +1799,85 @@
         return cues.map((c) => ({ start: round(c.start), end: round(Math.max(c.end, c.start + 0.3)), text: c.text }));
     }
 
+    /**
+     * Times a written text to speech it was not recognised from — for
+     * languages the recogniser does not know, such as Afaan Oromoo. Words are
+     * shared out over the `segments` with sound ([{ start, end }], from the
+     * pauses) by their length, each word kept whole inside one segment.
+     * Returns words { text, start, end } for wordsToCaptions.
+     */
+    function alignWords(text, segments) {
+        const words = String(text || '').split(/\s+/).filter(Boolean);
+        const segs = (segments || []).filter((s) => s.end > s.start);
+        if (!words.length || !segs.length) return [];
+        const weight = (w) => w.replace(/[^\p{L}\p{N}]/gu, '').length + 1.5 + (/[.!?؟,;:،]$/.test(w) ? 1.5 : 0);
+        const total = words.reduce((a, w) => a + weight(w), 0);
+        const speech = segs.reduce((a, s) => a + s.end - s.start, 0);
+        // Which segment each word's middle falls in, on the segments laid end to end.
+        const bins = segs.map(() => []);
+        let acc = 0;
+        words.forEach(function (w) {
+            const mid = (acc + weight(w) / 2) / total * speech;
+            acc += weight(w);
+            let run = 0;
+            let k = 0;
+            while (k < segs.length - 1 && run + (segs[k].end - segs[k].start) < mid) { run += segs[k].end - segs[k].start; k += 1; }
+            bins[k].push(w);
+        });
+        const out = [];
+        bins.forEach(function (list, k) {
+            if (!list.length) return;
+            const s = segs[k];
+            const sum = list.reduce((a, w) => a + weight(w), 0);
+            let t = s.start;
+            list.forEach(function (w) {
+                const d = (s.end - s.start) * weight(w) / sum;
+                out.push({ text: w, start: round(t), end: round(t + d) });
+                t += d;
+            });
+        });
+        return out;
+    }
+
+    /**
+     * Like alignWords, for a text in lines (one caption each): when there
+     * are at least as many stretches of speech as lines, each line starts on
+     * a pause — the one nearest where its share of the text falls — so a line
+     * is not split across two phrases. Words carry the `line` they came from.
+     */
+    function alignLines(lines, segments) {
+        const list = (lines || []).map((l) => String(l).trim()).filter(Boolean);
+        const segs = (segments || []).filter((s) => s.end > s.start);
+        if (!list.length || !segs.length) return [];
+        const tag = (words, i) => words.map((w) => Object.assign(w, { line: i }));
+        if (segs.length < list.length) {
+            let k = 0;
+            const words = alignWords(list.join(' '), segs);
+            return list.reduce(function (out, l, i) {
+                const n = l.split(/\s+/).length;
+                out.push.apply(out, tag(words.slice(k, k + n), i));
+                k += n;
+                return out;
+            }, []);
+        }
+        const weight = (l) => l.replace(/[^\p{L}\p{N}]/gu, '').length + 1.5 * l.split(/\s+/).length;
+        const total = list.reduce((a, l) => a + weight(l), 0);
+        const starts = [0];
+        segs.forEach((s, i) => starts.push(starts[i] + s.end - s.start));
+        const speech = starts[segs.length];
+        const first = [0];
+        let acc = weight(list[0]);
+        for (let i = 1; i < list.length; i += 1) {
+            const want = acc / total * speech;
+            let best = first[i - 1] + 1;
+            for (let k = best; k <= segs.length - (list.length - i); k += 1) if (Math.abs(starts[k] - want) < Math.abs(starts[best] - want)) best = k;
+            first.push(best);
+            acc += weight(list[i]);
+        }
+        first.push(segs.length);
+        return list.reduce((out, l, i) => out.concat(tag(alignWords(l, segs.slice(first[i], first[i + 1])), i)), []);
+    }
+
     function subtitleTime(t, sep) {
         const ms = Math.round(Math.max(0, t) * 1000);
         const pad = (n, w) => String(n).padStart(w || 2, '0');
@@ -1771,7 +2013,8 @@
         createProject, addMedia, getMedia, getClip, getTrack, addTrack, nextTrackId, updateTrack, removeTrack,
         isGenerated, clipKind, trackKindFor, isTimed, speedOf, clipEnd, trackClips, trackEnd, projectDuration, lowestTrack,
         isFree, findFreeStart, clipFromMedia, textClip, drawClip, addClip, appendMedia, updateClip, updateClips,
-        moveClip, moveClips, trimClip, splitClip, insertTime, excerpt, splitAt, deleteClips, duplicateClip, copyClips, pasteClips,
+        moveClip, moveClips, trimClip, splitClip, insertTime, removeTime, excerpt,
+        findPauses, speechSegments, pauseCuts, clipPauses, cutAt, removePauses, splitAt, deleteClips, duplicateClip, copyClips, pasteClips,
         sourceLength, setSpeed, freezeFrame, detachAudio,
         previousAdjacent, transitionWindow, transitionAt, setTransition, transitionAllCuts, transitionMix,
         activeClips, sourceTime, fadeAt, edgeFade, renderLayers, mediaAt, audibleClips, placeRect,
@@ -1779,7 +2022,7 @@
         motionAt, textAnimAt, keyframeAt, setKeyframe, removeKeyframe, KEY_PROPS, moveAt, combineMoves, isStill, exitAt, clipMoveAt, handOf, drawAnimAt, strokeLengths, revealStrokes, simplifyPoints, shapeStrokes, filterString, duckEnvelope, envelopeAt,
         addMarker, updateMarker, removeMarker, chaptersText,
         snapTime, rulerStep, formatTime, parseTime, toFrame,
-        isArabic, arabicDigits, wordsToCaptions, toSRT, toVTT, parseSubtitles, trackCues,
+        isArabic, arabicDigits, wordsToCaptions, alignWords, alignLines, toSRT, toVTT, parseSubtitles, trackCues,
         History, serialize, deserialize, matchMedia
     };
 }));
