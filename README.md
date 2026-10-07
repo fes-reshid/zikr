@@ -9,8 +9,8 @@ Two pages for reading one juz of the Qur'ān a day, published as part of
 | `/quran-tracker/reader/` | Reads and recites any juz, verse by verse |
 
 The repo also holds **Reel**, a separate video editor that runs entirely in
-the browser, in [`video-editor/`](video-editor/README.md), published at
-[diinislaam.com/video-editing/](https://diinislaam.com/video-editing/) with
+the browser, in [`video-editor/`](video-editor/README.md), published on NoorEditor at
+[nooreditor.web.app/video](https://nooreditor.web.app/video) with
 `npm run deploy:video-editor`. It shares nothing with the tracker and is not
 part of its build.
 

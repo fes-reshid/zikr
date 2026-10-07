@@ -1,8 +1,9 @@
 # Reel: a video editor in the browser
 
 Reel is a multitrack video editor that runs entirely in the browser. It is
-published on diinislaam.com at
-[/video-editing/](https://diinislaam.com/video-editing/).
+published on NoorEditor at
+[nooreditor.web.app/video](https://nooreditor.web.app/video) (diinislaam.com's
+old /video-editing/ address redirects there).
 
 You import video, audio and images, arrange them on a timeline, add titles
 in Arabic or English, make Qur'ān verse videos with recitation, caption
@@ -176,12 +177,13 @@ Set `CHROMIUM_PATH` to use a particular Chromium.
 ## Deploying
 
 ```sh
-npm run deploy:video-editor   # copies to ../barnoota/video-editing/
+npm run deploy:video-editor   # copies to ../nooreditor/public/video-editing/ and brands it
 ```
 
 The script stamps every asset link with a release version, so browsers and
-the offline cache never mix old and new files. Commit the result in the site
-repo. The copy there is generated: edit the source here.
+the offline cache never mix old and new files, then brands the copy for
+NoorEditor. Commit and push in the nooreditor repo; it publishes itself to
+Firebase. The copy there is generated: edit the source here.
 
 ## Limits
 
