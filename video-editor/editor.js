@@ -1151,8 +1151,11 @@
         const stage = $('stage');
         const box = stage.getBoundingClientRect();
         const pad = 24;
+        // While drawing, the picture sits below the drawing toolbar, not under it.
+        const bar = drawMode && drawMode.bar ? drawMode.bar.offsetHeight + 12 : 0;
+        stage.style.paddingTop = bar ? bar + 'px' : '';
         const availW = Math.max(40, box.width - pad);
-        const availH = Math.max(40, box.height - pad);
+        const availH = Math.max(40, box.height - pad - bar);
         const ratio = canvas.width / canvas.height;
         let w = availW;
         let h = w / ratio;
@@ -1171,6 +1174,13 @@
 
     function play() {
         if (state.playing) return;
+        if (drawMode) {
+            // Playing while the drawing board is open finishes the drawing
+            // and plays it from its start, hand and all.
+            const id = closeDrawMode(true);
+            const clip = id && T.getClip(state.project, id);
+            if (clip) seek(clip.start);
+        }
         const d = duration();
         if (d <= 0) { toast('Add something to the timeline first.'); return; }
         wakeAudio();
@@ -3014,6 +3024,11 @@
         pause();
         const editing = clipId ? T.getClip(state.project, clipId) : null;
         drawMode = {
+            // The project before drawing, for Cancel; the drawing joins the
+            // timeline (without an undo step) from its first stroke.
+            base: state.project,
+            at: Math.round(state.time * 1000) / 1000,
+            created: false,
             clipId: editing ? editing.id : null,
             frame: editing ? { x: editing.x, y: editing.y, scale: editing.scale || 1 } : { x: 0.5, y: 0.5, scale: 1 },
             strokes: editing ? T.clone(editing.strokes || []) : [],
@@ -3063,6 +3078,7 @@
             drawMode.hand = v === 'none' ? 'none' : v === 'pencil' ? 'pencil' : 'pen';
             drawMode.handStyle = v === 'real' ? 'realistic' : v === 'sketch' || v === 'pencil' ? 'sketch' : 'emoji';
             paintDrawLayer();
+            syncDrawClip();
         });
         const undoBtn = el('button', { className: 'ghost', text: 'Undo', title: 'Undo the last stroke (Ctrl+Z)', onclick: undoStroke });
         const clearBtn = el('button', { className: 'ghost', text: 'Clear', onclick: function () { if (drawMode.strokes.length) { drawMode.undo.push(drawMode.strokes); drawMode.strokes = []; paintDrawLayer(); } } });
@@ -3076,7 +3092,7 @@
         $('stage').classList.add('drawing');
         drawMode.layer = layer;
         drawMode.bar = bar;
-        sizeDrawLayer();
+        fitCanvas();
         paintDrawLayer();
         requestDraw();
 
@@ -3150,6 +3166,7 @@
         drawMode.undo.push(drawMode.strokes);
         drawMode.strokes = drawMode.strokes.concat(finishStroke(cur));
         paintDrawLayer();
+        syncDrawClip();
     }
 
     /** The strokes a stroke in progress becomes: a thinned freehand line, or a shape's lines. */
@@ -3183,13 +3200,53 @@
             for (let i = 2; i < p.length; i += 2) if (toSegment(p[i - 2], p[i - 1], p[i], p[i + 1]) < near) return false;
             return true;
         });
-        if (keep.length !== drawMode.strokes.length) { drawMode.strokes = keep; paintDrawLayer(); }
+        if (keep.length !== drawMode.strokes.length) { drawMode.strokes = keep; paintDrawLayer(); syncDrawClip(); }
     }
 
     function undoStroke() {
         if (!drawMode.undo.length) return;
         drawMode.strokes = drawMode.undo.pop();
         paintDrawLayer();
+        syncDrawClip();
+    }
+
+    /** The hand settings chosen on the drawing board, as clip properties. */
+    function drawHandPatch(m) {
+        return { hand: m.hand, handStyle: m.handStyle, handSkin: m.handSkin, handSize: m.handSize };
+    }
+
+    /**
+     * Keeps the timeline in step with the board: a new drawing appears as a
+     * clip from its first stroke and grows with every stroke after. None of
+     * this is an undo step — Done makes it one, and Cancel puts it all back.
+     */
+    function syncDrawClip() {
+        const m = drawMode;
+        if (!m) return;
+        if (m.clipId && T.getClip(state.project, m.clipId)) {
+            if (m.created && !m.strokes.length) {
+                state.project = T.deleteClips(state.project, [m.clipId], false);
+                m.clipId = null;
+                m.created = false;
+                state.selection = [];
+                state.selected = null;
+                renderAll();
+                return;
+            }
+            if (!m.strokes.length) return;
+            state.project = T.updateClip(state.project, m.clipId, Object.assign({ strokes: m.strokes }, drawHandPatch(m)));
+            scheduleTimeline();
+            return;
+        }
+        if (!m.strokes.length) return;
+        const placed = placeDrawing(state.project, m.at, m.strokes, drawHandPatch(m));
+        if (!placed) return;
+        state.project = placed.project;
+        m.clipId = placed.id;
+        m.created = true;
+        state.selection = [placed.id];
+        state.selected = placed.id;
+        renderAll();
     }
 
     function paintDrawLayer() {
@@ -3213,25 +3270,40 @@
         }
     }
 
-    function closeDrawMode(save) {        if (!drawMode) return;
+    /** Closes the drawing board, keeping the drawing (one undo step) or putting everything back. Returns the drawing's clip id. */
+    function closeDrawMode(save) {
+        if (!drawMode) return null;
+        syncDrawClip();
         const m = drawMode;
         drawMode = null;
         m.layer.remove();
         m.bar.remove();
         $('stage').classList.remove('drawing');
-        if (save && m.clipId && T.getClip(state.project, m.clipId)) {
-            if (m.strokes.length) apply(T.updateClip(state.project, m.clipId, { strokes: m.strokes, hand: m.hand, handStyle: m.handStyle, handSkin: m.handSkin, handSize: m.handSize }));
-            else toast('The drawing is empty — delete the clip if you no longer want it.');
-        } else if (save && m.strokes.length) {
-            addDrawing(m.strokes, { hand: m.hand, handStyle: m.handStyle, handSkin: m.handSkin, handSize: m.handSize });
+        fitCanvas();
+        let id = null;
+        if (!save) {
+            if (state.project !== m.base) { state.project = m.base; afterChange(); }
+        } else if (m.clipId && T.getClip(state.project, m.clipId)) {
+            id = m.clipId;
+            if (!m.strokes.length) toast('The drawing is empty — delete the clip if you no longer want it.');
+            else if (state.project !== m.base) {
+                state.selection = [id];
+                state.selected = id;
+                commit();
+                showDetails();
+            }
         }
         requestDraw();
+        return id;
     }
 
-    /** Puts a new drawing at the playhead on a titles track with room for it, adding a track if none has. */
-    function addDrawing(strokes, hand) {
-        let p = state.project;
-        const clip = T.drawClip(null, Math.round(state.time * 1000) / 1000, strokes);
+    /**
+     * A project with a new drawing at `at` on a titles track with room for
+     * it, adding a track if none has; null if it cannot be placed.
+     */
+    function placeDrawing(project, at, strokes, hand) {
+        let p = project;
+        const clip = T.drawClip(null, at, strokes);
         Object.assign(clip, hand || {});
         let track = p.tracks.filter((t) => t.kind === 'text').find(function (t) {
             const at = T.findFreeStart(p, t.id, clip.start, clip.duration, null);
@@ -3244,11 +3316,8 @@
         }
         clip.track = track.id;
         const next = T.addClip(p, clip);
-        if (next === p) return;
-        state.selection = [clip.id];
-        state.selected = clip.id;
-        apply(next);
-        showDetails();
+        if (next === p) return null;
+        return { project: next, id: clip.id };
     }
 
     function addMarkerHere() {
@@ -3824,7 +3893,11 @@
             if (e.key === 'Escape') { e.preventDefault(); closeDrawMode(false); } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !inField) {
                 e.preventDefault();
                 undoStroke();
-            }            return;
+            } else if (e.key === ' ' && !inField && !(e.target.closest && e.target.closest('button'))) {
+                e.preventDefault();
+                play();
+            }
+            return;
         }
         if (dialogStack.length) {
             if (e.key === 'Escape') dialogStack[dialogStack.length - 1].close();
