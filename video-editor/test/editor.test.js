@@ -925,6 +925,12 @@ async function probeFile(page, bytes) {
         const louder = (await project(page)).clips.find((c) => c.id === toneNow.id);
         check('Normalise loudness raises a quiet clip', louder.volume > toneNow.volume, toneNow.volume + ' → ' + louder.volume);
 
+        // Until the full AI video creator is switched on, its button says it is coming soon.
+        await page.click('#ai-maker');
+        const soon = await page.locator('.modal.generic .dialog').textContent();
+        check('the ✨ AI button says the AI video maker is coming soon', /Coming soon/.test(soon) && await page.locator('.modal.generic .ai-log').count() === 0 && /Soon/.test(await page.locator('#ai-maker').textContent()), soon.slice(0, 120));
+        await page.locator('.modal.generic').getByRole('button', { name: 'Close' }).click();
+
         // The menu bar.
         check('a clean menu bar on the right: File, Edit, View, Create, Tools, Help', (await page.locator('.menubar button:visible').allTextContents()).map((t) => t.trim()).join('|') === 'File|Edit|View|Create|Tools|Help' &&
             await page.locator('.studio-bar').isHidden() && await page.locator('.workspace-size-bar').isHidden() && !(await page.locator('#quran-video').isVisible()));
@@ -1410,10 +1416,10 @@ async function probeFile(page, bytes) {
             p.tracks.find((t) => t.id === keysClip.track).kind === 'audio', keysClip && (keysClip.start + ' ' + keysClip.duration + ' vs ' + keySpan + ' title ' + keyTitle.start + ' track ' + keysClip.track + ' ' + (p.tracks.find((t) => t.id === keysClip.track) || {}).kind));
         await page.evaluate((id) => window.ReelApp.selectOnly(id), keyTitle.id);
         await page.locator('.inspector-body button', { hasText: /^Chalk$/ }).click();
-        await page.waitForFunction(() => window.Reel.project.media.some((m) => /^Chalk on a board — Bismillah/.test(m.name)), null, { timeout: 15000 });
+        await page.waitForFunction((at) => { const p = window.Reel.project; return p.clips.some((c) => Math.abs(c.start - at) < 0.001 && /^Chalk on a board — Bismillah/.test((p.media.find((m) => m.id === c.mediaId) || {}).name || '')); }, keyTitle.start, { timeout: 15000 });
         p = await project(page);
-        const chalkMedia = p.media.filter((m) => /^Chalk on a board — Bismillah/.test(m.name)).pop();
-        const chalkClip = chalkMedia && p.clips.find((c) => c.mediaId === chalkMedia.id);
+        const chalkIds = p.media.filter((m) => /^Chalk on a board — Bismillah/.test(m.name)).map((m) => m.id);
+        const chalkClip = p.clips.find((c) => chalkIds.includes(c.mediaId) && Math.abs(c.start - keyTitle.start) < 0.001);
         check('and Writing sound ▸ Chalk adds chalk strokes for the same letters', !!chalkClip && approx(chalkClip.start, keyTitle.start, 0.001) && approx(chalkClip.duration, keysClip.duration, 0.05));
 
         /* ------------------------------------------------------------ recording */
@@ -1654,7 +1660,7 @@ async function probeFile(page, bytes) {
         const hosted = await context.newPage();
         await hosted.addInitScript(function () {
             window.REEL_CONFIG = {
-                watermark: 'nooreditor.app', siteUrl: 'https://nooreditor.app', features: { readAloud: false },
+                watermark: 'nooreditor.app', siteUrl: 'https://nooreditor.app', features: { readAloud: false, ai: true },
                 canRemoveWatermark: () => window.__pro === true, upgrade: (why) => { window.__upgrade = why; }
             };
         });
@@ -1693,6 +1699,8 @@ async function probeFile(page, bytes) {
 
         /* ------------------------------------------------------ Ramadan pack */
         const ram = await context.newPage();
+        // The AI video maker is switched on here; on a plain page it says it is coming soon.
+        await ram.addInitScript(() => { window.REEL_CONFIG = { features: { ai: true } }; });
         await ram.goto(base + '/video-editing/');
         await ram.waitForFunction(() => document.documentElement.dataset.ready === 'true');
         await ram.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));

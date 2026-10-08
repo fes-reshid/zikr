@@ -4,6 +4,11 @@
  */
 window.REEL_AR = [
     // AI video maker
+    ['Coming soon, in shā’ Allāh.', 'قريبًا إن شاء الله.'], ['Soon', 'قريبًا'], ['AI video maker — coming soon', 'صانع الفيديو بالذكاء الاصطناعي — قريبًا'],
+    ['✨ AI video maker (coming soon)', '✨ صانع الفيديو بالذكاء الاصطناعي (قريبًا)'],
+    ['Soon you will describe a video, add your photos, videos and sound, and the AI will make it for you.', 'قريبًا تصف الفيديو وتضيف صورك وفيديوهاتك وصوتك، والذكاء الاصطناعي يصنعه لك.'],
+    ['Until then, Create ▸ Templates, Trending templates and Occasion video make a ready video in a few clicks.', 'إلى ذلك الحين، إنشاء ▸ القوالب والقوالب الرائجة وفيديو المناسبات تصنع فيديو جاهزًا ببضع نقرات.'],
+    ['Open templates', 'افتح القوالب'],
     ['✨ AI video maker', '✨ صانع الفيديو بالذكاء الاصطناعي'], ['AI video maker', 'صانع الفيديو بالذكاء الاصطناعي'], ['AI', 'ذكاء اصطناعي'],
     ['AI video maker: describe a video, add your photos, and it is made for you', 'صانع الفيديو بالذكاء الاصطناعي: صف الفيديو وأضف صورك ويُصنع لك'],
     ['✨ AI video maker — describe it, add your photos…', '✨ صانع الفيديو بالذكاء الاصطناعي — صِفه وأضف صورك…'],

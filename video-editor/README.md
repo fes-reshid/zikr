@@ -24,7 +24,7 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 
 | | |
 | --- | --- |
-| **✨ AI video maker** | Describe a video in a sentence (English or Arabic) and add your own photos, videos or sound if you like. It writes the words, picks a shape, mood, text designs, painted scenes, a short Qur'ān verse or hadith with its reference where it fits, and nature, animal and writing sounds, then builds the video on the timeline with the editor's own tools. Follow-ups change the same video: "longer", "add rain", "gold text", "another version", "read it aloud", "in Arabic". It runs on the device; a host can connect a language model with `REEL_CONFIG.ai.endpoint`, whose plan is checked against the editor's own lists. |
+| **✨ AI video maker** | Coming soon. The gold ✨ AI button says so until a host switches the assistant on with `REEL_CONFIG.features.ai = true`. The groundwork is in `ai.js`: a planner that turns a description (and your own photos, videos and sound) into a video built with the editor's tools, and a hook (`REEL_CONFIG.ai.endpoint`) for connecting a language model, whose plan is checked against the editor's own lists. |
 | **Import** | Video, audio and images from the Import button, or dropped on the page or onto a track. |
 | **Timeline** | Titles, overlay, video and audio tracks, and you can add more. Tracks can be hidden, muted, ducked, or removed when empty. |
 | **Editing** | Move clips (singly or as a group), trim, split, duplicate, delete, or delete and close the gap. Copy and paste works at the playhead. Clips snap to edges, markers and the playhead. Undo and redo cover every edit. |

@@ -1132,12 +1132,33 @@
         setTimeout(() => prompt.focus(), 0);
     }
 
-    app.addTool({ section: 'Create', label: '✨ AI video maker — describe it, add your photos…', run: open });
+    /** Until the full AI video creator is ready, the button says it is coming soon. */
+    function comingSoon() {
+        app.pause();
+        app.openDialog({
+            title: '✨ AI video maker',
+            body: [
+                el('p', { className: 'ai-soon', text: 'Coming soon, in shā’ Allāh.' }),
+                el('p', { text: 'Soon you will describe a video, add your photos, videos and sound, and the AI will make it for you.' }),
+                el('p', { className: 'hint', text: 'Until then, Create ▸ Templates, Trending templates and Occasion video make a ready video in a few clicks.' })
+            ],
+            actions: [
+                { label: 'Close' },
+                { label: 'Open templates', primary: true, run: function () { setTimeout(() => app.runTool(/^Templates…$/), 0); return true; } }
+            ]
+        });
+    }
+
+    // The assistant is switched on by the host (REEL_CONFIG.features.ai = true) once the full AI creator is in place.
+    const ready = !!(app.config.features && app.config.features.ai === true);
+    const start = ready ? open : comingSoon;
+    app.addTool({ section: 'Create', label: ready ? '✨ AI video maker — describe it, add your photos…' : '✨ AI video maker (coming soon)', run: start });
     // A gold ✨ AI button in the top bar, just before the menus.
     const bar = document.querySelector('.menubar');
     if (bar && !document.getElementById('ai-maker')) {
-        const b = el('button', { type: 'button', id: 'ai-maker', className: 'ai-btn', 'aria-label': 'AI video maker', title: 'AI video maker: describe a video, add your photos, and it is made for you', onclick: open }, [el('span', { text: '✨' }), el('span', { className: 'hide-narrow', text: ' AI' })]);
+        const b = el('button', { type: 'button', id: 'ai-maker', className: 'ai-btn', 'aria-label': 'AI video maker', title: ready ? 'AI video maker: describe a video, add your photos, and it is made for you' : 'AI video maker — coming soon', onclick: start },
+            [el('span', { text: '✨' }), el('span', { className: 'hide-narrow', text: ' AI' }), ready ? null : el('span', { className: 'ai-soon-badge hide-narrow', text: 'Soon' })]);
         bar.parentNode.insertBefore(b, bar);
     }
-    Object.assign(window.ReelAI, { open, build, chat });
+    Object.assign(window.ReelAI, { open: start, openAssistant: open, comingSoon, ready, build, chat });
 }());
