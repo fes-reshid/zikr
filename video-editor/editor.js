@@ -607,6 +607,8 @@
             fitCanvas();
         }
         const source = o.source || liveSource;
+        recordHands = !o.ctx;
+        if (recordHands) handHits = [];
         c.save();
         c.globalAlpha = 1;
         c.filter = 'none';
@@ -1199,7 +1201,7 @@
                 // A tap as each letter or word appears, then the finger lifts.
                 const frac = (units * anim.reveal) % 1;
                 const press = anim.reveal >= 1 ? 0 : Math.max(0, 1 - frac * 2.5);
-                drawHand(c, hand, tip.x, tip.y + lineH * 0.5, px, anim.exit, W, H, { press: press });
+                drawHand(c, hand, tip.x, tip.y + lineH * 0.5, px, anim.exit, W, H, { press: press, id: clip.id });
             } else {
                 // The pen moves up and down through the letters as it writes.
                 const writing = anim.reveal < 1;
@@ -1207,7 +1209,7 @@
                 // `px` is the pencil's length: about two and a half letters tall.
                 const px = Math.min(H * 0.45, Math.max(H * 0.1, size * 2.6)) * hand.size;
                 drawHand(c, hand, tip.x, tip.y + (tip.traced ? 0 : size * 0.1) + bob, px, anim.exit, W, H,
-                    { angle: writing ? Math.sin(local * 9) * 0.03 : 0, ink: clip.color });
+                    { angle: writing ? Math.sin(local * 9) * 0.03 : 0, ink: clip.color, id: clip.id });
             }
         }
     }
@@ -1216,9 +1218,21 @@
      * Draws the hand with its point at (x, y). As it leaves (`exit` 0 → 1)
      * it slides off to the bottom right and fades.
      */
+    // Where each hand was drawn in the last preview frame, so a click on it can take it away.
+    let handHits = [];
+    let recordHands = false;
     function drawHand(c, hand, x, y, px, exit, W, H, o) {
         if (!window.ReelHands || exit >= 1) return;
         const e = exit * exit;
+        if (recordHands && o && o.id && exit < 0.6) {
+            // The hand hangs below and to the right of its point.
+            const m = c.getTransform();
+            const hx = x + e * W * 0.45, hy = y + e * H * 0.55;
+            const pts = [[hx - px * 0.3, hy - px * 0.35], [hx + px * 1.05, hy - px * 0.35], [hx - px * 0.3, hy + px * 1.15], [hx + px * 1.05, hy + px * 1.15]]
+                .map((q) => [m.a * q[0] + m.c * q[1] + m.e, m.b * q[0] + m.d * q[1] + m.f]);
+            const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+            handHits.push({ id: o.id, x: Math.min.apply(null, xs), y: Math.min.apply(null, ys), w: Math.max.apply(null, xs) - Math.min.apply(null, xs), h: Math.max.apply(null, ys) - Math.min.apply(null, ys) });
+        }
         c.save();
         c.shadowColor = 'transparent';
         c.globalAlpha *= 1 - exit;
@@ -1296,7 +1310,7 @@
             const local = Math.max(0, t - clip.start);
             const inking = r.strokes[r.strokes.length - 1];
             drawHand(c, hand, at.x, at.y, H * DRAW_HAND * hand.size, anim.exit, W, H,
-                { angle: anim.reveal < 1 ? Math.sin(local * 7) * 0.04 : 0, ink: inking && inking.color });
+                { angle: anim.reveal < 1 ? Math.sin(local * 7) * 0.04 : 0, ink: inking && inking.color, id: clip.id });
         }
     }
 
@@ -2951,11 +2965,12 @@
                 control('Text', area),
                 // Right under the text, where it is easy to find on a phone too.
                 el('div', { className: 'row-buttons' }, [
-                    button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: 'pen', handStyle: 'realistic' })); writingSound(clip.id, 'chalk'); },
-                        { title: 'The title is written out by a hand holding a pen' }),
-                    button('⌨ Type with real hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger', handStyle: 'realistic', handSkin: 'medium' })); writingSound(clip.id, 'typing'); },
-                        { title: 'The title is typed letter by letter by a real tapping finger' })
+                    button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: 'pen', handStyle: 'realistic' })); },
+                        { title: 'The title is written out by a hand holding a pen (add a sound under Animation ▸ Writing sound)' }),
+                    button('⌨ Type with real hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger', handStyle: 'realistic', handSkin: 'medium' })); },
+                        { title: 'The title is typed letter by letter by a real tapping finger (add a sound under Animation ▸ Writing sound)' })
                 ]),
+                handRow(clip),
                 fontSelect(clip),
                 slider(clip, 'Size', (c) => c.fontSize, (v) => ({ fontSize: v }), { min: 12, max: 240, show: (v) => v + 'px' }),
                 colour(clip, 'Colour', 'color'),
@@ -2990,17 +3005,19 @@
                     button('Chalk', function () { writingSound(clip.id, 'chalk'); }, { title: 'Chalk on a board, one stroke as each letter appears' }),
                     button('Pencil', function () { writingSound(clip.id, 'pencil'); }, { title: 'Pencil on paper, one stroke as each letter appears' }),
                     button('Keys', function () { writingSound(clip.id, 'typing'); }, { title: 'Keyboard typing, one key as each letter appears' })
-                ])) : null,
+                ])) : null
+            ].concat(writingSoundControls(clip), [
                 clip.anim && T.MOVES.indexOf(clip.anim) !== -1
                     ? slider(clip, 'Duration', (c) => c.animDuration || 0.6, (v) => ({ animDuration: v }), { min: 0.1, max: 3, step: 0.1, show: secs })
                     : null
-            ].concat(exitControls(clip))));
+            ], exitControls(clip))));
         } else if (clip.sticker) {
             box.append(group('Animated sticker', [button('Edit sticker / arrow', function () { window.ReelEffects.openStickers(); })]));
         } else if (clip.type === 'draw') {
             const n = (clip.strokes || []).length;
             box.append(group('Drawing', [
                 el('div', { className: 'row-buttons' }, [button('✎ Edit drawing', function () { openDrawMode(clip.id); }, { title: 'Draw more, rub out or change it (double-click the clip)' })]),
+                handRow(clip),
                 el('p', { className: 'hint', text: n + (n === 1 ? ' stroke' : ' strokes') + '. Move and size it under Layout.' })
             ]));
             box.append(group('Animation', [
@@ -3408,6 +3425,50 @@
 
     /** A title that a hand holding a pen writes out. */
     /** Puts a chalk, pencil or keyboard sound under a title, in time with its letters. */
+    /** Takes the hand off a title or drawing; the words or lines still appear by themselves. */
+    function removeHand(id) {
+        const clip = T.getClip(state.project, id);
+        if (!clip || !clip.hand || clip.hand === 'none') return;
+        apply(T.updateClip(state.project, id, { hand: 'none' }));
+        toast('Hand removed. The ' + (clip.type === 'draw' ? 'drawing still draws itself' : 'words still appear by themselves') + ' — press ✋ Add hand to bring it back.');
+    }
+
+    /** One clear button: remove the hand, or bring it back. */
+    function handRow(clip) {
+        const reveals = clip.type === 'draw' ? clip.anim === 'draw' : T.REVEAL_ANIMS.indexOf(clip.anim) !== -1;
+        if (clip.hand && clip.hand !== 'none') {
+            return el('div', { className: 'row-buttons' }, [button('✋ Remove hand', function () { removeHand(clip.id); }, { title: 'Take the hand out of the video; the writing stays' })]);
+        }
+        if (!reveals) return null;
+        const back = clip.type === 'draw' ? { hand: 'pen' } : (clip.anim === 'handwrite' ? { hand: 'pen', handStyle: 'realistic' } : { hand: 'finger', handStyle: 'realistic', handSkin: clip.handSkin || 'medium' });
+        return el('div', { className: 'row-buttons' }, [button('✋ Add hand', function () { apply(T.updateClip(state.project, clip.id, back)); }, { title: 'Show a hand writing it again' })]);
+    }
+
+    /** The chalk, pencil or keyboard sound under a title (made with Writing sound). */
+    function writingClips(p, clip) {
+        const named = (c) => /^(Chalk on a board|Pencil on paper|Keyboard typing) — /.test((T.getMedia(p, c.mediaId) || {}).name || '');
+        return p.clips.filter((c) => c.writingFor === clip.id || (!c.writingFor && c.type === 'media' && Math.abs(c.start - clip.start) < 0.01 && named(c)));
+    }
+
+    /** Volume and removal for a title's writing sound, when it has one. */
+    function writingSoundControls(clip) {
+        const list = writingClips(state.project, clip);
+        if (!list.length) return [];
+        const ids = list.map((c) => c.id);
+        const now = list[0].volume == null ? 1 : list[0].volume;
+        const out = el('output', { text: pct(now * 100) });
+        const input = el('input', { type: 'range', min: 0, max: 200, step: 5, value: Math.round(now * 100), 'aria-label': 'Writing sound volume' });
+        input.addEventListener('input', function () {
+            const v = Number(input.value) / 100;
+            out.textContent = pct(v * 100);
+            ids.forEach((id) => { state.project = T.updateClip(state.project, id, { volume: v }); });
+            scheduleTimeline();
+        });
+        input.addEventListener('change', commitQuiet);
+        return [control('Sound volume', input, out),
+            el('div', { className: 'row-buttons' }, [button('✕ Remove sound', function () { apply(T.deleteClips(state.project, ids, false)); toast('Writing sound removed.'); }, { title: 'Take the writing sound off this title' })])];
+    }
+
     function writingSound(id, kind) {
         if (!window.ReelSounds || !window.ReelSounds.addWritingSound) return;
         window.ReelSounds.addWritingSound(id, kind).catch(function (err) { toast(err.message); });
@@ -4797,6 +4858,9 @@
         showAbout: showAbout,
         /** Adds a command to the Tools menu: { section, label, run }. */
         addTool: function (tool) { tools.push(tool); },
+        removeHand: removeHand,
+        /** Where hands were drawn in the last preview frame, in frame pixels: [{ id, x, y, w, h }]. */
+        handHits: function () { return handHits.slice(); },
         /** Runs the first added tool whose label matches `re`; false when there is none. */
         runTool: function (re) { const t = tools.find((x) => re.test(x.label)); if (!t) return false; t.run(); return true; }
     };

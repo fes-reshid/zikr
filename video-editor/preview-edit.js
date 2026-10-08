@@ -13,8 +13,24 @@ function usable(){return !app.state.playing&&!app.state.exporting&&!stage.classL
 function point(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)/r.width*app.state.project.width,y:(e.clientY-r.top)/r.height*app.state.project.height};}
 function hit(e){const p=point(e);return layers().find(l=>{const b=app.previewBounds(l.clip);return b&&p.x>=b.x-8&&p.x<=b.x+b.w+8&&p.y>=b.y-8&&p.y<=b.y+b.h+8;})?.clip;}
 pick.onchange=()=>{finishText(true);app.pause();app.selectOnly(pick.value||null);};
+// A click on a writing hand offers to take it away.
+let handMenuEl=null;
+function closeHandMenu(){if(handMenuEl){handMenuEl.remove();handMenuEl=null;}}
+function handAt(p){const r=(app.handHits?app.handHits():[]).reverse().find(h=>p.x>=h.x&&p.x<=h.x+h.w&&p.y>=h.y&&p.y<=h.y+h.h);return r?r.id:null;}
+function handMenu(e,id){
+ closeHandMenu();const s=stage.getBoundingClientRect();
+ handMenuEl=el('div',{className:'hand-menu',role:'menu','aria-label':'Hand'},[
+  el('button',{type:'button',role:'menuitem',text:'✋ Remove hand',onclick:()=>{closeHandMenu();app.removeHand(id);}}),
+  el('button',{type:'button',role:'menuitem',className:'ghost',text:'Keep',onclick:closeHandMenu})]);
+ handMenuEl.style.left=clamp(e.clientX-s.left,8,s.width-170)+'px';handMenuEl.style.top=clamp(e.clientY-s.top+10,8,s.height-90)+'px';
+ handMenuEl.addEventListener('pointerdown',ev=>ev.stopPropagation());
+ stage.append(handMenuEl);handMenuEl.querySelector('button').focus();
+}
+document.addEventListener('pointerdown',e=>{if(handMenuEl&&!handMenuEl.contains(e.target))closeHandMenu();},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeHandMenu();});
 function begin(e,resize){
  if(e.button!==0||!usable()||editor)return;
+ if(!resize){const hid=handAt(point(e));if(hid){e.preventDefault();app.pause();app.selectOnly(hid);handMenu(e,hid);return;}}
  const clip=resize?T.getClip(app.state.project,app.state.selected):hit(e);if(!clip)return;
  e.preventDefault();app.pause();app.selectOnly(clip.id);
  drag={id:clip.id,before:app.state.project,clip,p:point(e),clientX:e.clientX,clientY:e.clientY,resize,moved:false,pointer:e.pointerId,target:e.currentTarget};

@@ -3,6 +3,14 @@
  * Add a row whenever new words appear in the editor; anything not listed stays in English.
  */
 window.REEL_AR = [
+    // Hands and writing sounds
+    ['✋ Remove hand', '✋ إزالة اليد'], ['✋ Add hand', '✋ إضافة اليد'], ['Keep', 'إبقاء'], ['Hand', 'اليد'], ['Sound volume', 'مستوى الصوت'], ['✕ Remove sound', '✕ إزالة الصوت'],
+    ['Writing sound volume', 'مستوى صوت الكتابة'], ['Writing sound removed.', 'أُزيل صوت الكتابة.'],
+    ['Take the hand out of the video; the writing stays', 'أزل اليد من الفيديو؛ تبقى الكتابة'], ['Show a hand writing it again', 'أظهر يدًا تكتبه مجددًا'], ['Take the writing sound off this title', 'أزل صوت الكتابة عن هذا العنوان'],
+    ['The title is written out by a hand holding a pen (add a sound under Animation ▸ Writing sound)', 'يُكتب العنوان بيد تمسك قلمًا (أضف صوتًا من الحركة ▸ صوت الكتابة)'],
+    ['The title is typed letter by letter by a real tapping finger (add a sound under Animation ▸ Writing sound)', 'يُكتب العنوان حرفًا حرفًا بإصبع حقيقي (أضف صوتًا من الحركة ▸ صوت الكتابة)'],
+    ['Hand removed. The words still appear by themselves — press ✋ Add hand to bring it back.', 'أُزيلت اليد. ما زالت الكلمات تظهر وحدها — اضغط «✋ إضافة اليد» لإرجاعها.'],
+    ['Hand removed. The drawing still draws itself — press ✋ Add hand to bring it back.', 'أُزيلت اليد. ما زال الرسم يُرسم وحده — اضغط «✋ إضافة اليد» لإرجاعها.'],
     // AI video maker
     ['Coming soon, in shā’ Allāh.', 'قريبًا إن شاء الله.'], ['Soon', 'قريبًا'], ['AI video maker — coming soon', 'صانع الفيديو بالذكاء الاصطناعي — قريبًا'],
     ['✨ AI video maker (coming soon)', '✨ صانع الفيديو بالذكاء الاصطناعي (قريبًا)'],
@@ -299,7 +307,7 @@ window.REEL_AR = [
 
 /* Labels with numbers or names in them: [pattern, (match, tr) => Arabic]. */
 window.REEL_AR_PATTERNS = [
-    [/^(Chalk on a board|Pencil on paper|Keyboard typing) added under the title, in time with its letters(.*)$/, (m) => ({ 'Chalk on a board': 'أُضيف صوت الطباشير', 'Pencil on paper': 'أُضيف صوت القلم الرصاص', 'Keyboard typing': 'أُضيف صوت المفاتيح' })[m[1]] + ' تحت العنوان متزامنًا مع حروفه.'],
+    [/^(Chalk on a board|Pencil on paper|Keyboard typing) added under the title, in time with its letters(.*)$/, (m) => ({ 'Chalk on a board': 'أُضيف صوت الطباشير', 'Pencil on paper': 'أُضيف صوت القلم الرصاص', 'Keyboard typing': 'أُضيف صوت المفاتيح' })[m[1]] + ' تحت العنوان متزامنًا مع حروفه.' + (/volume/.test(m[2]) ? ' غيّر مستواه أو أزله من «صوت الكتابة».' : '')],
     [/^(.+) added at the playhead\.$/, (m, tr) => 'أُضيف ' + tr(m[1]) + ' عند مؤشر التشغيل.'],
     [/^Uses your (\d+) newest imported pictures? or videos? for the photo slots\.$/, (m) => 'يستخدم أحدث ' + m[1] + ' من صورك أو فيديوهاتك المستوردة لأماكن الصور.'],
     [/^(.+) added \(([\d.]+) s\)\. Select any part to change it; one Undo takes it all off\.$/, (m, tr) => 'أُضيف ' + tr(m[1]) + ' (' + m[2] + ' ث). حدّد أي جزء لتغييره؛ تراجع واحد يزيله كله.'],

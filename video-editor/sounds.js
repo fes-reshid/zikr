@@ -656,9 +656,13 @@
         const span = T.revealSpan(c);
         const data = writingSound(kind, span + 0.3, times);
         const words = String(clip.text).trim().split(/\s+/).slice(0, 4).join(' ');
-        const placed = await placeSound(data, WRITING[kind] + ' — ' + words + '.wav', clip.start, { volume: 0.8 });
+        // One writing sound per title: a new one replaces the last.
+        let p = app.state.project;
+        const old = p.clips.filter((c) => c.writingFor === clipId).map((c) => c.id);
+        if (old.length) { app.state.project = T.deleteClips(p, old, false); }
+        const placed = await placeSound(data, WRITING[kind] + ' — ' + words + '.wav', clip.start, { volume: 0.8, writingFor: clipId });
         app.selectOnly(clipId);
-        app.toast(WRITING[kind] + ' added under the title, in time with its letters' + (reveal ? '.' : ' — set the entrance to Typewriter, Word by word or Handwriting to see it written.'));
+        app.toast(WRITING[kind] + ' added under the title, in time with its letters' + (reveal ? '. Change its volume or remove it under Writing sound.' : ' — set the entrance to Typewriter, Word by word or Handwriting to see it written.'));
         return placed;
     }
 

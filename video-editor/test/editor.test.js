@@ -1112,6 +1112,25 @@ async function probeFile(page, bytes) {
         const handAfter = await countSkin(handAt + span + 0.7);
         check('the title is written out from the start', inkHalf > 200 && inkFull > inkHalf * 1.4, inkHalf + ' → ' + inkFull);
         check('a hand holds the pen while it writes, then leaves', handWriting > 1500 && handAfter === 0, handWriting + ' → ' + handAfter);
+        check('writing by hand adds no sound by itself', !(await project(page)).clips.some((c) => c.writingFor === written.id || (c.type === 'media' && approx(c.start, written.start, 0.001))));
+        // Click the hand on the picture to take it away.
+        await page.evaluate((t) => { window.ReelApp.selectOnly(null); window.Reel.seek(t); window.Reel.drawFrame(); }, handAt + span * 0.45);
+        const handBox = await page.evaluate((id) => window.ReelApp.handHits().find((h) => h.id === id), written.id);
+        const canvasBox = await page.locator('#preview').boundingBox();
+        const proj = await project(page);
+        const hx = canvasBox.x + (handBox.x + handBox.w * 0.55) / proj.width * canvasBox.width, hy = canvasBox.y + (handBox.y + handBox.h * 0.6) / proj.height * canvasBox.height;
+        await page.mouse.click(hx, hy);
+        check('clicking the hand on the picture offers to remove it', await page.locator('.hand-menu').isVisible());
+        await page.locator('.hand-menu button', { hasText: '✋ Remove hand' }).click();
+        const handless = (await project(page)).clips.find((c) => c.id === written.id);
+        const skinGone = await countSkin(handAt + span * 0.45);
+        check('and Remove hand takes the hand out but keeps the writing', handless.hand === 'none' && handless.anim === 'handwrite' && skinGone === 0, handless.hand + ' ' + skinGone);
+        await page.evaluate((id) => window.Reel.select(id), written.id);
+        await page.locator('.inspector-body button', { hasText: '✋ Add hand' }).click();
+        check('✋ Add hand brings it back', (await project(page)).clips.find((c) => c.id === written.id).hand === 'pen');
+        await page.locator('.inspector-body button', { hasText: '✋ Remove hand' }).click();
+        check('and the details panel can remove it too', (await project(page)).clips.find((c) => c.id === written.id).hand === 'none');
+        await page.locator('.inspector-body button', { hasText: '✋ Add hand' }).click();
         const arabicOk = await page.evaluate(function (id) {
             const app = window.ReelApp;
             app.state.project = app.T.updateClip(app.state.project, id, { text: 'بسم الله' });
@@ -1406,13 +1425,16 @@ async function probeFile(page, bytes) {
         await page.keyboard.type('Bismillah');
         const keyTitle = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'Bismillah' && approx(c.start, typeAt, 0.01));
         await page.locator('.inspector-body button', { hasText: '⌨ Type with real hand' }).click();
+        await page.waitForTimeout(300);
+        check('typing by hand adds no sound by itself', !(await project(page)).clips.some((c) => c.writingFor === keyTitle.id));
+        await page.locator('.inspector-body button', { hasText: /^Keys$/ }).click();
         // Wait for the sound under this title (an earlier test made one with the same name).
         await page.waitForFunction((at) => { const p = window.Reel.project; return p.clips.some((c) => Math.abs(c.start - at) < 0.001 && /^Keyboard typing — Bismillah/.test((p.media.find((m) => m.id === c.mediaId) || {}).name || '')); }, keyTitle.start, { timeout: 15000 });
         p = await project(page);
         const keysIds = p.media.filter((m) => /^Keyboard typing — Bismillah/.test(m.name)).map((m) => m.id);
         const keysClip = p.clips.filter((c) => keysIds.includes(c.mediaId)).sort((a, b) => Math.abs(a.start - keyTitle.start) - Math.abs(b.start - keyTitle.start))[0];
         const keySpan = await page.evaluate((id) => window.ReelApp.T.revealSpan(window.Reel.project.clips.find((c) => c.id === id)), keyTitle.id);
-        check('typing a title by hand adds a keyboard sound under it, as long as the typing', !!keysClip && approx(keysClip.start, keyTitle.start, 0.001) && approx(keysClip.duration, keySpan + 0.3, 0.05) &&
+        check('Writing sound ▸ Keys adds a keyboard sound under it, as long as the typing', !!keysClip && approx(keysClip.start, keyTitle.start, 0.001) && approx(keysClip.duration, keySpan + 0.3, 0.05) &&
             p.tracks.find((t) => t.id === keysClip.track).kind === 'audio', keysClip && (keysClip.start + ' ' + keysClip.duration + ' vs ' + keySpan + ' title ' + keyTitle.start + ' track ' + keysClip.track + ' ' + (p.tracks.find((t) => t.id === keysClip.track) || {}).kind));
         await page.evaluate((id) => window.ReelApp.selectOnly(id), keyTitle.id);
         await page.locator('.inspector-body button', { hasText: /^Chalk$/ }).click();
@@ -1420,7 +1442,14 @@ async function probeFile(page, bytes) {
         p = await project(page);
         const chalkIds = p.media.filter((m) => /^Chalk on a board — Bismillah/.test(m.name)).map((m) => m.id);
         const chalkClip = p.clips.find((c) => chalkIds.includes(c.mediaId) && Math.abs(c.start - keyTitle.start) < 0.001);
-        check('and Writing sound ▸ Chalk adds chalk strokes for the same letters', !!chalkClip && approx(chalkClip.start, keyTitle.start, 0.001) && approx(chalkClip.duration, keysClip.duration, 0.05));
+        check('and Writing sound ▸ Chalk swaps it for chalk strokes on the same letters', !!chalkClip && approx(chalkClip.start, keyTitle.start, 0.001) && approx(chalkClip.duration, keysClip.duration, 0.05) &&
+            !p.clips.some((c) => c.id === keysClip.id) && p.clips.filter((c) => c.writingFor === keyTitle.id).length === 1);
+        await page.evaluate((id) => window.ReelApp.selectOnly(id), keyTitle.id);
+        await page.getByRole('slider', { name: 'Writing sound volume' }).fill('150');
+        await page.getByRole('slider', { name: 'Writing sound volume' }).dispatchEvent('change');
+        check('its volume can be turned up or down from the title', approx((await project(page)).clips.find((c) => c.writingFor === keyTitle.id).volume, 1.5, 0.001));
+        await page.locator('.inspector-body button', { hasText: '✕ Remove sound' }).click();
+        check('and the writing sound can be removed', !(await project(page)).clips.some((c) => c.writingFor === keyTitle.id));
 
         /* ------------------------------------------------------------ recording */
         await menu(page, 'create', /Record screen/);

@@ -142,7 +142,7 @@
             lines: ['Never lose hope', 'His mercy is greater than any mistake', 'Turn back to Him — the door is open', 'Astaghfirullah'],
             arLines: ['لا تيأس', 'رحمته أوسع من كل خطأ', 'عُد إليه فالباب مفتوح', 'أستغفر الله'] },
         { id: 'knowledge', en: /knowledge|\blearn|\bstud(y|ying|ent)|\bschool\b|\bexams?\b|\bteach|\bilm\b|madrasa|lesson/, ar: /علم|دراسة|طالب|مدرسة|امتحان|معلم|درس/, mood: 'calm',
-            paint: 'paper', verse: '20:114', writing: 'chalk', stickers: ['book', 'pen'],
+            paint: 'paper', verse: '20:114', stickers: ['book', 'pen'],
             lines: ['Seek knowledge', 'Every page brings you closer', 'Learn it, live it, share it', 'Rabbi zidni ‘ilma'],
             arLines: ['اطلب العلم', 'كل صفحة تقرّبك أكثر', 'تعلّمه واعمل به وعلّمه', 'رب زدني علمًا'] },
         { id: 'parents', en: /\bparents?\b|\bmother\b|\bmo(m|mmy)\b|\bmum\b|\bfather\b|\bdad\b|\bfamily\b/, ar: /الوالدين|والدي|أمي|أبي|الأم|الأب|عائلة|أسرة/, mood: 'calm',
