@@ -948,7 +948,7 @@ async function probeFile(page, bytes) {
         check('and View ▸ Show the side panels brings them back', await page.locator('.workspace > .bin').isVisible());
         const createSections = await page.locator('#create').click().then(() => page.locator('#create-menu .menu-section').allTextContents());
         await page.keyboard.press('Escape');
-        check('Create groups everything you can make', createSections.join('|') === 'Add|Islamic videos|Ready-made designs|Sound and recording|Share and brand', createSections.join('|'));
+        check('Create groups everything you can make', createSections.join('|') === 'Add|Islamic videos|Trending|Ready-made designs|Sound and recording|Share and brand', createSections.join('|'));
 
         // Help ▸ About.
         await page.click('#help');
@@ -1190,11 +1190,11 @@ async function probeFile(page, bytes) {
             Math.round(w1) + '×' + Math.round(h0) + ' → ' + Math.round(after.width) + '×' + Math.round(after.height));
         await page.evaluate(() => { ['reel.binWidth', 'reel.inspectorWidth', 'reel.timelineHeight'].forEach((k) => localStorage.removeItem(k)); document.body.style.removeProperty('--insp-w'); document.body.style.removeProperty('--timeline-h'); window.dispatchEvent(new Event('resize')); });
 
-        // The nooreditor.web.app watermark.
+        // The NoorEditor.web.app watermark, top right.
         const markPixels = () => page.evaluate(function () {
             window.Reel.drawFrame();
             const c = document.getElementById('preview');
-            const d = c.getContext('2d').getImageData(Math.floor(c.width * 0.7), Math.floor(c.height * 0.9), Math.floor(c.width * 0.3), Math.floor(c.height * 0.1)).data;
+            const d = c.getContext('2d').getImageData(Math.floor(c.width * 0.7), 0, Math.floor(c.width * 0.3), Math.floor(c.height * 0.1)).data;
             let n = 0;
             for (let i = 0; i < d.length; i += 4) if (d[i] > 150 && Math.abs(d[i] - d[i + 2]) < 12) n += 1;
             return n;
@@ -1202,9 +1202,9 @@ async function probeFile(page, bytes) {
         await page.evaluate((t) => window.Reel.seek(t), sizeAt + 30);
         const marked = await markPixels();
         await page.evaluate(() => window.ReelApp.selectOnly(null));
-        await page.locator('.inspector-body label.check', { hasText: 'nooreditor.web.app' }).click();
+        await page.locator('.inspector-body label.check', { hasText: 'NoorEditor.web.app' }).click();
         const unmarked = await markPixels();
-        check('the nooreditor.web.app watermark is in the corner, and can be turned off', marked > 150 && unmarked === 0 &&
+        check('the NoorEditor.web.app watermark is in the top-right corner, and can be turned off', marked > 150 && unmarked === 0 &&
             (await project(page)).watermark === false, marked + ' → ' + unmarked);
         await page.keyboard.press('Control+z');
         check('it is on again after undo', (await project(page)).watermark !== false);
@@ -1680,6 +1680,50 @@ async function probeFile(page, bytes) {
         await ram.locator('#create-menu .menu-item', { hasText: /^Templates…$/ }).click();
         const ramCards = await ram.locator('.modal.generic .studio-card').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
         check('the Ramadan templates are in the gallery', ['Iftar invitation', 'Suhoor reminder', 'Taraweeh prayers', 'Ramadan timetable', 'Zakat al-Fitr reminder', 'Eid prayer announcement'].every((n) => ramCards.includes(n)), ramCards.length + ' templates');
+        // Trending templates and text designs
+        await ram.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
+        await ram.evaluate(() => { window.ReelApp.apply(window.ReelApp.T.createProject({ width: 1080, height: 1920, fps: 30 })); });
+        await ram.evaluate(async () => {
+            const files = [];
+            for (const n of ['mountain-lake', 'sea-sunset']) { const c = window.ReelOccasions.paintScene(n, 800, 600); const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.8)); files.push(new File([blob], n + '.jpg', { type: 'image/jpeg' })); }
+            await window.ReelApp.importFiles(files, {});
+        });
+        await ram.click('#create');
+        await ram.locator('#create-menu .menu-item', { hasText: 'Trending templates' }).click();
+        const trendBox = ram.locator('.modal.generic');
+        check('the trending templates gallery shows all ten', await trendBox.locator('.trend-card').count() === 10);
+        await trendBox.locator('.trend-card', { hasText: 'Before & after' }).click();
+        await trendBox.getByRole('textbox', { name: 'First line' }).fill('My room makeover');
+        await trendBox.getByRole('button', { name: 'Use template' }).click();
+        await ram.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+        const tp = await ram.evaluate(() => window.Reel.project);
+        const photoClips = tp.clips.filter((c) => c.type === 'media' && /mountain-lake|sea-sunset/.test((tp.media.find((m) => m.id === c.mediaId) || {}).name || ''));
+        check('a trending template puts my own pictures into its photo slots, side by side', photoClips.length === 2 && photoClips.some((c) => c.x < 0.5) && photoClips.some((c) => c.x > 0.5) &&
+            tp.clips.some((c) => c.type === 'text' && c.text === 'My room makeover') && tp.clips.some((c) => c.type === 'text' && c.text === 'BEFORE') && tp.clips.some((c) => c.type === 'text' && c.text === 'AFTER'),
+            photoClips.length + ' photos · ' + tp.clips.filter((c) => c.type === 'text').map((c) => c.text).join(' | '));
+        const bgClip = tp.clips.find((c) => c.type === 'media' && /^Trend /.test((tp.media.find((m) => m.id === c.mediaId) || {}).name || ''));
+        check('with its painted background under the whole template', !!bgClip && approx(bgClip.duration, 6.5, 0.01));
+        const titleId = tp.clips.find((c) => c.type === 'text' && c.text === 'My room makeover').id;
+        await ram.evaluate((id) => window.ReelApp.selectOnly(id), titleId);
+        await ram.locator('button', { hasText: '✦ Text designs…' }).click();
+        await ram.locator('.modal.generic .trend-card', { hasText: 'Neon pink' }).click();
+        const neonClip = await ram.evaluate((id) => window.Reel.project.clips.find((c) => c.id === id), titleId);
+        check('a text design gives the title its look, with a coloured glow for neon', neonClip.glow === '#ff3fd2' && neonClip.box === false);
+        await ram.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
+        await ram.click('#undo');
+        check('and Undo puts the old look back', !(await ram.evaluate((id) => window.Reel.project.clips.find((c) => c.id === id).glow, titleId)));
+
+        // Arabic interface, chosen from the View menu
+        await ram.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
+        await ram.click('#view');
+        await ram.locator('#view-menu .menu-item', { hasText: 'العربية' }).click();
+        const arUi = await ram.evaluate(() => ({ file: document.getElementById('file').textContent.trim(), exp: document.getElementById('export').textContent.trim(), lang: document.documentElement.lang, rtl: getComputedStyle(document.querySelector('.inspector-body')).direction }));
+        await ram.click('#create');
+        const arMenu = await ram.locator('#create-menu .menu-item').first().textContent();
+        await ram.keyboard.press('Escape');
+        check('the interface switches to Arabic from the View menu, text panels read right to left', arUi.file === 'ملف' && arUi.exp === 'تصدير' && arUi.lang === 'ar' && arUi.rtl === 'rtl' && /عنوان/.test(arMenu), JSON.stringify(arUi) + ' ' + arMenu);
+        await ram.evaluate(() => window.ReelI18n.set('en'));
+        check('and back to English', await ram.evaluate(() => document.getElementById('file').textContent.trim() === 'File' && document.documentElement.lang === 'en'));
         await ram.close();
 
         /* ------------------------------------------------------------ offline */

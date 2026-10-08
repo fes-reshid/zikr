@@ -506,6 +506,16 @@ dialog#consentGate h1:focus-visible { outline: none; }
     :root { --head-w: 96px; }
 }
 .panel-foot { display: none; }
+/* Trending templates and text designs */
+.trend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; max-height: 46vh; overflow: auto; padding: 2px; }
+.trend-grid.designs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 60vh; }
+.trend-card { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; background: var(--panel-2); border: 2px solid transparent; text-align: center; }
+.trend-card canvas { width: 100%; height: auto; border-radius: 6px; display: block; }
+.trend-card[aria-pressed="true"] { border-color: var(--accent); }
+.trend-card strong { font-size: 12px; font-weight: 600; }
+/* Arabic: text panels and windows read right to left; the preview and timeline stay left to right. */
+.ui-rtl .menu, .ui-rtl .dialog, .ui-rtl .inspector-body, .ui-rtl .panel-head, .ui-rtl .toast, .ui-rtl .bin .panel-body, .ui-rtl .consent-box { direction: rtl; text-align: right; }
+.ui-rtl .dialog input[type=range], .ui-rtl .inspector-body input[type=range], .ui-rtl .dialog .timecode { direction: ltr; }
 @media (min-width: 901px) { .show-narrow { display: none !important; } }
 
 /* Creative tools stay within reach on both phones and computers. */
@@ -840,7 +850,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
                     <option value="12000000">High · 12 Mbps</option>
                 </select>
             </div>
-            <label class="check"><input type="checkbox" id="export-watermark" checked> Add the nooreditor.web.app watermark</label>
+            <label class="check"><input type="checkbox" id="export-watermark" checked> Add the NoorEditor.web.app watermark</label>
             <p id="export-summary"></p>
             <p id="export-note"></p>
         </div>
@@ -894,9 +904,12 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
 <script src="pauses.js?v=dev"></script>
 <script src="occasions.js?v=dev"></script>
 <script src="ramadan.js?v=dev"></script>
+<script src="trends.js?v=dev"></script>
 <script src="reframe.js?v=dev"></script>
 <script src="speak.js?v=dev"></script>
 <script src="mobile.js?v=dev"></script>
+<script src="i18n-ar.js?v=dev"></script>
+<script src="i18n.js?v=dev"></script>
 <script>
 // Works offline after the first visit (http only; the service worker cannot run from a file).
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {

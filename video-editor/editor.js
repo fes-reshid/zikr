@@ -695,7 +695,8 @@
         const m = short * 0.035;
         const pos = logo.pos || 'tr';
         const x = pos.indexOf('l') !== -1 ? m : W - m - w;
-        const y = pos.indexOf('t') === 0 ? m : H - m - h - (pos === 'br' && watermarkOn() ? short * 0.05 : 0);
+        // The watermark sits in the top-right corner, so a logo there goes just below it.
+        const y = pos.indexOf('t') === 0 ? m + (pos === 'tr' && watermarkOn() ? short * 0.06 : 0) : H - m - h;
         c.save();
         c.globalAlpha = logo.opacity > 0 ? logo.opacity : 0.9;
         c.drawImage(img, x, y, w, h);
@@ -705,14 +706,14 @@
     /*
      * What the site hosting the editor can set before loading it, as
      * window.REEL_CONFIG = {
-     *   watermark: 'nooreditor.web.app',      // the text in the corner
+     *   watermark: 'NoorEditor.web.app',      // the text in the corner
      *   siteUrl: 'https://nooreditor.web.app', // shared with exported videos
      *   canRemoveWatermark: () => bool | Promise<bool>,  // e.g. a paid plan
      *   upgrade: (reason) => {},              // shows the host's upgrade offer
      *   features: { readAloud: false }        // switch tools off
      * }. Call ReelApp.refreshPlan() when the visitor's plan changes.
      */
-    const CONFIG = Object.assign({ watermark: 'nooreditor.web.app', siteUrl: 'https://nooreditor.web.app', canRemoveWatermark: null, upgrade: null, features: {} }, window.REEL_CONFIG || {});
+    const CONFIG = Object.assign({ watermark: 'NoorEditor.web.app', siteUrl: 'https://nooreditor.web.app', canRemoveWatermark: null, upgrade: null, features: {} }, window.REEL_CONFIG || {});
     let mayRemoveWatermark = !CONFIG.canRemoveWatermark;
     function refreshPlan() {
         if (!CONFIG.canRemoveWatermark) return Promise.resolve(true);
@@ -731,7 +732,7 @@
 
     const WATERMARK = CONFIG.watermark;
 
-    /** The site's mark (nooreditor.web.app) in the bottom-right corner; it can be turned off per project. */
+    /** The site's mark (NoorEditor.web.app) in the top-right corner; it can be turned off per project. */
     function drawWatermark(c, W, H) {
         const size = Math.max(10, Math.round(Math.min(W, H) * 0.034));
         const m = Math.round(size * 0.9);
@@ -739,13 +740,13 @@
         c.globalAlpha = 0.78;
         c.font = '700 ' + size + 'px ' + FONTS.sans.css;
         c.textAlign = 'right';
-        c.textBaseline = 'alphabetic';
+        c.textBaseline = 'top';
         c.direction = 'ltr';
         c.shadowColor = 'rgba(0,0,0,.55)';
         c.shadowBlur = size * 0.35;
         c.shadowOffsetY = size * 0.06;
         c.fillStyle = '#ffffff';
-        c.fillText(WATERMARK, W - m, H - m);
+        c.fillText(WATERMARK, W - m, m);
         c.restore();
     }
 
@@ -1083,6 +1084,12 @@
             c.shadowColor = 'rgba(0,0,0,.65)';
             c.shadowBlur = size * 0.12;
             c.shadowOffsetY = size * 0.04;
+        }
+        // A coloured glow (neon looks) in place of the dark shadow.
+        if (clip.glow) {
+            c.shadowColor = clip.glow;
+            c.shadowBlur = size * 0.42;
+            c.shadowOffsetY = 0;
         }
         c.fillStyle = clip.color || '#fff';
         const outline = clip.outline && clip.outline.width > 0 ? clip.outline : null;
@@ -2332,6 +2339,7 @@
     const CREATE_GROUPS = [
         ['Add', /^Title|written by hand|Drawing \(D\)|gradient card/],
         ['Islamic videos', /Qur|Hadith|Nasheed|Occasion|Ramadan/],
+        ['Trending', /Trending/],
         ['Ready-made designs', /template|Background images|shapes|Drawing images|stickers/i],
         ['Sound and recording', /Record|Read aloud|Sound library|Sync|pauses/i],
         ['Share and brand', /Brand|Short/]
@@ -2397,6 +2405,10 @@
             { section: 'Timeline', label: 'Fit the whole project', run: zoomToFit },
             { section: 'Timeline', label: (state.snap ? '✓ ' : '\u2003 ') + 'Snap to edges and the playhead', run: function () { $('snap').click(); } }
         );
+        const I = window.ReelI18n;
+        if (I) I.LANGS.forEach(function (l) {
+            items.push({ section: 'Language', label: (I.lang() === l[0] ? '✓ ' : '\u2003 ') + l[1], run: function () { I.set(l[0]); } });
+        });
         return items;
     }
 
@@ -2933,6 +2945,7 @@
                 el('div', { className: 'row-buttons' }, Object.keys(T.TITLE_STYLES).map(function (k) {
                     return button(T.TITLE_STYLES[k].label, function () { apply(T.updateClip(state.project, clip.id, T.TITLE_STYLES[k].patch)); });
                 })),
+                window.ReelTrends ? el('div', { className: 'row-buttons' }, [button('✦ Text designs…', function () { window.ReelTrends.openDesigns(clip.id); })]) : null,
                 control('Text', area),
                 // Right under the text, where it is easy to find on a phone too.
                 el('div', { className: 'row-buttons' }, [
@@ -2958,6 +2971,15 @@
                     });
                     input.addEventListener('change', commitQuiet);
                     return control('Outline colour', input);
+                }()),
+                (function () {
+                    const on = el('input', { type: 'checkbox' });
+                    on.checked = !!clip.glow;
+                    const pick = el('input', { type: 'color', value: clip.glow || '#ff3fd2' });
+                    on.addEventListener('change', function () { apply(T.updateClip(state.project, clip.id, { glow: on.checked ? pick.value : null })); });
+                    pick.addEventListener('input', function () { if (on.checked) liveEdit(clip.id, { glow: pick.value }); });
+                    pick.addEventListener('change', commitQuiet);
+                    return control('Glow', el('div', { className: 'row-buttons' }, [el('label', { className: 'check' }, [on, 'Neon glow']), pick]));
                 }())
             ]));
             box.append(group('Animation', [
@@ -3251,7 +3273,7 @@
                     box.addEventListener('change', function () { setWatermark(box.checked); });
                     return el('label', { className: 'check' }, [box, 'Show the ' + WATERMARK + ' watermark']);
                 }()),
-                el('p', { className: 'hint', text: 'It appears in the bottom-right corner of the preview and of exported videos.' })
+                el('p', { className: 'hint', text: 'It appears in the top-right corner of the preview and of exported videos.' })
             ]),
             group('Ducking', [
                 control('Duck to', duck, duckOut),
