@@ -2446,6 +2446,7 @@
     function helpItems() {
         return [
             { section: 'Help', label: 'User guide', run: openGuide },
+            { section: 'Help', label: 'Take the tour', run: function () { if (window.ReelTour) window.ReelTour.start(); } },
             { section: 'Help', label: 'Keyboard shortcuts', run: function () { window.open('help.html#keys', '_blank', 'noopener'); } },
             { section: 'Help', label: 'About', run: showAbout }
         ];
@@ -4677,6 +4678,23 @@
     $('mobile-done-bin').addEventListener('click', function () { mobileDone('show-bin', false); });
     syncMobilePanels();
 
+    /** Sets and remembers the timeline's height in pixels (kept between 140 px and the window less room for the video). */
+    function setTimelineHeight(px) {
+        const h = Math.round(T.clamp(px, 140, window.innerHeight - 220));
+        document.body.style.setProperty('--timeline-h', h + 'px');
+        storage((s) => s.setItem(LAYOUT_KEY, String(h)));
+        storage((s) => s.removeItem('reel-preview-space'));
+        fitCanvas();
+        renderTimeline();
+        return h;
+    }
+    function timelineHeight() {
+        const tl = document.querySelector('.timeline-panel');
+        return tl ? tl.getBoundingClientRect().height : window.innerHeight * 0.4;
+    }
+    $('timeline-bigger').addEventListener('click', function () { setTimelineHeight(timelineHeight() + Math.max(90, window.innerHeight * 0.12)); });
+    $('timeline-smaller').addEventListener('click', function () { setTimelineHeight(timelineHeight() - Math.max(90, window.innerHeight * 0.12)); });
+
     // Timeline height: drag the bar between the workspace and the timeline.
     (function () {
         const bar = $('resizer');
@@ -4859,6 +4877,8 @@
         /** Adds a command to the Tools menu: { section, label, run }. */
         addTool: function (tool) { tools.push(tool); },
         removeHand: removeHand,
+        setTimelineHeight: setTimelineHeight,
+        timelineHeight: timelineHeight,
         /** Where hands were drawn in the last preview frame, in frame pixels: [{ id, x, y, w, h }]. */
         handHits: function () { return handHits.slice(); },
         /** Runs the first added tool whose label matches `re`; false when there is none. */

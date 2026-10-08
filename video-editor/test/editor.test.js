@@ -331,6 +331,8 @@ async function probeFile(page, bytes) {
         args: ['--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
     });
     const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 900 } });
+    // The first-visit tour has its own test below; elsewhere it is marked as seen.
+    await context.addInitScript(() => { try { localStorage.setItem('reel.tourDone', '1'); } catch (e) { /* none */ } });
     await context.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
     await context.route(/api\.quran\.com/, function (route) {
         const body = quranApi(route.request().url());
@@ -958,7 +960,7 @@ async function probeFile(page, bytes) {
 
         // Help ▸ About.
         await page.click('#help');
-        check('the Help menu has the guide and About', (await page.locator('#help-menu .menu-item').allTextContents()).join('|') === 'User guide|Keyboard shortcuts|About');
+        check('the Help menu has the guide, the tour and About', (await page.locator('#help-menu .menu-item').allTextContents()).join('|') === 'User guide|Take the tour|Keyboard shortcuts|About');
         await page.getByRole('menuitem', { name: 'About' }).click();
         const about = page.locator('.modal.generic');
         const aboutText = await about.innerText();
@@ -1872,6 +1874,49 @@ async function probeFile(page, bytes) {
         await ram.evaluate(() => window.ReelI18n.set('en'));
         check('and back to English', await ram.evaluate(() => document.getElementById('file').textContent.trim() === 'File' && document.documentElement.lang === 'en'));
         await ram.close();
+
+        /* ------------------------------------------------- first-visit tour */
+        const tourCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const tour = await tourCtx.newPage();
+        await tour.goto(base + '/video-editing/');
+        await tour.check('#consentCheck');
+        await tour.click('#consentAgree');
+        await tour.waitForSelector('.tour-pop', { timeout: 15000 });
+        check('a first-time visitor gets a short tour', /Welcome to NoorEditor/.test(await tour.locator('.tour-pop').textContent()));
+        const tlHeight = await tour.evaluate(() => document.querySelector('.timeline-panel').getBoundingClientRect().height);
+        check('the timeline starts big enough to see several tracks', tlHeight >= 280, tlHeight);
+        await tour.locator('.tour-pop button', { hasText: 'Start the tour' }).click();
+        const titles = [];
+        for (let i = 0; i < 12 && await tour.locator('.tour-pop').count(); i += 1) {
+            titles.push(await tour.locator('.tour-pop h3').textContent());
+            if (/timeline/i.test(titles[titles.length - 1])) {
+                const before = await tour.evaluate(() => document.querySelector('.timeline-panel').getBoundingClientRect().height);
+                await tour.locator('.tour-pop button', { hasText: '▲ Bigger timeline' }).click();
+                const bigger = await tour.evaluate(() => document.querySelector('.timeline-panel').getBoundingClientRect().height);
+                await tour.locator('.tour-pop button', { hasText: '▼ Smaller timeline' }).click();
+                const smaller = await tour.evaluate(() => document.querySelector('.timeline-panel').getBoundingClientRect().height);
+                check('the timeline tip makes the timeline bigger and smaller', bigger > before + 50 && smaller < bigger - 50, before + ' → ' + bigger + ' → ' + smaller);
+            }
+            await tour.locator('.tour-pop .tour-foot .primary').click();
+        }
+        check('Next walks through each part of the screen and Done ends it', titles.join('|') === 'Bring in your files|Your video|The timeline|Make something|Details|Share it|Need help?' &&
+            await tour.locator('.tour-pop, .tour-ring').count() === 0, titles.join('|'));
+        await tour.reload();
+        await tour.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+        await tour.waitForTimeout(2000);
+        check('it shows only once', await tour.locator('.tour-pop').count() === 0);
+        await tour.click('#help');
+        await tour.locator('#help-menu').getByRole('menuitem', { name: 'Take the tour' }).click();
+        check('and Help ▸ Take the tour shows it again', await tour.locator('.tour-pop').isVisible());
+        await tour.keyboard.press('Escape');
+        check('Escape closes it', await tour.locator('.tour-pop').count() === 0);
+        const t0 = await tour.evaluate(() => document.querySelector('.timeline-panel').getBoundingClientRect().height);
+        await tour.click('#timeline-bigger');
+        const t1 = await tour.evaluate(() => document.querySelector('.timeline-panel').getBoundingClientRect().height);
+        await tour.click('#timeline-smaller');
+        const t2 = await tour.evaluate(() => document.querySelector('.timeline-panel').getBoundingClientRect().height);
+        check('the timeline toolbar has bigger and smaller buttons', t1 > t0 + 50 && t2 < t1 - 50, t0 + ' → ' + t1 + ' → ' + t2);
+        await tourCtx.close();
 
         /* ------------------------------------------------------------ offline */
         const sw = await context.newPage();

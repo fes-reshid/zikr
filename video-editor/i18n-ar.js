@@ -3,6 +3,18 @@
  * Add a row whenever new words appear in the editor; anything not listed stays in English.
  */
 window.REEL_AR = [
+    // First-visit tour and timeline size
+    ['Welcome to NoorEditor 👋', 'مرحبًا بك في نور إديتور 👋'], ['A quick tour of the editor — a few short tips. You can skip it any time, and find it again in Help ▸ Take the tour.', 'جولة سريعة في المحرر — بضع نصائح قصيرة. يمكنك تخطيها في أي وقت، وتجدها مجددًا في مساعدة ▸ جولة تعريفية.'],
+    ['Bring in your files', 'أحضر ملفاتك'], ['Import videos, photos and sound — or drop them anywhere on the page. They stay on your device; nothing is uploaded.', 'استورد الفيديوهات والصور والصوت — أو أفلتها في أي مكان من الصفحة. تبقى على جهازك ولا يُرفع شيء.'],
+    ['Your video', 'الفيديو'], ['This is the preview. Click a title or picture on it to select it, then drag to move it. Press Space to play.', 'هذه المعاينة. انقر على عنوان أو صورة لتحديدها ثم اسحبها لتحريكها. اضغط المسافة للتشغيل.'],
+    ['The timeline', 'الخط الزمني'], ['Your clips in order, on tracks. Drag clips to move them, drag their ends to trim. Make the timeline bigger or smaller here — or drag the bar just above it.', 'مقاطعك بالترتيب على المسارات. اسحب المقاطع لتحريكها واسحب أطرافها للقص. كبّر الخط الزمني أو صغّره من هنا — أو اسحب الشريط فوقه.'],
+    ['▲ Bigger timeline', '▲ خط زمني أكبر'], ['▼ Smaller timeline', '▼ خط زمني أصغر'],
+    ['Make something', 'اصنع شيئًا'], ['Create has titles, templates, Qur’an and hadith videos, Ramadan and Eid videos, stickers, sounds and recording.', 'في «إنشاء» العناوين والقوالب وفيديوهات القرآن والحديث ورمضان والعيد والملصقات والأصوات والتسجيل.'],
+    ['Details', 'التفاصيل'], ['Select anything and its details appear here: text, colours, animation, the writing hand, sound and more.', 'حدّد أي شيء وتظهر تفاصيله هنا: النص والألوان والحركة واليد الكاتبة والصوت وغيرها.'],
+    ['Share it', 'شاركه'], ['When it is ready, press Export and choose YouTube, Shorts, TikTok, Instagram, Facebook or WhatsApp.', 'عندما يجهز، اضغط «تصدير» واختر يوتيوب أو شورتس أو تيك توك أو إنستغرام أو فيسبوك أو واتساب.'],
+    ['Need help?', 'تحتاج مساعدة؟'], ['Help has step-by-step tutorials with pictures, and this tour. That’s it — enjoy making your video!', 'في «مساعدة» شروحات خطوة بخطوة بالصور وهذه الجولة. هذا كل شيء — استمتع بصنع الفيديو!'],
+    ['Start the tour', 'ابدأ الجولة'], ['Skip', 'تخطَّ'], ['Back', 'رجوع'], ['Next', 'التالي'], ['Done', 'تم'], ['Tour', 'جولة'], ['Take the tour', 'جولة تعريفية'],
+    ['Make the timeline bigger', 'كبّر الخط الزمني'], ['Make the timeline smaller', 'صغّر الخط الزمني'], ['Timeline size', 'حجم الخط الزمني'],
     // Hands and writing sounds
     ['✋ Remove hand', '✋ إزالة اليد'], ['✋ Add hand', '✋ إضافة اليد'], ['Keep', 'إبقاء'], ['Hand', 'اليد'], ['Sound volume', 'مستوى الصوت'], ['✕ Remove sound', '✕ إزالة الصوت'],
     ['Writing sound volume', 'مستوى صوت الكتابة'], ['Writing sound removed.', 'أُزيل صوت الكتابة.'],

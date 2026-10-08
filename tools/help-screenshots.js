@@ -137,6 +137,7 @@ async function makePhotos(page) {
     const browser = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined });
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
     await context.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+    await context.addInitScript(() => { try { localStorage.setItem('reel.tourDone', '1'); } catch (e) { /* none */ } });
     await context.route(/api\.quran\.com/, function (route) {
         const body = quranApi(route.request().url());
         return route.fulfill(body ? { status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(body) } : { status: 404, body: '{}' });
@@ -505,6 +506,7 @@ async function makePhotos(page) {
     /* 12. On a phone */
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     await phone.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+    await phone.addInitScript(() => { try { localStorage.setItem('reel.tourDone', '1'); } catch (e) { /* none */ } });
     const mobile = await phone.newPage();
     await mobile.goto(base + '/index.html');
     if (await mobile.locator('#consentCheck').isVisible()) { await mobile.check('#consentCheck'); await mobile.click('#consentAgree'); }
