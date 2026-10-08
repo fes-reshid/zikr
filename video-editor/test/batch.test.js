@@ -101,3 +101,27 @@ test('every library sound is made, sensible and the same each time', () => {
     });
     assert.equal(Sounds.synth('rain', 10).length, 10 * Sounds.RATE, 'nature sounds take the length asked for');
 });
+
+test('animal, water, air and chalk sounds are made on the device, finite and at a safe level', function () {
+    const kinds = Object.keys(Sounds.ANIMALS).concat(Object.keys(Sounds.WATER), Object.keys(Sounds.CHALK), ['fountain', 'bubbling']);
+    assert.ok(Object.keys(Sounds.ANIMALS).length >= 30, 'thirty animals, from doves to a lion');
+    ['lion', 'elephant', 'wolf', 'camel', 'cat', 'sheep'].forEach((k) => assert.ok(Sounds.ANIMALS[k], k));
+    kinds.forEach(function (k) {
+        const d = Sounds.synth(k, 4);
+        let peak = 0;
+        for (let i = 0; i < d.length; i += 1) { assert.ok(Number.isFinite(d[i]), k + ' has finite samples'); peak = Math.max(peak, Math.abs(d[i])); }
+        assert.ok(peak > 0.3 && peak <= 0.95, k + ' peak ' + peak);
+    });
+});
+
+test('a writing sound strikes a key or a chalk stroke at each letter, and is quiet in between', function () {
+    const times = [0.2, 0.7, 1.2];
+    const level = (d, from, to) => { let m = 0; for (let i = Math.floor(from * Sounds.RATE); i < Math.floor(to * Sounds.RATE); i += 1) m = Math.max(m, Math.abs(d[i])); return m; };
+    ['typing', 'chalk', 'pencil'].forEach(function (kind) {
+        const d = Sounds.writingSound(kind, 1.6, times);
+        assert.equal(d.length, Math.floor(1.6 * Sounds.RATE));
+        times.forEach((t) => assert.ok(level(d, t, t + 0.03) > 0.2, kind + ' sounds at ' + t));
+        assert.ok(level(d, 0, 0.18) < 0.01, kind + ' is silent before the first letter');
+        if (kind === 'typing') assert.ok(level(d, 0.35, 0.65) < 0.01, 'and between key presses');
+    });
+});

@@ -259,7 +259,7 @@ async function makePhotos(page) {
         sel.dispatchEvent(new Event('change', { bubbles: true }));
         sel.dispatchEvent(new Event('input', { bubbles: true }));
     }));
-    await dialogShot('create', /Sound library/, 'sounds');
+    await dialogShot('create', /Sound library/, 'sounds', 700, () => dialog().locator('.sound-chips button', { hasText: 'Animals' }).click());
     await dialogShot('create', /Record screen/, 'record');
     await dialogShot('tools', /Resize for social media/, 'resize', 900);
     await dialogShot('file', 'My projects…', 'projects');

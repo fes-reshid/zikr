@@ -1383,6 +1383,37 @@ async function probeFile(page, bytes) {
         await page.locator('.modal.generic').getByRole('button', { name: 'Add Whoosh' }).click();
         await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
         check('and sound effects next to it on a free track', (await project(page)).media.some((m) => /^Whoosh/.test(m.name)));
+        await menu(page, 'create', /Sound library/);
+        const libHeads = await page.locator('.modal.generic h3').allTextContents();
+        await page.locator('.modal.generic').getByRole('searchbox', { name: 'Search sounds' }).fill('lion');
+        const lionRows = await page.locator('.modal.generic .sound-row:visible').allTextContents();
+        check('searching the sound library finds the lion', lionRows.length === 1 && /Lion roaring/.test(lionRows[0]), lionRows.join(' | '));
+        await page.locator('.modal.generic').getByRole('searchbox', { name: 'Search sounds' }).fill('');
+        await page.locator('.modal.generic').getByRole('button', { name: 'Add Doves cooing' }).click();
+        await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
+        check('the library has animals, water and air, and chalk', ['Animals', 'Water & air', 'Chalk & writing'].every((h) => libHeads.includes(h)) &&
+            (await project(page)).media.some((m) => /^Doves cooing/.test(m.name)), libHeads.join(' | '));
+        // A typed title with a keyboard sound in time with its letters
+        const typeAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
+        await page.evaluate((t) => window.Reel.seek(t), typeAt);
+        await page.click('#add-text');
+        await page.keyboard.type('Bismillah');
+        const keyTitle = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'Bismillah' && approx(c.start, typeAt, 0.01));
+        await page.locator('.inspector-body button', { hasText: '⌨ Type with real hand' }).click();
+        await page.waitForFunction(() => window.Reel.project.media.some((m) => /^Keyboard typing — Bismillah/.test(m.name)), null, { timeout: 15000 });
+        p = await project(page);
+        const keysMedia = p.media.filter((m) => /^Keyboard typing — Bismillah/.test(m.name)).pop();
+        const keysClip = p.clips.filter((c) => c.mediaId === keysMedia.id).sort((a, b) => Math.abs(a.start - keyTitle.start) - Math.abs(b.start - keyTitle.start))[0];
+        const keySpan = await page.evaluate((id) => window.ReelApp.T.revealSpan(window.Reel.project.clips.find((c) => c.id === id)), keyTitle.id);
+        check('typing a title by hand adds a keyboard sound under it, as long as the typing', !!keysClip && approx(keysClip.start, keyTitle.start, 0.001) && approx(keysClip.duration, keySpan + 0.3, 0.05) &&
+            p.tracks.find((t) => t.id === keysClip.track).kind === 'audio', keysClip && (keysClip.start + ' ' + keysClip.duration + ' vs ' + keySpan + ' title ' + keyTitle.start + ' track ' + keysClip.track + ' ' + (p.tracks.find((t) => t.id === keysClip.track) || {}).kind));
+        await page.evaluate((id) => window.ReelApp.selectOnly(id), keyTitle.id);
+        await page.locator('.inspector-body button', { hasText: /^Chalk$/ }).click();
+        await page.waitForFunction(() => window.Reel.project.media.some((m) => /^Chalk on a board — Bismillah/.test(m.name)), null, { timeout: 15000 });
+        p = await project(page);
+        const chalkMedia = p.media.filter((m) => /^Chalk on a board — Bismillah/.test(m.name)).pop();
+        const chalkClip = chalkMedia && p.clips.find((c) => c.mediaId === chalkMedia.id);
+        check('and Writing sound ▸ Chalk adds chalk strokes for the same letters', !!chalkClip && approx(chalkClip.start, keyTitle.start, 0.001) && approx(chalkClip.duration, keysClip.duration, 0.05));
 
         /* ------------------------------------------------------------ recording */
         await menu(page, 'create', /Record screen/);

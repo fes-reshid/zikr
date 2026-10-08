@@ -507,6 +507,10 @@ dialog#consentGate h1:focus-visible { outline: none; }
 }
 .panel-foot { display: none; }
 /* Trending templates and text designs */
+.sound-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.sound-chips button { padding: 5px 12px; border-radius: 999px; }
+.sound-chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.sound-section[hidden], .sound-row[hidden] { display: none !important; }
 .trend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; max-height: 46vh; overflow: auto; padding: 2px; }
 .trend-grid.designs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 60vh; }
 .trend-card { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; background: var(--panel-2); border: 2px solid transparent; text-align: center; }

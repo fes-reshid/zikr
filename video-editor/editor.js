@@ -2949,9 +2949,9 @@
                 control('Text', area),
                 // Right under the text, where it is easy to find on a phone too.
                 el('div', { className: 'row-buttons' }, [
-                    button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: 'pen', handStyle: 'realistic' })); },
+                    button('✍ Write by hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'handwrite', hand: 'pen', handStyle: 'realistic' })); writingSound(clip.id, 'chalk'); },
                         { title: 'The title is written out by a hand holding a pen' }),
-                    button('⌨ Type with real hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger', handStyle: 'realistic', handSkin: 'medium' })); },
+                    button('⌨ Type with real hand', function () { apply(T.updateClip(state.project, clip.id, { anim: 'typewriter', hand: 'finger', handStyle: 'realistic', handSkin: 'medium' })); writingSound(clip.id, 'typing'); },
                         { title: 'The title is typed letter by letter by a real tapping finger' })
                 ]),
                 fontSelect(clip),
@@ -2984,6 +2984,11 @@
             ]));
             box.append(group('Animation', [
                 select_(clip, 'Entrance', 'anim', Object.keys(ANIM_LABELS).map((k) => [k, ANIM_LABELS[k]])),
+                window.ReelSounds && window.ReelSounds.addWritingSound ? control('Writing sound', el('div', { className: 'row-buttons' }, [
+                    button('Chalk', function () { writingSound(clip.id, 'chalk'); }, { title: 'Chalk on a board, one stroke as each letter appears' }),
+                    button('Pencil', function () { writingSound(clip.id, 'pencil'); }, { title: 'Pencil on paper, one stroke as each letter appears' }),
+                    button('Keys', function () { writingSound(clip.id, 'typing'); }, { title: 'Keyboard typing, one key as each letter appears' })
+                ])) : null,
                 clip.anim && T.MOVES.indexOf(clip.anim) !== -1
                     ? slider(clip, 'Duration', (c) => c.animDuration || 0.6, (v) => ({ animDuration: v }), { min: 0.1, max: 3, step: 0.1, show: secs })
                     : null
@@ -3400,6 +3405,12 @@
     }
 
     /** A title that a hand holding a pen writes out. */
+    /** Puts a chalk, pencil or keyboard sound under a title, in time with its letters. */
+    function writingSound(id, kind) {
+        if (!window.ReelSounds || !window.ReelSounds.addWritingSound) return;
+        window.ReelSounds.addWritingSound(id, kind).catch(function (err) { toast(err.message); });
+    }
+
     function addHandwrittenTitle() {
         addTitle({ anim: 'handwrite', hand: 'pen', handStyle: 'realistic', font: 'hand', bold: false, writeDuration: 3.5 });
         toast('Type your words, then press Play to watch the hand write them.');

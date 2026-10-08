@@ -1192,6 +1192,36 @@
     }
 
     /**
+     * How long a typed, word-by-word or handwritten title takes to appear:
+     * spread across most of the clip, so the last word lands before it ends.
+     */
+    function revealSpan(clip) {
+        const d = clip.animDuration > 0 ? clip.animDuration : 0.6;
+        return clip.anim === 'handwrite' && clip.writeDuration > 0
+            ? Math.max(0.1, Math.min(clip.writeDuration, clip.duration * 0.9))
+            : Math.max(d, clip.duration * 0.75);
+    }
+
+    /**
+     * When each letter of a revealing title appears, in seconds from its start
+     * (spaces and line breaks make no sound). Word by word: each word's letters
+     * come together.
+     */
+    function revealTimes(clip) {
+        const span = revealSpan(clip);
+        const text = String(clip.text || '');
+        const out = [];
+        if (clip.anim === 'words') {
+            const words = text.split(/\s+/).filter(Boolean);
+            words.forEach(function (w, i) { for (let k = 0; k < Math.min(w.length, 4); k += 1) out.push(span * i / words.length + k * 0.045); });
+            return out;
+        }
+        const chars = Array.from(text);
+        chars.forEach(function (ch, i) { if (/\S/.test(ch)) out.push(span * i / Math.max(1, chars.length)); });
+        return out;
+    }
+
+    /**
      * How a title's entrance animation looks at `time`: opacity, offset and
      * scale, and `reveal` — the share of characters (typewriter) or words
      * (word by word) shown so far.
@@ -1205,10 +1235,7 @@
         if (MOVES.indexOf(type) !== -1) {
             Object.assign(out, combineMoves(moveAt(type, local / d), out));
         } else if (REVEAL_ANIMS.indexOf(type) !== -1) {
-            // Spread across most of the clip, so the last word lands before it ends.
-            const span = type === 'handwrite' && clip.writeDuration > 0
-                ? Math.max(0.1, Math.min(clip.writeDuration, clip.duration * 0.9))
-                : Math.max(d, clip.duration * 0.75);
+            const span = revealSpan(clip);
             out.reveal = clamp(local / span, 0, 1);
             out.unit = type === 'typewriter' ? 'chars' : type === 'words' ? 'words' : 'width';
             out.exit = handExit(local - span);
@@ -2058,6 +2085,7 @@
     return {
         FORMAT, VERSION, MIN_DURATION, DEFAULT_STILL, DEFAULT_FILTERS, MIN_SPEED, MAX_SPEED,
         TRANSITIONS, MOTIONS, MOVES, TEXT_ANIMS, REVEAL_ANIMS, HAND_TOOLS, DEFAULT_FX, LOOKS, TITLE_STYLES,
+        revealSpan, revealTimes,
         fxOf, mergeFx, applyLook, cropRect, hasFx, clipPeak, normalisedVolume,
         newId, clone, clamp,
         createProject, addMedia, getMedia, getClip, getTrack, addTrack, nextTrackId, updateTrack, removeTrack,

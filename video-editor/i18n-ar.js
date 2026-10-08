@@ -262,11 +262,28 @@ window.REEL_AR = [
     ['Text designs', 'تصاميم النص'], ['✦ Text designs…', '✦ تصاميم النص…'], ['Tap a design to give the selected title that look. Size, colours and animation stay changeable in the details panel.', 'اضغط تصميمًا لتعطي العنوان المحدد هذا المظهر. يبقى الحجم والألوان والحركة قابلة للتغيير في لوحة التفاصيل.'],
     ['Bold caption', 'نص عريض'], ['Yellow hook', 'جملة صفراء جاذبة'], ['Neon pink', 'نيون وردي'], ['Neon blue', 'نيون أزرق'], ['Highlighter', 'قلم تمييز'], ['Red label', 'ملصق أحمر'], ['Comic pop', 'كوميكس'],
     ['Elegant gold', 'ذهبي أنيق'], ['Typewriter note', 'ملاحظة بالآلة الكاتبة'], ['Arabic gold', 'عربي ذهبي'], ['Soft pastel', 'باستيل ناعم'], ['Big number', 'رقم كبير'], ['Glow', 'التوهج'], ['Neon glow', 'توهج نيون'],
+    // Animal, water, air and chalk sounds
+    ['Animals', 'حيوانات'], ['Water & air', 'الماء والهواء'], ['Chalk & writing', 'الطباشير والكتابة'],
+    ['Doves cooing', 'هديل الحمام'], ['Rooster', 'ديك'], ['Sheep', 'خروف'], ['Cow', 'بقرة'], ['Cat', 'قطة'], ['Dog barking', 'نباح كلب'], ['Duck', 'بطة'], ['Owl', 'بومة'],
+    ['Frogs', 'ضفادع'], ['Horse', 'حصان'], ['Bees buzzing', 'طنين النحل'], ['Seagulls', 'نوارس'],
+    ['Lion roaring', 'زئير أسد'], ['Tiger growling', 'زمجرة نمر'], ['Elephant trumpeting', 'صوت فيل'], ['Wolf howling', 'عواء ذئب'], ['Goat', 'ماعز'], ['Donkey', 'نهيق حمار'],
+    ['Camel', 'جمل'], ['Monkeys', 'قرود'], ['Bear growling', 'زمجرة دب'], ['Crow', 'غراب'], ['Hens clucking', 'قوقأة الدجاج'], ['Chicks peeping', 'صوصوة الكتاكيت'], ['Eagle', 'نسر'],
+    ['Parrot', 'ببغاء'], ['Turkey', 'ديك رومي'], ['Snake hissing', 'فحيح أفعى'], ['Mouse squeaking', 'صرير فأر'], ['Dolphin', 'دلفين'], ['Whale song', 'غناء الحوت'], ['Mosquito', 'بعوضة'],
+    ['Fountain', 'نافورة'], ['Bubbling water', 'ماء يغلي بفقاعات'], ['Pouring water', 'صبّ الماء'], ['Bubbles', 'فقاعات'], ['Splash', 'رشّة ماء'], ['Dripping tap', 'صنبور يقطر'],
+    ['Gust of air', 'هبّة هواء'], ['Blowing air', 'نفخ هواء'], ['Chalk writing on a board', 'كتابة بالطباشير على السبورة'], ['Chalk tap', 'نقرة طباشير'], ['Board eraser', 'ممحاة السبورة'], ['Pencil writing', 'كتابة بقلم رصاص'],
+    ['To hear chalk or keys in time with a title as it is written or typed, select the title and use Writing sound in its details.', 'لسماع الطباشير أو المفاتيح مع ظهور العنوان وهو يُكتب، حدّد العنوان واستخدم «صوت الكتابة» في تفاصيله.'],
+    ['Search sounds — lion, rain, chalk…', 'ابحث في الأصوات — أسد، مطر، طباشير…'], ['Search sounds', 'البحث في الأصوات'], ['All', 'الكل'], ['Nature', 'الطبيعة'], ['Kinds of sound', 'أنواع الأصوات'],
+    ['Nature sounds, sound effects, animals, water and chalk — no music and no instruments, made on your device and free to use in any video.', 'أصوات الطبيعة والمؤثرات والحيوانات والماء والطباشير — بلا موسيقى ولا آلات، تُصنع على جهازك ومجانية لأي فيديو.'],
+    ['Writing sound', 'صوت الكتابة'], ['Chalk', 'طباشير'], ['Pencil', 'قلم رصاص'], ['Keys', 'مفاتيح'],
+    ['Chalk on a board, one stroke as each letter appears', 'طباشير على السبورة، خط مع ظهور كل حرف'], ['Pencil on paper, one stroke as each letter appears', 'قلم رصاص على الورق، خط مع ظهور كل حرف'], ['Keyboard typing, one key as each letter appears', 'كتابة على لوحة المفاتيح، نقرة مع ظهور كل حرف'],
+    ['Type some words in the title first.', 'اكتب بعض الكلمات في العنوان أولًا.'],
     ['Close details', 'إغلاق التفاصيل'], ['Show details', 'إظهار التفاصيل'], ['Close media', 'إغلاق الوسائط'], ['Show media', 'إظهار الوسائط'], ['Details', 'التفاصيل']
 ];
 
 /* Labels with numbers or names in them: [pattern, (match, tr) => Arabic]. */
 window.REEL_AR_PATTERNS = [
+    [/^(Chalk on a board|Pencil on paper|Keyboard typing) added under the title, in time with its letters(.*)$/, (m) => ({ 'Chalk on a board': 'أُضيف صوت الطباشير', 'Pencil on paper': 'أُضيف صوت القلم الرصاص', 'Keyboard typing': 'أُضيف صوت المفاتيح' })[m[1]] + ' تحت العنوان متزامنًا مع حروفه.'],
+    [/^(.+) added at the playhead\.$/, (m, tr) => 'أُضيف ' + tr(m[1]) + ' عند مؤشر التشغيل.'],
     [/^Uses your (\d+) newest imported pictures? or videos? for the photo slots\.$/, (m) => 'يستخدم أحدث ' + m[1] + ' من صورك أو فيديوهاتك المستوردة لأماكن الصور.'],
     [/^(.+) added \(([\d.]+) s\)\. Select any part to change it; one Undo takes it all off\.$/, (m, tr) => 'أُضيف ' + tr(m[1]) + ' (' + m[2] + ' ث). حدّد أي جزء لتغييره؛ تراجع واحد يزيله كله.'],
     [/^(.+) applied\. Undo puts the old look back\.$/, (m, tr) => 'طُبّق ' + tr(m[1]) + '. التراجع يعيد المظهر السابق.'],
