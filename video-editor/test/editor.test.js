@@ -941,7 +941,7 @@ async function probeFile(page, bytes) {
         await page.getByRole('menuitem', { name: 'About' }).click();
         const about = page.locator('.modal.generic');
         const aboutText = await about.innerText();
-        check('About shows the name, author, version and contact', /Video Editor — Diin Islaam/.test(aboutText) && /Feysel Reshid/.test(aboutText) &&
+        check('About shows the name, author, version and contact', /Video Editor — NoorEditor/.test(aboutText) && /Feysel Reshid/.test(aboutText) &&
             /Version/.test(aboutText) && /fesbackups@gmail\.com/.test(aboutText) && /never uploaded/.test(aboutText));
         await about.getByRole('button', { name: 'Close' }).click();
         check('and closes', await page.locator('.modal.generic').count() === 0);
@@ -1175,7 +1175,7 @@ async function probeFile(page, bytes) {
             Math.round(w1) + '×' + Math.round(h0) + ' → ' + Math.round(after.width) + '×' + Math.round(after.height));
         await page.evaluate(() => { ['reel.binWidth', 'reel.inspectorWidth', 'reel.timelineHeight'].forEach((k) => localStorage.removeItem(k)); document.body.style.removeProperty('--insp-w'); document.body.style.removeProperty('--timeline-h'); window.dispatchEvent(new Event('resize')); });
 
-        // The nooreditor.com watermark.
+        // The nooreditor.web.app watermark.
         const markPixels = () => page.evaluate(function () {
             window.Reel.drawFrame();
             const c = document.getElementById('preview');
@@ -1187,9 +1187,9 @@ async function probeFile(page, bytes) {
         await page.evaluate((t) => window.Reel.seek(t), sizeAt + 30);
         const marked = await markPixels();
         await page.evaluate(() => window.ReelApp.selectOnly(null));
-        await page.locator('.inspector-body label.check', { hasText: 'nooreditor.com' }).click();
+        await page.locator('.inspector-body label.check', { hasText: 'nooreditor.web.app' }).click();
         const unmarked = await markPixels();
-        check('the nooreditor.com watermark is in the corner, and can be turned off', marked > 150 && unmarked === 0 &&
+        check('the nooreditor.web.app watermark is in the corner, and can be turned off', marked > 150 && unmarked === 0 &&
             (await project(page)).watermark === false, marked + ' → ' + unmarked);
         await page.keyboard.press('Control+z');
         check('it is on again after undo', (await project(page)).watermark !== false);

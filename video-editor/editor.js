@@ -705,14 +705,14 @@
     /*
      * What the site hosting the editor can set before loading it, as
      * window.REEL_CONFIG = {
-     *   watermark: 'nooreditor.app',          // the text in the corner
-     *   siteUrl: 'https://nooreditor.app',    // shared with exported videos
+     *   watermark: 'nooreditor.web.app',      // the text in the corner
+     *   siteUrl: 'https://nooreditor.web.app', // shared with exported videos
      *   canRemoveWatermark: () => bool | Promise<bool>,  // e.g. a paid plan
      *   upgrade: (reason) => {},              // shows the host's upgrade offer
      *   features: { readAloud: false }        // switch tools off
      * }. Call ReelApp.refreshPlan() when the visitor's plan changes.
      */
-    const CONFIG = Object.assign({ watermark: 'nooreditor.com', siteUrl: 'https://nooreditor.com', canRemoveWatermark: null, upgrade: null, features: {} }, window.REEL_CONFIG || {});
+    const CONFIG = Object.assign({ watermark: 'nooreditor.web.app', siteUrl: 'https://nooreditor.web.app', canRemoveWatermark: null, upgrade: null, features: {} }, window.REEL_CONFIG || {});
     let mayRemoveWatermark = !CONFIG.canRemoveWatermark;
     function refreshPlan() {
         if (!CONFIG.canRemoveWatermark) return Promise.resolve(true);
@@ -731,7 +731,7 @@
 
     const WATERMARK = CONFIG.watermark;
 
-    /** The nooreditor.com mark in the bottom-right corner; it can be turned off per project. */
+    /** The site's mark (nooreditor.web.app) in the bottom-right corner; it can be turned off per project. */
     function drawWatermark(c, W, H) {
         const size = Math.max(10, Math.round(Math.min(W, H) * 0.034));
         const m = Math.round(size * 0.9);
@@ -2497,7 +2497,7 @@
     function showAbout() {
         const p = (text, children) => el('p', { text: text }, children);
         openDialog({
-            title: 'Video Editor — Diin Islaam',
+            title: 'Video Editor — NoorEditor',
             body: [
                 el('div', { className: 'about' }, [
                     el('p', null, ['Built by ', el('strong', { text: 'Feysel Reshid' }), '.']),

@@ -198,6 +198,68 @@ async function makePhotos(page) {
     await shot('first-export', page.locator('#export-dialog .dialog'));
     await page.click('#export-cancel');
 
+    /* Reference pictures: the whole screen, the timeline, the side panel's sections and each tool's window. */
+    const panel = page.locator('.panel.inspector');
+    const clipOf = (name) => page.evaluate((n) => { const p = window.Reel.project; const m = p.media.find((x) => x.name === n); const c = m && p.clips.find((x) => x.mediaId === m.id); return c ? c.id : null; }, name);
+    const showGroup = async (title) => {
+        const g = page.locator('#inspector .group-title', { hasText: new RegExp('^' + title + '$') }).first();
+        await g.scrollIntoViewIfNeeded();
+        await page.evaluate((t) => {
+            const el = Array.from(document.querySelectorAll('#inspector .group-title')).find((x) => x.textContent === t);
+            if (el) el.parentNode.scrollIntoView({ block: 'start' });
+        }, title);
+        await page.waitForTimeout(250);
+    };
+    await page.evaluate(() => window.Reel.select(null));
+    await seek(2.2);
+    await settle();
+    await shot('screen-map');
+    const dawn = await clipOf('dawn.png');
+    await page.evaluate((id) => window.Reel.select(id), dawn);
+    await seek(1.6);
+    await page.click('#tool-split');
+    await settle();
+    await shot('edit-timeline', page.locator('.timeline-panel'));
+    await page.keyboard.press('Control+z');
+    const titleId = await page.evaluate(() => (window.Reel.project.clips.find((c) => c.type === 'text') || {}).id);
+    await page.evaluate((id) => window.Reel.select(id), titleId);
+    await settle();
+    await shot('title-inspector', panel);
+    await page.evaluate((id) => window.Reel.select(id), dawn);
+    await settle();
+    await showGroup('Keyframes');
+    await shot('keyframes', panel);
+    await showGroup('Look');
+    await shot('effects', panel);
+    await page.evaluate((id) => window.Reel.select(id), await clipOf('Talk.wav'));
+    await settle();
+    await showGroup('Sound');
+    await shot('sound-inspector', panel);
+    await page.evaluate(() => window.Reel.select(null));
+    const dialogShot = async (which, item, name, wait, prepare) => {
+        await menu(which, item);
+        await page.waitForTimeout(wait || 700);
+        if (prepare) { await prepare(); await page.waitForTimeout(500); }
+        await page.evaluate(() => document.querySelectorAll('.modal.generic, .modal.generic *').forEach((e) => { e.scrollTop = 0; }));
+        await shot(name, dialog());
+        await closeDialog();
+    };
+    await dialogShot('tools', /Transition gallery/, 'transitions', 1200);
+    await dialogShot('create', /Hadith video/, 'hadith');
+    await dialogShot('create', /Nasheed lyrics/, 'lyrics');
+    await dialogShot('create', /Animated stickers/, 'stickers', 1200, () => page.evaluate(() => {
+        // Show a crescent and star rather than the first sticker, an arrow.
+        const sel = Array.from(document.querySelectorAll('.modal.generic select')).find((x) => Array.from(x.options).some((o) => /crescent/i.test(o.text)));
+        if (!sel) return;
+        sel.value = Array.from(sel.options).find((o) => /crescent/i.test(o.text)).value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        sel.dispatchEvent(new Event('input', { bubbles: true }));
+    }));
+    await dialogShot('create', /Sound library/, 'sounds');
+    await dialogShot('create', /Record screen/, 'record');
+    await dialogShot('tools', /Resize for social media/, 'resize', 900);
+    await dialogShot('file', 'My projects…', 'projects');
+
     /* 2. Pictures on the pauses */
     await page.evaluate(function () {
         // Start again with only the voice on the timeline.
@@ -341,31 +403,6 @@ async function makePhotos(page) {
     await seek(1.6);
     await settle();
     await shot('occasion-result');
-
-    /* 9. Read aloud */
-    await page.evaluate(function () {
-        // Stands in for the downloaded voice: a voice-like sound as long as each sentence.
-        window.__reelTestSpeaker = async function (parts, models) {
-            return { rate: 16000, model: models[0], parts: parts.map(function (t) {
-                const n = Math.round(16000 * (0.6 + t.length / 16));
-                return Float32Array.from({ length: n }, (x, i) => Math.sin(i / 7 + Math.sin(i / 900) * 3) * 0.35 * (0.5 + 0.5 * Math.abs(Math.sin(i / 2600))));
-            }) };
-        };
-    });
-    await seek(10.2);
-    await menu('create', /Read aloud/);
-    await dialog().getByRole('combobox', { name: 'Voice' }).selectOption('orm');
-    await dialog().getByRole('textbox', { name: 'Text' }).fill('Assalaamu alaykum. Ji’i Ramadaanaa baga nagaan geessan. Rabbiin soomana keessan haa qeebalu.');
-    await settle();
-    await shot('speak-dialog', dialog());
-    await dialog().getByRole('button', { name: 'Make voice-over' }).click();
-    await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
-    const sayAt = await page.evaluate(() => { const p = window.Reel.project; const t = p.tracks.find((x) => x.name === 'Voice-over captions'); return p.clips.filter((c) => c.track === t.id).sort((a, b) => a.start - b.start)[1].start + 0.6; });
-    await page.evaluate(() => window.Reel.select(null));
-    await seek(sayAt);
-    await settle();
-    await shot('speak-result');
-    await page.evaluate(() => { delete window.__reelTestSpeaker; });
 
     /* 10. A Qur'an video with a new background each ayah */
     await menu('file', 'New tab');
