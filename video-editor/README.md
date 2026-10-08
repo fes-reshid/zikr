@@ -24,6 +24,7 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 
 | | |
 | --- | --- |
+| **✨ AI video maker** | Describe a video in a sentence (English or Arabic) and add your own photos, videos or sound if you like. It writes the words, picks a shape, mood, text designs, painted scenes, a short Qur'ān verse or hadith with its reference where it fits, and nature, animal and writing sounds, then builds the video on the timeline with the editor's own tools. Follow-ups change the same video: "longer", "add rain", "gold text", "another version", "read it aloud", "in Arabic". It runs on the device; a host can connect a language model with `REEL_CONFIG.ai.endpoint`, whose plan is checked against the editor's own lists. |
 | **Import** | Video, audio and images from the Import button, or dropped on the page or onto a track. |
 | **Timeline** | Titles, overlay, video and audio tracks, and you can add more. Tracks can be hidden, muted, ducked, or removed when empty. |
 | **Editing** | Move clips (singly or as a group), trim, split, duplicate, delete, or delete and close the gap. Copy and paste works at the playhead. Clips snap to edges, markers and the playhead. Undo and redo cover every edit. |
@@ -83,6 +84,7 @@ Keyboard shortcuts and a user guide are in [help.html](help.html).
 | `quran.js` | The Qur'ān verse video tool (Quran.com API) |
 | `captions.js` | Auto captions (Whisper), captions timed from a pasted text, and subtitle import/export |
 | `occasions.js`, `reframe.js`, `speak.js` + `speak-worker.js`, `mobile.js` | Occasion videos, auto-reframe, Read aloud, the phone layout |
+| `ai.js` | The AI video maker: the planner (pure, unit tested) and the builder that makes the video with the editor's tools |
 | `pauses.js` | Sync to the voice: pictures on the pauses, cut at pauses, jump cuts |
 | `transcribe-worker.js` | The Whisper worker, shared with the audio editor |
 | `vendor/mediabunny.min.mjs` | [mediabunny](https://mediabunny.dev) 1.61 (MPL-2.0, licence alongside), loaded only when exporting |

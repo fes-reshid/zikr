@@ -948,7 +948,7 @@ async function probeFile(page, bytes) {
         check('and View ▸ Show the side panels brings them back', await page.locator('.workspace > .bin').isVisible());
         const createSections = await page.locator('#create').click().then(() => page.locator('#create-menu .menu-section').allTextContents());
         await page.keyboard.press('Escape');
-        check('Create groups everything you can make', createSections.join('|') === 'Add|Islamic videos|Trending|Ready-made designs|Sound and recording|Share and brand', createSections.join('|'));
+        check('Create groups everything you can make', createSections.join('|') === 'AI|Add|Islamic videos|Trending|Ready-made designs|Sound and recording|Share and brand', createSections.join('|'));
 
         // Help ▸ About.
         await page.click('#help');
@@ -1744,13 +1744,71 @@ async function probeFile(page, bytes) {
         await ram.click('#undo');
         check('and Undo puts the old look back', !(await ram.evaluate((id) => window.Reel.project.clips.find((c) => c.id === id).glow, titleId)));
 
+        // AI video maker: describe a video, add your files, keep talking to it
+        await ram.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
+        await ram.evaluate(() => { window.ReelApp.apply(window.ReelApp.T.createProject({ width: 1280, height: 720, fps: 30 })); });
+        await ram.click('#ai-maker');
+        const aiBox = ram.locator('.modal.generic');
+        check('the ✨ AI button opens the AI video maker with examples', await aiBox.locator('h2').textContent() === '✨ AI video maker' && await aiBox.locator('.ai-examples button').count() >= 6);
+        await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('what can you do?');
+        await aiBox.getByRole('button', { name: '✨ Make video' }).click();
+        check('asked what it can do, it lists what it can use', await aiBox.locator('.ai-msg.ai li').count() >= 6 && !(await ram.evaluate(() => window.Reel.project.clips.length)));
+        await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('A 20-second Reel about patience with rain sounds');
+        await aiBox.getByRole('button', { name: '✨ Make video' }).click();
+        await ram.waitForFunction(() => /Done!/.test(document.querySelector('.ai-log').textContent), null, { timeout: 60000 });
+        const ai1 = await ram.evaluate(() => { const p = window.Reel.project; const name = (c) => (p.media.find((m) => m.id === c.mediaId) || {}).name || ''; return {
+            w: p.width, h: p.height, len: window.ReelApp.T.projectDuration(p), texts: p.clips.filter((c) => c.type === 'text').map((c) => c.text),
+            rain: p.clips.filter((c) => /^Rain/.test(name(c))).map((c) => c.duration), scenes: p.clips.filter((c) => /^AI /.test(name(c))).length, stickers: p.clips.filter((c) => c.sticker).length }; });
+        check('from one sentence it writes the words, adds a fitting verse, paints scenes and lays rain under a 9:16 video of 20 s',
+            ai1.w === 1080 && ai1.h === 1920 && approx(ai1.len, 20, 0.6) && ai1.texts.includes('Be patient') && ai1.texts.includes('إِنَّ مَعَ الْعُسْرِ يُسْرًا') && ai1.texts.includes('Qur’an 94:6') &&
+            ai1.rain.length === 1 && ai1.rain[0] >= 19 && ai1.scenes >= 4 && ai1.stickers >= 1, JSON.stringify(ai1));
+        await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('make it 30 seconds with gold text');
+        await aiBox.getByRole('button', { name: '✨ Make video' }).click();
+        await ram.waitForFunction(() => document.querySelectorAll('.ai-msg.ai').length >= 4 && /Changed/.test(document.querySelector('.ai-log').lastElementChild.textContent), null, { timeout: 60000 });
+        const ai2 = await ram.evaluate(() => { const p = window.Reel.project; return { len: window.ReelApp.T.projectDuration(p), patient: p.clips.filter((c) => c.text === 'Be patient').length, gold: p.clips.find((c) => c.text === 'Be patient').color }; });
+        check('a follow-up changes the same video instead of adding another', approx(ai2.len, 30, 0.6) && ai2.patient === 1 && ai2.gold === '#f2d27a', JSON.stringify(ai2));
+        await aiBox.getByRole('button', { name: 'Close' }).click();
+        await ram.click('#undo');
+        check('and one Undo brings the previous version back', approx(await ram.evaluate(() => window.ReelApp.T.projectDuration(window.Reel.project)), 20, 0.6));
+        await ram.click('#ai-maker');
+        // Your own pictures and sound.
+        await ram.evaluate(async () => {
+            const files = [];
+            for (const n of ['forest-sun', 'kaaba', 'sea-sunset']) { const c = window.ReelOccasions.paintScene(n, 900, 600); const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.8)); files.push(new File([blob], 'my ' + n + '.jpg', { type: 'image/jpeg' })); }
+            const tone = Float32Array.from({ length: 44100 * 12 }, (x, i) => Math.sin(i / 20) * 0.2);
+            files.push(new File([window.ReelAudio.encodeWav([tone], 44100)], 'my nasheed.wav', { type: 'audio/wav' }));
+            const dt = new DataTransfer(); files.forEach((f) => dt.items.add(f));
+            const input = document.querySelector('.modal.generic input[type=file]');
+            input.files = dt.files; input.dispatchEvent(new Event('change'));
+        });
+        check('added files show as chips before making', await aiBox.locator('.ai-file').count() === 4);
+        await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('"Welcome to our channel" "Subscribe for more"');
+        await aiBox.getByRole('button', { name: '✨ Make video' }).click();
+        await ram.waitForFunction(() => /Your own words|Used your own words/.test(document.querySelector('.ai-log').lastElementChild.textContent), null, { timeout: 60000 });
+        const ai3 = await ram.evaluate(() => { const p = window.Reel.project; const name = (c) => (p.media.find((m) => m.id === c.mediaId) || {}).name || ''; return {
+            len: window.ReelApp.T.projectDuration(p), texts: p.clips.filter((c) => c.type === 'text').map((c) => c.text), mine: p.clips.filter((c) => /^my (forest|kaaba|sea)/.test(name(c))).map((c) => !!c.motion),
+            song: p.clips.filter((c) => name(c) === 'my nasheed.wav').map((c) => c.duration), patient: p.clips.filter((c) => c.text === 'Be patient').length }; });
+        check('with my photos and sound it builds around them: my words, my pictures moving, my sound under it, as long as the sound',
+            ai3.texts.includes('Welcome to our channel') && ai3.texts.includes('Subscribe for more') && ai3.mine.length >= 3 && ai3.mine.every(Boolean) &&
+            ai3.song.length === 1 && approx(ai3.song[0], 12, 0.2) && approx(ai3.len, 12, 0.3) && ai3.patient === 0, JSON.stringify(ai3));
+        await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('Animal sounds for kids: lion, elephant and camel');
+        await aiBox.getByRole('button', { name: '✨ Make video' }).click();
+        await ram.waitForFunction(() => document.querySelectorAll('.ai-msg.ai').length >= 6, null, { timeout: 60000 });
+        const ai4 = await ram.evaluate(() => { const p = window.Reel.project; const names = p.clips.map((c) => (p.media.find((m) => m.id === c.mediaId) || {}).name || ''); return { names: names, texts: p.clips.filter((c) => c.type === 'text').map((c) => c.text) }; });
+        check('a new idea starts again, and the animals it names are heard as they appear',
+            ['Lion', 'Elephant', 'Camel'].every((a) => ai4.names.some((n) => n.startsWith(a))) && ai4.texts.includes('The lion says hello!') && !ai4.texts.includes('Welcome to our channel'), ai4.names.join(', '));
+        await aiBox.getByRole('button', { name: 'Close' }).click();
+        await ram.click('#ai-maker');
+        check('closing and opening it again keeps the conversation', await ram.locator('.modal.generic .ai-msg').count() >= 10);
+        await ram.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
+
         // Arabic interface, chosen from the View menu
         await ram.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
         await ram.click('#view');
         await ram.locator('#view-menu .menu-item', { hasText: 'العربية' }).click();
         const arUi = await ram.evaluate(() => ({ file: document.getElementById('file').textContent.trim(), exp: document.getElementById('export').textContent.trim(), lang: document.documentElement.lang, rtl: getComputedStyle(document.querySelector('.inspector-body')).direction }));
         await ram.click('#create');
-        const arMenu = await ram.locator('#create-menu .menu-item').first().textContent();
+        const arMenu = (await ram.locator('#create-menu .menu-item').allTextContents()).join(' | ');
         await ram.keyboard.press('Escape');
         check('the interface switches to Arabic from the View menu, text panels read right to left', arUi.file === 'ملف' && arUi.exp === 'تصدير' && arUi.lang === 'ar' && arUi.rtl === 'rtl' && /عنوان/.test(arMenu), JSON.stringify(arUi) + ' ' + arMenu);
         await ram.evaluate(() => window.ReelI18n.set('en'));

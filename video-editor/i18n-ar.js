@@ -3,6 +3,18 @@
  * Add a row whenever new words appear in the editor; anything not listed stays in English.
  */
 window.REEL_AR = [
+    // AI video maker
+    ['✨ AI video maker', '✨ صانع الفيديو بالذكاء الاصطناعي'], ['AI video maker', 'صانع الفيديو بالذكاء الاصطناعي'], ['AI', 'ذكاء اصطناعي'],
+    ['AI video maker: describe a video, add your photos, and it is made for you', 'صانع الفيديو بالذكاء الاصطناعي: صف الفيديو وأضف صورك ويُصنع لك'],
+    ['✨ AI video maker — describe it, add your photos…', '✨ صانع الفيديو بالذكاء الاصطناعي — صِفه وأضف صورك…'],
+    ['Describe a video and I write it and make it with this editor’s own tools. Add your photos, videos or sound and I build around them. Everything stays editable.', 'صف الفيديو وسأكتبه وأصنعه بأدوات هذا المحرر. أضف صورك أو فيديوهاتك أو صوتك وسأبني الفيديو منها. كل شيء يبقى قابلًا للتعديل.'],
+    ['Describe your video', 'صف الفيديو'], ['Describe your video… e.g. “A 20-second Reel about patience with rain sounds”', 'صف الفيديو… مثلًا: «ريلز 20 ثانية عن الصبر مع صوت المطر»'],
+    ['Shape: let the AI choose', 'المقاس: يختاره الذكاء الاصطناعي'], ['9:16 · Reels, Shorts, TikTok, status', '9:16 · ريلز وشورتس وتيك توك والحالة'], ['1:1 · Instagram post', '1:1 · منشور إنستغرام'], ['16:9 · YouTube', '16:9 · يوتيوب'],
+    ['Length: let the AI choose', 'المدة: يختارها الذكاء الاصطناعي'], ['10 seconds', '10 ثوانٍ'],
+    ['Read the words aloud (English and other languages; the voice downloads once, about 30 MB)', 'قراءة الكلمات بصوت (الإنجليزية ولغات أخرى؛ يُنزَّل الصوت مرة واحدة، نحو 30 ميغابايت)'],
+    ['📎 Add photos, videos or sound', '📎 أضف صورًا أو فيديوهات أو صوتًا'], ['Options', 'خيارات'], ['Watch', 'شاهد'], ['✨ Make video', '✨ اصنع الفيديو'], ['Conversation', 'المحادثة'], ['Examples', 'أمثلة'],
+    ['Tip: put exact words in "quotes". Ask “what can you do?” to see everything I can use.', 'نصيحة: ضع الكلمات المطلوبة بين علامتي تنصيص. اسأل «ماذا تستطيع؟» لترى كل ما أستطيع استخدامه.'],
+    ['✨ Or describe a video and let AI make it', '✨ أو صف فيديو ودع الذكاء الاصطناعي يصنعه'],
     // Before you begin
     ['Before you begin — please read', 'قبل أن تبدأ — يُرجى القراءة'],
     ['This video editor was built for', 'صُنع محرر الفيديو هذا من أجل'], ['halal use', 'الاستخدام الحلال'],
@@ -313,5 +325,6 @@ window.REEL_AR_PATTERNS = [
     [/^Ready for (.+?): (\S+), (\S+) long(, saved as MP4)?\.$/, (m, tr) => 'جاهز لـ ' + tr(m[1]) + ': ' + m[2] + '، المدة ' + m[3] + (m[4] ? '، بصيغة MP4' : '') + '.'],
     [/^(.+) takes videos up to (\S+); this one is (\S+)\. Trim it first, or choose another site\.$/, (m, tr) => tr(m[1]) + ' يقبل فيديوهات حتى ' + m[2] + '؛ وهذا ' + m[3] + '. قصّه أولًا أو اختر موقعًا آخر.'],
     [/^Post this video on (.+)$/, (m, tr) => 'نشر هذا الفيديو على ' + tr(m[1])],
-    [/^Download (.+)$/, (m) => 'تنزيل ' + m[1]]
+    [/^Download (.+)$/, (m) => 'تنزيل ' + m[1]],
+    [/^Remove (.+)$/, (m) => 'إزالة ' + m[1]]
 ];

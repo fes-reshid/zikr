@@ -502,6 +502,33 @@ async function makePhotos(page) {
     await settle();
     await shot('reframe-result');
 
+    /* 11b. AI video maker */
+    await page.evaluate(() => { document.querySelectorAll('.modal.generic').forEach((m) => m.remove()); window.ReelApp.apply(window.ReelApp.T.createProject({ width: 1280, height: 720, fps: 30 })); });
+    await page.click('#ai-maker');
+    await dialog().locator('.ai-prompt').fill('A 20-second Reel about patience with rain sounds');
+    await dialog().getByRole('button', { name: '✨ Make video' }).click();
+    await page.waitForFunction(() => /Done!/.test(document.querySelector('.ai-log').textContent), null, { timeout: 60000 });
+    await settle();
+    await shot('ai-dialog', dialog());
+    await closeDialog();
+    await page.evaluate(() => window.Reel.select(null));
+    await seek(7.5);
+    await settle();
+    await shot('ai-made');
+    await page.click('#ai-maker');
+    await page.setInputFiles('.modal.generic input[type=file]', photos);
+    await dialog().locator('.ai-prompt').fill('"Our trip to the mountains" "Alhamdulillah for every moment"');
+    await dialog().getByRole('button', { name: '✨ Make video' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.ai-msg.ai').length >= 3 && /Used your/.test(document.querySelector('.ai-log').lastElementChild.textContent), null, { timeout: 60000 });
+    await closeDialog();
+    await page.evaluate(() => window.Reel.select(null));
+    await seek(4.6);
+    await settle();
+    // The frame itself, at a readable size.
+    const frame = await page.evaluate(() => { const src = document.getElementById('preview'); const c = document.createElement('canvas'); c.width = 432; c.height = Math.round(432 * src.height / src.width); c.getContext('2d').drawImage(src, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.82).split(',')[1]; });
+    fs.writeFileSync(path.join(OUT, 'ai-photos.jpg'), Buffer.from(frame, 'base64'));
+    console.log('saved ai-photos');
+
     /* 12. On a phone */
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     await phone.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
@@ -518,6 +545,9 @@ async function makePhotos(page) {
     await mobile.click('#create');
     await mobile.waitForTimeout(400);
     await mshot('phone-menu');
+    await mobile.evaluate(() => { document.getElementById('create').click(); window.ReelAI.open(); });
+    await mobile.waitForTimeout(400);
+    await mshot('phone-ai');
     await phone.close();
 
     await browser.close();

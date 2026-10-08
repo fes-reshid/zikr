@@ -2337,6 +2337,7 @@
      * anything else in Tools under its section.
      */
     const CREATE_GROUPS = [
+        ['AI', /AI video/],
         ['Add', /^Title|written by hand|Drawing \(D\)|gradient card/],
         ['Islamic videos', /Qur|Hadith|Nasheed|Occasion|Ramadan/],
         ['Trending', /Trending/],
@@ -2414,9 +2415,10 @@
 
     function createItems() {
         const made = tools.filter((t) => t.section === 'Create');
-        const items = [{ section: 'Add', label: 'Title (T)', run: function () { addTitle(); } }];
+        const items = [];
         const used = new Set();
         CREATE_GROUPS.forEach(function (g) {
+            if (g[0] === 'Add') items.push({ section: 'Add', label: 'Title (T)', run: function () { addTitle(); } });
             made.forEach(function (t) {
                 if (used.has(t) || !g[1].test(t.label)) return;
                 used.add(t);

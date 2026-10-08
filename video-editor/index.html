@@ -513,6 +513,27 @@ dialog#consentGate h1:focus-visible { outline: none; }
 .sound-section[hidden], .sound-row[hidden] { display: none !important; }
 .trend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; max-height: 46vh; overflow: auto; padding: 2px; }
 .trend-grid.designs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 60vh; }
+/* AI video maker */
+#ai-maker { color: #202b22; background: linear-gradient(120deg, #f2d27a, #e3b85a); border-color: #e3b85a; font-weight: 650; padding: 6px 12px; flex-shrink: 0; }
+#ai-maker:hover { filter: brightness(1.06); }
+.stage-hint .ai-start { pointer-events: auto; margin-top: 12px; background: linear-gradient(120deg, #f2d27a, #e3b85a); color: #202b22; border-color: #e3b85a; font-weight: 650; padding: 9px 16px; border-radius: 999px; }
+.ai-log { display: flex; flex-direction: column; gap: 8px; max-height: 38vh; min-height: 90px; overflow-y: auto; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.ai-msg { max-width: 92%; padding: 8px 11px; border-radius: 12px; line-height: 1.45; }
+.ai-msg strong { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.ai-msg p { margin: 0; }
+.ai-msg ul { margin: 6px 0 0; padding-inline-start: 18px; font-size: 12.5px; color: var(--muted); }
+.ai-msg.ai { align-self: flex-start; background: var(--panel-3); border: 1px solid var(--line-2); }
+.ai-msg.me { align-self: flex-end; background: #2b4a3d; color: #eef7f0; }
+.ai-prompt { width: 100%; resize: vertical; font: inherit; margin-top: 8px; }
+.ai-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.ai-files { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-file { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--panel-3); border: 1px solid var(--line-2); font-size: 12px; }
+.ai-file button { padding: 0 8px; min-height: 24px; }
+.ai-options { margin-top: 6px; }
+.ai-options select { margin: 6px 6px 0 0; }
+.ai-examples button, .ai-followups button { font-size: 12px; border: 1px solid var(--line-2); background: var(--panel-2); min-height: 30px; }
+.ai-examples button:hover, .ai-followups button:hover { border-color: #e3b85a; }
+@media (max-width: 900px) { .ai-log { max-height: 34vh; } #ai-maker { min-width: 34px; min-height: 38px; padding: 4px 6px; justify-content: center; } .ai-examples, .ai-followups { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } .ai-examples button, .ai-followups button { flex: 0 0 auto; white-space: nowrap; } .ai-prompt { min-height: 64px; } }
 .trend-card { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; background: var(--panel-2); border: 2px solid transparent; text-align: center; }
 .trend-card canvas { width: 100%; height: auto; border-radius: 6px; display: block; }
 .trend-card[aria-pressed="true"] { border-color: var(--accent); }
@@ -686,7 +707,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
     body.menu-open::after { content: ''; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 79; }
     .preview-edit-bar { display: none; }
 }
-@media (max-width: 380px) { .project-tabs, .project-tab { max-width: 104px; } .project-tab .tab-name { max-width: 76px; } }
+@media (max-width: 430px) { .project-tabs, .project-tab { max-width: 96px; } .project-tab .tab-name { max-width: 78px; } }
 </style>
 </head>
 <body>
@@ -911,6 +932,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
 <script src="trends.js?v=dev"></script>
 <script src="reframe.js?v=dev"></script>
 <script src="speak.js?v=dev"></script>
+<script src="ai.js?v=dev"></script>
 <script src="mobile.js?v=dev"></script>
 <script src="i18n-ar.js?v=dev"></script>
 <script src="i18n.js?v=dev"></script>

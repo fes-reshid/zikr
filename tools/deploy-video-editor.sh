@@ -15,7 +15,7 @@ SRC="$HERE/video-editor"
 DEST=${1:-"$HERE/../nooreditor/public/video-editing"}
 V=$(date -u +%Y%m%d%H%M)
 
-FILES="index.html help.html manifest.webmanifest sw.js consent.js timeline.js hands.js handwriting.js studio.js workspace-layout.js workspace-resize.js brand.js short.js sounds.js record.js library.js pauses.js occasions.js ramadan.js trends.js reframe.js speak.js mobile.js i18n-ar.js i18n.js hadith.js art-gallery.js preview-edit.js creator-tools.js creative-effects.js audio-core.js webm.js editor.js
+FILES="index.html help.html manifest.webmanifest sw.js consent.js timeline.js hands.js handwriting.js studio.js workspace-layout.js workspace-resize.js brand.js short.js sounds.js record.js library.js pauses.js occasions.js ramadan.js trends.js reframe.js speak.js ai.js mobile.js i18n-ar.js i18n.js hadith.js art-gallery.js preview-edit.js creator-tools.js creative-effects.js audio-core.js webm.js editor.js
 media-store.js audio-mix.js export-fast.js quran.js captions.js transcribe-worker.js speak-worker.js"
 
 rm -rf "$DEST"
