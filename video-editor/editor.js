@@ -4424,6 +4424,17 @@
     });
     $('mobile-close-bin').addEventListener('click', function () { $('workspace').classList.remove('show-bin'); syncMobilePanels(); });
     $('mobile-close-inspector').addEventListener('click', function () { $('workspace').classList.remove('show-inspector'); syncMobilePanels(); });
+    // Done: finish what is being typed (a text box saves when it loses focus), close the sheet, show the preview.
+    function mobileDone(cls, saved) {
+        const el = document.activeElement;
+        if (el && el !== document.body && el.closest('.bin, .inspector')) el.blur();
+        $('workspace').classList.remove(cls);
+        syncMobilePanels();
+        persist();
+        if (saved) toast('Saved');
+    }
+    $('mobile-done-inspector').addEventListener('click', function () { mobileDone('show-inspector', true); });
+    $('mobile-done-bin').addEventListener('click', function () { mobileDone('show-bin', false); });
     syncMobilePanels();
 
     // Timeline height: drag the bar between the workspace and the timeline.

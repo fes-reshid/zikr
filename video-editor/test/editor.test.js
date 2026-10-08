@@ -1594,6 +1594,12 @@ async function probeFile(page, bytes) {
         await writeBtn.scrollIntoViewIfNeeded();
         await writeBtn.click();
         check('and Write by hand is right there', (await project(page)).clips.find((c) => c.id === phoneTitle.id).anim === 'handwrite');
+        await page.locator('#inspector textarea').first().fill('Done on a phone');
+        const doneBox = await page.locator('#mobile-done-inspector').boundingBox();
+        await page.click('#mobile-done-inspector');
+        check('a big Done button at the foot of the details keeps the typed text and closes them',
+            !!doneBox && doneBox.width > 300 && doneBox.y + doneBox.height <= (await page.locator('.timeline-panel').boundingBox()).y + 1 &&
+            !(await page.locator('#inspector').isVisible()) && (await project(page)).clips.find((c) => c.id === phoneTitle.id).text === 'Done on a phone', JSON.stringify(doneBox));
         await page.setViewportSize({ width: 1440, height: 900 });
         await page.waitForTimeout(200);
 

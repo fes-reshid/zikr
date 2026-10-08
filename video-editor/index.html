@@ -497,6 +497,7 @@ dialog#consentGate h1:focus-visible { outline: none; }
     .hide-narrow { display: none !important; }
     :root { --head-w: 96px; }
 }
+.panel-foot { display: none; }
 @media (min-width: 901px) { .show-narrow { display: none !important; } }
 
 /* Creative tools stay within reach on both phones and computers. */
@@ -591,6 +592,10 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
     .panel-head{min-height:50px;padding:8px 12px;font-size:12px;}
     .panel-body{padding-bottom:max(12px,env(safe-area-inset-bottom));}
     .inspector-body{padding:12px max(12px,env(safe-area-inset-right)) 20px max(12px,env(safe-area-inset-left));}
+    /* A big Done button at the foot of the media and details sheets, always in reach. */
+    .panel-foot{display:flex;flex:none;padding:10px max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));border-top:1px solid var(--line);background:var(--panel);}
+    .panel-foot button{flex:1;justify-content:center;min-height:48px;font-size:16px;}
+    .panel-head .show-narrow.icon{min-width:44px;min-height:44px;font-size:22px;}
 
     .preview-edit-bar{flex-wrap:nowrap;overflow-x:auto;padding:4px 8px;min-height:42px;}
     .preview-edit-bar>*{flex:none;}
@@ -757,6 +762,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
             </div>
             <div id="media-list" class="media-list"></div>
         </div>
+        <div class="panel-foot"><button id="mobile-done-bin" class="primary" type="button">✓ Done</button></div>
     </section>
 
     <section class="panel viewer" aria-label="Preview">
@@ -778,6 +784,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
     <section class="panel inspector" aria-label="Inspector">
         <div class="panel-head"><span>Inspector</span><button id="mobile-close-inspector" class="show-narrow icon ghost" aria-label="Close details" title="Close details">×</button></div>
         <div class="panel-body"><div id="inspector" class="inspector-body"></div></div>
+        <div class="panel-foot"><button id="mobile-done-inspector" class="primary" type="button">✓ Done</button></div>
     </section>
 </main>
 
