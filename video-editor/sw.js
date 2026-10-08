@@ -6,7 +6,7 @@ const CACHE = 'video-editor-' + V;
 const RUNTIME = 'video-editor-runtime';
 const q = (f) => f + '?v=' + V;
 const PRECACHE = ['./', 'index.html', 'help.html', 'manifest.webmanifest',
-    q('consent.js'), q('timeline.js'), q('hands.js'), q('handwriting.js'), q('studio.js'), q('art-gallery.js'), q('hadith.js'), q('workspace-layout.js'), q('workspace-resize.js'), q('brand.js'), q('short.js'), q('sounds.js'), q('record.js'), q('library.js'), q('pauses.js'), q('occasions.js'), q('reframe.js'), q('speak.js'), q('speak-worker.js'), q('mobile.js'), q('preview-edit.js'), q('creator-tools.js'), q('creative-effects.js'), q('assets/hand-real.webp'), q('assets/hand-typing-real.webp'), q('audio-core.js'), q('webm.js'), q('editor.js'), q('media-store.js'), q('audio-mix.js'),
+    q('consent.js'), q('timeline.js'), q('hands.js'), q('handwriting.js'), q('studio.js'), q('art-gallery.js'), q('hadith.js'), q('workspace-layout.js'), q('workspace-resize.js'), q('brand.js'), q('short.js'), q('sounds.js'), q('record.js'), q('library.js'), q('pauses.js'), q('occasions.js'), q('ramadan.js'), q('reframe.js'), q('speak.js'), q('speak-worker.js'), q('mobile.js'), q('preview-edit.js'), q('creator-tools.js'), q('creative-effects.js'), q('assets/hand-real.webp'), q('assets/hand-typing-real.webp'), q('audio-core.js'), q('webm.js'), q('editor.js'), q('media-store.js'), q('audio-mix.js'),
     q('export-fast.js'), q('quran.js'), q('captions.js'), q('transcribe-worker.js'), q('vendor/mediabunny.min.mjs'),
     'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
 

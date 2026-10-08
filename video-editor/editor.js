@@ -2331,7 +2331,7 @@
      */
     const CREATE_GROUPS = [
         ['Add', /^Title|written by hand|Drawing \(D\)|gradient card/],
-        ['Islamic videos', /Qur|Hadith|Nasheed|Occasion/],
+        ['Islamic videos', /Qur|Hadith|Nasheed|Occasion|Ramadan/],
         ['Ready-made designs', /template|Background images|shapes|Drawing images|stickers/i],
         ['Sound and recording', /Record|Read aloud|Sound library|Sync|pauses/i],
         ['Share and brand', /Brand|Short/]

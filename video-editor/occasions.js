@@ -625,21 +625,24 @@
         p = window.ReelPauses.picturesOnCuts(p, ids, from, to, cuts, { trackName: occ.label + ' scenes', transition: 'crossfade', kenBurns: true });
         const length = to - from;
         const first = Math.min(5, Math.max(2.5, (cuts[0] || to) - from));
+        // Tall frames (Status, Reels): smaller words, spread out, with an outline so they read over any scene.
+        const tall = p.height > p.width * 1.2;
+        const ink = { width: tall ? 4 : 3, color: '#1a1408' };
         const titleTrack = T.nextTrackId(p, 'text');
         p = T.addTrack(p, 'text', occ.label + ' greeting');
-        p = T.addClip(p, titleClip(titleTrack, from + 0.3, first - 0.3, o.title, { fontSize: 72, color: occ.color, y: 0.4, anim: 'zoom-in', animDuration: 0.9, exit: 'fade' }));
+        p = T.addClip(p, titleClip(titleTrack, from + 0.3, first - 0.3, o.title, { fontSize: tall ? 58 : 72, color: occ.color, y: tall ? 0.3 : 0.4, outline: ink, anim: 'zoom-in', animDuration: 0.9, exit: 'fade' }));
         if (o.arabic) {
             const arTrack = T.nextTrackId(p, 'text');
             p = T.addTrack(p, 'text', occ.label + ' Arabic');
-            p = T.addClip(p, titleClip(arTrack, from + 0.8, first - 0.8, o.arabic, { font: 'naskh', fontSize: 56, color: '#ffffff', y: 0.58, anim: 'fade', exit: 'fade' }));
+            p = T.addClip(p, titleClip(arTrack, from + 0.8, first - 0.8, o.arabic, { font: 'naskh', fontSize: tall ? 50 : 56, color: '#ffffff', y: tall ? 0.52 : 0.58, outline: ink, anim: 'fade', exit: 'fade' }));
         }
         if (o.sub && length > first + 2) {
-            p = T.addClip(p, titleClip(titleTrack, from + first + 0.2, Math.min(5, length - first - 2.4), o.sub, { fontSize: 40, y: 0.82, box: true, boxColor: '#000000', anim: 'rise', exit: 'fade' }));
+            p = T.addClip(p, titleClip(titleTrack, from + first + 0.2, Math.min(5, length - first - 2.4), o.sub, { fontSize: tall ? 36 : 40, y: tall ? 0.74 : 0.82, box: true, boxColor: '#000000', anim: 'rise', exit: 'fade' }));
         }
         if (o.end && length > 6) {
             const endStart = Math.max(from + first + 0.4, to - 3.5);
             const room = T.trackClips(p, titleTrack).every((c) => T.clipEnd(c) <= endStart + 1e-6);
-            if (room) p = T.addClip(p, titleClip(titleTrack, endStart, to - endStart, o.end, { fontSize: 60, color: occ.color, y: 0.45, anim: 'pop', exit: 'fade' }));
+            if (room) p = T.addClip(p, titleClip(titleTrack, endStart, to - endStart, o.end, { fontSize: tall ? 50 : 60, color: occ.color, y: tall ? 0.42 : 0.45, outline: ink, anim: 'pop', exit: 'fade' }));
         }
         app.apply(p);
         app.zoomToFit();

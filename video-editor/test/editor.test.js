@@ -1645,6 +1645,43 @@ async function probeFile(page, bytes) {
             await hosted.locator('#create-menu .menu-item', { hasText: 'Occasion video' }).count() === 1);
         await hosted.close();
 
+        /* ------------------------------------------------------ Ramadan pack */
+        const ram = await context.newPage();
+        await ram.goto(base + '/video-editing/');
+        await ram.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+        await ram.evaluate(() => document.querySelectorAll('.modal.generic').forEach((m) => m.remove()));
+        await ram.evaluate(() => { const p = window.ReelApp.T.createProject({ width: 1280, height: 720, fps: 30 }); window.ReelApp.apply(p); });
+        await ram.click('#create');
+        await ram.locator('#create-menu .menu-item', { hasText: 'greeting for someone' }).click();
+        const greet = ram.locator('.modal.generic');
+        await greet.getByRole('combobox', { name: 'Occasion' }).selectOption('eid-fitr');
+        await greet.getByRole('textbox', { name: 'To' }).fill('Amina');
+        await greet.getByRole('textbox', { name: 'From' }).fill('the Hassan family');
+        await greet.getByRole('button', { name: 'Make greeting' }).click();
+        await ram.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+        const gp = await ram.evaluate(() => window.Reel.project);
+        const gTitle = gp.clips.find((c) => c.type === 'text' && c.text === 'Eid Mubarak, Amina!');
+        check('a greeting for someone has their name and yours, in the tall Status shape', gp.width === 1080 && gp.height === 1920 && !!gTitle &&
+            gp.clips.some((c) => c.type === 'text' && c.text === 'With love, from the Hassan family') && gp.media.some((m) => /^Eid al-Fitr – /.test(m.name)),
+            gp.width + 'x' + gp.height + ' ' + gp.clips.filter((c) => c.type === 'text').map((c) => c.text).join(' | '));
+        check('and on a tall frame the words are outlined and placed higher', !!gTitle && gTitle.y < 0.35 && gTitle.outline && gTitle.outline.width > 0);
+        await ram.click('#create');
+        await ram.locator('#create-menu .menu-item', { hasText: 'Ramadan daily reminders' }).click();
+        const series = ram.locator('.modal.generic');
+        await series.getByRole('combobox', { name: 'Day' }).selectOption('5');
+        check('the daily reminders fill in each day’s ayah or hadith with its reference', await series.getByRole('textbox', { name: 'Reference' }).inputValue() === 'Qur’an 2:186');
+        await series.getByRole('combobox', { name: 'Shape' }).selectOption('square');
+        await series.getByRole('button', { name: 'Make this day’s video' }).click();
+        await ram.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+        const dp = await ram.evaluate(() => ({ p: window.Reel.project, tabs: document.querySelectorAll('.project-tab').length }));
+        check('a day’s video opens in a new tab, keeping the greeting', dp.tabs === 2 && dp.p.name === 'Ramadan day 5' && dp.p.width === 1080 && dp.p.height === 1080 &&
+            ['Ramadan · Day 5', 'He is near', '— Qur’an 2:186', 'Ramadan Kareem'].every((t) => dp.p.clips.some((c) => c.type === 'text' && c.text.startsWith(t))), dp.tabs + ' ' + dp.p.name + ' ' + dp.p.width + 'x' + dp.p.height + ' ' + dp.p.clips.filter((c) => c.type === 'text').map((c) => c.text).join(' | '));
+        await ram.click('#create');
+        await ram.locator('#create-menu .menu-item', { hasText: /^Templates…$/ }).click();
+        const ramCards = await ram.locator('.modal.generic .studio-card').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+        check('the Ramadan templates are in the gallery', ['Iftar invitation', 'Suhoor reminder', 'Taraweeh prayers', 'Ramadan timetable', 'Zakat al-Fitr reminder', 'Eid prayer announcement'].every((n) => ramCards.includes(n)), ramCards.length + ' templates');
+        await ram.close();
+
         /* ------------------------------------------------------------ offline */
         const sw = await context.newPage();
         await sw.goto(base + '/video-editing/');

@@ -645,6 +645,10 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
     .dialog-body .field .hint{grid-column:1;}
     .field-pair{grid-template-columns:minmax(0,1fr);}
     .dialog input,.dialog select,.dialog textarea{width:100%;font-size:16px;}
+    .dialog input[type=checkbox],.dialog input[type=radio]{width:auto;flex:none;min-height:0;}
+    .inspector-body input[type=text],.inspector-body input[type=number],.inspector-body input:not([type]){min-height:40px;}
+    /* While a window is open its buttons sit at the bottom: show messages at the top instead. */
+    body:has(.modal:not([hidden])) .toast{top:max(12px,env(safe-area-inset-top));bottom:auto;}
     .studio-grid,.studio-grid.transitions{grid-template-columns:minmax(0,1fr);}
     dialog#consentGate{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:16px;}
 }
@@ -889,6 +893,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
 <script src="library.js?v=dev"></script>
 <script src="pauses.js?v=dev"></script>
 <script src="occasions.js?v=dev"></script>
+<script src="ramadan.js?v=dev"></script>
 <script src="reframe.js?v=dev"></script>
 <script src="speak.js?v=dev"></script>
 <script src="mobile.js?v=dev"></script>
