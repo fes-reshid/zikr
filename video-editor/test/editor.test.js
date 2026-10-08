@@ -1400,10 +1400,11 @@ async function probeFile(page, bytes) {
         await page.keyboard.type('Bismillah');
         const keyTitle = (await project(page)).clips.find((c) => c.type === 'text' && c.text === 'Bismillah' && approx(c.start, typeAt, 0.01));
         await page.locator('.inspector-body button', { hasText: '⌨ Type with real hand' }).click();
-        await page.waitForFunction(() => window.Reel.project.media.some((m) => /^Keyboard typing — Bismillah/.test(m.name)), null, { timeout: 15000 });
+        // Wait for the sound under this title (an earlier test made one with the same name).
+        await page.waitForFunction((at) => { const p = window.Reel.project; return p.clips.some((c) => Math.abs(c.start - at) < 0.001 && /^Keyboard typing — Bismillah/.test((p.media.find((m) => m.id === c.mediaId) || {}).name || '')); }, keyTitle.start, { timeout: 15000 });
         p = await project(page);
-        const keysMedia = p.media.filter((m) => /^Keyboard typing — Bismillah/.test(m.name)).pop();
-        const keysClip = p.clips.filter((c) => c.mediaId === keysMedia.id).sort((a, b) => Math.abs(a.start - keyTitle.start) - Math.abs(b.start - keyTitle.start))[0];
+        const keysIds = p.media.filter((m) => /^Keyboard typing — Bismillah/.test(m.name)).map((m) => m.id);
+        const keysClip = p.clips.filter((c) => keysIds.includes(c.mediaId)).sort((a, b) => Math.abs(a.start - keyTitle.start) - Math.abs(b.start - keyTitle.start))[0];
         const keySpan = await page.evaluate((id) => window.ReelApp.T.revealSpan(window.Reel.project.clips.find((c) => c.id === id)), keyTitle.id);
         check('typing a title by hand adds a keyboard sound under it, as long as the typing', !!keysClip && approx(keysClip.start, keyTitle.start, 0.001) && approx(keysClip.duration, keySpan + 0.3, 0.05) &&
             p.tracks.find((t) => t.id === keysClip.track).kind === 'audio', keysClip && (keysClip.start + ' ' + keysClip.duration + ' vs ' + keySpan + ' title ' + keyTitle.start + ' track ' + keysClip.track + ' ' + (p.tracks.find((t) => t.id === keysClip.track) || {}).kind));
@@ -1674,6 +1675,20 @@ async function probeFile(page, bytes) {
         await hosted.click('#create');
         check('a host can switch Read aloud off', await hosted.locator('#create-menu .menu-item', { hasText: 'Read aloud' }).count() === 0 &&
             await hosted.locator('#create-menu .menu-item', { hasText: 'Occasion video' }).count() === 1);
+        await hosted.keyboard.press('Escape');
+        await hosted.evaluate(() => { window.__pro = false; window.NOOR_CONFIG = { prices: { monthly: { label: '$4.99 / month' }, yearly: { label: '$39 / year' } } }; return window.ReelApp.refreshPlan(); });
+        await hosted.click('#ai-maker');
+        const guide = hosted.locator('.modal.generic .ai-welcome');
+        const guideText = await guide.textContent();
+        check('on a paid site the AI explains what is free, the real editing tools, and Pro with its prices',
+            /Free, right now/.test(guideText) && /real editing of your own videos/.test(guideText) && /NoorEditor Pro/.test(guideText) && /\$4\.99 \/ month or \$39 \/ year/.test(guideText), guideText.slice(0, 200));
+        check('with Read aloud switched off, the AI does not offer a voice', await hosted.locator('.modal.generic .ai-options input[type=checkbox]').count() === 0);
+        await guide.getByRole('button', { name: '⭐ See Pro' }).click();
+        check('and its Pro button shows the site’s upgrade offer', await hosted.evaluate(() => window.__upgrade) === 'ai');
+        await hosted.evaluate(() => { window.__pro = true; document.querySelectorAll('.modal.generic').forEach((m) => m.remove()); return window.ReelApp.refreshPlan(); });
+        await hosted.click('#ai-maker');
+        await hosted.waitForTimeout(200);
+        check('a Pro member is thanked instead of offered Pro', /You have Pro/.test(await hosted.locator('.modal.generic .ai-welcome').textContent()) && await hosted.locator('.modal.generic .ai-welcome button', { hasText: 'See Pro' }).count() === 0);
         await hosted.close();
 
         /* ------------------------------------------------------ Ramadan pack */
@@ -1750,9 +1765,15 @@ async function probeFile(page, bytes) {
         await ram.click('#ai-maker');
         const aiBox = ram.locator('.modal.generic');
         check('the ✨ AI button opens the AI video maker with examples', await aiBox.locator('h2').textContent() === '✨ AI video maker' && await aiBox.locator('.ai-examples button').count() >= 6);
+        const welcomeText = await aiBox.locator('.ai-welcome').textContent();
+        check('it first says what it can do for free and which tools do real editing (no Pro offer on a site without one)', /Free, right now/.test(welcomeText) && /real editing/.test(welcomeText) && !/NoorEditor Pro/.test(welcomeText) &&
+            await aiBox.locator('.ai-welcome .ai-tools button').count() === 6, welcomeText.slice(0, 160));
+        check('no AI button on the empty preview any more', await ram.locator('#stage-hint button').count() === 0);
+        await aiBox.locator('.ai-welcome button', { hasText: 'Auto captions' }).click();
+        check('with nothing on the timeline, a real-editing tool explains to import the video first', /First put your video/.test(await aiBox.locator('.ai-log > .ai-msg').last().textContent()));
         await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('what can you do?');
         await aiBox.getByRole('button', { name: '✨ Make video' }).click();
-        check('asked what it can do, it lists what it can use', await aiBox.locator('.ai-msg.ai li').count() >= 6 && !(await ram.evaluate(() => window.Reel.project.clips.length)));
+        check('asked what it can do, it lists what it can use', await aiBox.locator('.ai-log > .ai-msg.ai').last().locator('li').count() >= 6 && !(await ram.evaluate(() => window.Reel.project.clips.length)));
         await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('A 20-second Reel about patience with rain sounds');
         await aiBox.getByRole('button', { name: '✨ Make video' }).click();
         await ram.waitForFunction(() => /Done!/.test(document.querySelector('.ai-log').textContent), null, { timeout: 60000 });
@@ -1764,7 +1785,7 @@ async function probeFile(page, bytes) {
             ai1.rain.length === 1 && ai1.rain[0] >= 19 && ai1.scenes >= 4 && ai1.stickers >= 1, JSON.stringify(ai1));
         await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('make it 30 seconds with gold text');
         await aiBox.getByRole('button', { name: '✨ Make video' }).click();
-        await ram.waitForFunction(() => document.querySelectorAll('.ai-msg.ai').length >= 4 && /Changed/.test(document.querySelector('.ai-log').lastElementChild.textContent), null, { timeout: 60000 });
+        await ram.waitForFunction(() => /Changed/.test(document.querySelector('.ai-log').lastElementChild.textContent), null, { timeout: 60000 });
         const ai2 = await ram.evaluate(() => { const p = window.Reel.project; return { len: window.ReelApp.T.projectDuration(p), patient: p.clips.filter((c) => c.text === 'Be patient').length, gold: p.clips.find((c) => c.text === 'Be patient').color }; });
         check('a follow-up changes the same video instead of adding another', approx(ai2.len, 30, 0.6) && ai2.patient === 1 && ai2.gold === '#f2d27a', JSON.stringify(ai2));
         await aiBox.getByRole('button', { name: 'Close' }).click();
@@ -1793,7 +1814,7 @@ async function probeFile(page, bytes) {
             ai3.song.length === 1 && approx(ai3.song[0], 12, 0.2) && approx(ai3.len, 12, 0.3) && ai3.patient === 0, JSON.stringify(ai3));
         await aiBox.getByRole('textbox', { name: 'Describe your video' }).fill('Animal sounds for kids: lion, elephant and camel');
         await aiBox.getByRole('button', { name: '✨ Make video' }).click();
-        await ram.waitForFunction(() => document.querySelectorAll('.ai-msg.ai').length >= 6, null, { timeout: 60000 });
+        await ram.waitForFunction(() => /Animal sounds: Lion/.test(document.querySelector('.ai-log').lastElementChild.textContent), null, { timeout: 60000 });
         const ai4 = await ram.evaluate(() => { const p = window.Reel.project; const names = p.clips.map((c) => (p.media.find((m) => m.id === c.mediaId) || {}).name || ''); return { names: names, texts: p.clips.filter((c) => c.type === 'text').map((c) => c.text) }; });
         check('a new idea starts again, and the animals it names are heard as they appear',
             ['Lion', 'Elephant', 'Camel'].every((a) => ai4.names.some((n) => n.startsWith(a))) && ai4.texts.includes('The lion says hello!') && !ai4.texts.includes('Welcome to our channel'), ai4.names.join(', '));

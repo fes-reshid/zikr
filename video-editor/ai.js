@@ -617,7 +617,11 @@
     }
 
     /** What the assistant can use, for "what can you do?". */
-    function abilities(lang) {
+    function abilities(lang, o) {
+        const voice = !o || o.voice !== false;
+        return abilityList(lang).filter((l) => voice || !/Read the words aloud|قراءة الكلمات بصوت/.test(l));
+    }
+    function abilityList(lang) {
         if (lang === 'ar') {
             return ['أكتب الكلمات وأصنع الفيديو كاملًا من وصفك',
                 'أستخدم صورك وفيديوهاتك وصوتك إن أضفتها، مع حركة وانتقالات ومظهر لوني',
@@ -625,7 +629,7 @@
                 'آيات قرآنية قصيرة وأحاديث مع المرجع',
                 SCENES.length + ' مشهدًا مرسومًا و' + DESIGNS.length + ' تصميمًا للنص وملصقات متحركة',
                 'أصوات الطبيعة والمؤثرات و' + Object.keys(ANIMALS).length + ' صوت حيوان وصوت الطباشير والقلم والكتابة',
-                'قراءة الكلمات بصوت (الإنجليزية ولغات أخرى) والمقاس 9:16 أو 1:1 أو 16:9',
+                'قراءة الكلمات بصوت (الإنجليزية ولغات أخرى)', 'المقاس 9:16 أو 1:1 أو 16:9',
                 'بعدها قل: أطول، أقصر، أضف مطرًا، نص ذهبي، نسخة أخرى، بالعربية…'];
         }
         return ['Write the words and build the whole video from what you describe',
@@ -634,7 +638,7 @@
             'Short Qur’an verses and hadith, with the reference on screen',
             SCENES.length + ' painted scenes, ' + DESIGNS.length + ' text designs and animated stickers',
             'Nature sounds, sound effects, ' + Object.keys(ANIMALS).length + ' animal sounds, and chalk, pencil or keyboard sounds as words are written',
-            'Read the words aloud (English and other languages), in 9:16, 1:1 or 16:9',
+            'Read the words aloud (English and other languages)', 'Any shape: 9:16, 1:1 or 16:9',
             'Afterwards just say: longer, shorter, add rain, gold text, another version, in Arabic…'];
     }
 
@@ -704,6 +708,65 @@
     // One conversation per page: the last request, what it built, and what was on the timeline before.
     const chat = { log: [], req: null, content: null, base: null, made: new Set(), files: [], ids: [], built: null };
     const mark = (p) => JSON.stringify(p.clips) + p.width + 'x' + p.height;
+
+    /** Whether this site offers spoken voice-overs (a host can switch Read aloud off). */
+    function canVoice() { return !!(window.ReelSpeak && window.ReelSpeak.speak) && !(app.config.features && app.config.features.readAloud === false); }
+
+    /**
+     * The greeting: what the assistant does for free on this device, the tools for
+     * real editing of your own recordings, and what Pro adds (when the site sells it).
+     */
+    function welcome(open, onTool) {
+        const ar = uiLang() === 'ar';
+        const section = function (title, kids) {
+            return el('details', { className: 'ai-guide', open: open ? '' : null }, [el('summary', { text: title })].concat(kids));
+        };
+        const free = section(say('✓ Free, right now — made on your device', '✓ مجانًا الآن — يُصنع على جهازك'), [el('ul', null, (ar ? [
+            'أكتب الكلمات وأصنع الفيديو كاملًا من جملة واحدة، بالعربية أو الإنجليزية',
+            'أستخدم صورك وفيديوهاتك وصوتك: حركة وانتقالات وصوتك تحت الفيديو',
+            A.TOPICS.length + ' موضوعًا: رمضان، العيد، الجمعة، الحج، التذكير، أعياد الميلاد، الزواج، المتاجر، الرحلات، الأطفال…',
+            'آيات وأحاديث مع المرجع، مشاهد مرسومة، تصاميم نص، أصوات الطبيعة والحيوانات',
+            'ثم غيّره بكلمة: أطول، أضف مطرًا، نص ذهبي، نسخة أخرى…'
+        ] : [
+            'Write the words and make a whole video from one sentence — in English or Arabic',
+            'Use your photos, videos and sound: movement, transitions, your sound underneath',
+            A.TOPICS.length + ' topics: Ramadan, Eid, Jumu‘ah, Hajj, reminders, birthdays, weddings, shops, travel, kids…',
+            'Verses and hadith with references, painted scenes, text designs, nature and animal sounds',
+            'Then change it with a word: longer, add rain, gold text, another version…'
+        ]).map((t) => el('li', { text: t })))]);
+        const tool = (label, labelAr, re) => el('button', { type: 'button', className: 'ghost', text: ar ? labelAr : label, onclick: function () { onTool(re); } });
+        const real = section(say('🎬 For real editing of your own videos', '🎬 لتحرير فيديوهاتك الحقيقية'), [
+            el('p', { text: say('I make new videos. To edit a recording you already have, these tools do the heavy work:', 'أنا أصنع فيديوهات جديدة. لتحرير تسجيل عندك، هذه الأدوات تقوم بالعمل الشاق:') }),
+            el('div', { className: 'ai-tools' }, [
+                el('button', { type: 'button', className: 'ghost', text: say('📥 Import my video', '📥 استورد الفيديو'), onclick: function () { onTool(null); } }),
+                tool('Auto captions', 'ترجمة تلقائية', /^Auto captions/),
+                tool('Cut pauses & jump cuts', 'قص الوقفات', /pauses & jump cuts/),
+                tool('Follow the face for Shorts', 'تتبّع الوجه للشورتس', /Auto-reframe/),
+                tool('Make a Short', 'اصنع شورت', /Make a Short/),
+                tool('Remove background', 'إزالة الخلفية', /Remove \/ replace background/)
+            ]),
+            el('small', { text: say('Select a sound clip and press Clean up voice to remove noise. Trim, split and arrange anything on the timeline.', 'حدّد مقطعًا صوتيًا واضغط «تنظيف الصوت» لإزالة الضجيج. قص وقسّم ورتّب أي شيء على الخط الزمني.') })
+        ]);
+        const kids = [free, real];
+        if (app.config.upgrade) {
+            const prices = (window.NOOR_CONFIG && window.NOOR_CONFIG.prices) || {};
+            const cost = [prices.monthly && prices.monthly.label, prices.yearly && prices.yearly.label].filter(Boolean).join(say(' or ', ' أو '));
+            const text = el('p', { text: (cost ? cost + ' — ' : '') + say('videos without the watermark, priority help, and new Pro tools as they arrive — including a smarter online AI that writes about any topic, in any language.',
+                'فيديوهات بدون العلامة المائية، ودعم أولوية، وأدوات Pro الجديدة فور صدورها — ومنها ذكاء اصطناعي أذكى عبر الإنترنت يكتب عن أي موضوع وبأي لغة.') });
+            const go = el('button', { type: 'button', className: 'ai-pro', text: say('⭐ See Pro', '⭐ اعرف المزيد عن Pro'), onclick: function () { app.config.upgrade('ai'); } });
+            const pro = section(say('⭐ NoorEditor Pro', '⭐ نور إديتور Pro'), [text, el('div', { className: 'ai-tools' }, [go])]);
+            kids.push(pro);
+            app.refreshPlan().then(function (isPro) {
+                if (!isPro || !app.config.canRemoveWatermark) return;
+                text.textContent = say('You have Pro — thank you! Your videos export without the watermark, and new Pro tools come to you first.', 'لديك Pro — شكرًا لك! فيديوهاتك تُصدَّر بدون العلامة المائية، وتصلك أدوات Pro الجديدة أولًا.');
+                go.remove();
+            });
+        }
+        return el('div', { className: 'ai-msg ai ai-welcome' }, [
+            el('strong', { text: say('✨ AI', '✨ الذكاء الاصطناعي') }),
+            el('p', { text: say('Assalamu alaikum! I’m the NoorEditor AI. Here is what I can do:', 'السلام عليكم! أنا مساعد نور إديتور. هذا ما أستطيع فعله:') })
+        ].concat(kids, [el('p', { className: 'ai-ask', text: say('Tell me what video you want, or tap an example below. Add photos, videos or sound with 📎.', 'قل لي ما الفيديو الذي تريده، أو اختر مثالًا بالأسفل. أضف صورًا أو فيديوهات أو صوتًا عبر 📎.') })]));
+    }
 
     function uiLang() { return window.ReelI18n && window.ReelI18n.lang() === 'ar' ? 'ar' : 'en'; }
     const say = (en, ar) => (uiLang() === 'ar' ? ar : en);
@@ -944,9 +1007,21 @@
             chat.log.push({ who: who, text: text, list: list || [] });
         }
         const history = chat.log.splice(0);
-        if (history.length) history.forEach((m) => bubble(m.who, m.text, m.list));
-        else bubble('ai', say('Assalamu alaikum! Tell me what video you want and I will write it and make it with this editor’s tools. Add your photos, videos or sound with 📎 and I will build around them.',
-            'السلام عليكم! صف الفيديو الذي تريده وسأكتبه وأصنعه بأدوات هذا المحرر. أضف صورك أو فيديوهاتك أو صوتك عبر 📎 وسأبني الفيديو منها.'));
+        // The guide opens fully the first time; later it stays folded above the conversation.
+        log.append(welcome(!history.length, function (re) {
+            if (!re) { dialog.close(); const b = document.getElementById('import'); if (b) b.click(); return; }
+            // These tools work on a recording that is already on the timeline.
+            if (!app.state.project.clips.some((c) => c.type === 'media')) {
+                bubble('ai', say('First put your video or recording on the timeline: press 📥 Import my video (or File ▸ Import), then double-click it. Then press that tool again.',
+                    'ضع الفيديو أو التسجيل على الخط الزمني أولًا: اضغط «📥 استورد الفيديو» (أو ملف ▸ استيراد) ثم انقر عليه مرتين، ثم اضغط الأداة مرة أخرى.'));
+                return;
+            }
+            dialog.close();
+            app.runTool(re);
+        }));
+        history.forEach((m) => bubble(m.who, m.text, m.list));
+        // A first visit reads the guide from its start.
+        if (!history.length) setTimeout(() => { log.scrollTop = 0; }, 0);
 
         function renderFiles() {
             fileList.replaceChildren(...chat.files.map(function (f, i) {
@@ -958,7 +1033,8 @@
         renderFiles();
 
         function showFollowups() {
-            const list = say('Make it longer|Shorter|Add rain|Gold text|Another version|Read it aloud|In Arabic|Square for Instagram', 'أطول|أقصر|أضف مطرًا|نص ذهبي|نسخة أخرى|اقرأه بصوت|بالإنجليزية|مربع لإنستغرام').split('|');
+            const list = say('Make it longer|Shorter|Add rain|Gold text|Another version|Read it aloud|In Arabic|Square for Instagram', 'أطول|أقصر|أضف مطرًا|نص ذهبي|نسخة أخرى|اقرأه بصوت|بالإنجليزية|مربع لإنستغرام').split('|')
+                .filter((f) => canVoice() || !/Read it aloud|اقرأه بصوت/.test(f));
             followups.replaceChildren(...list.map((f) => el('button', { type: 'button', className: 'ghost', text: f, onclick: function () { prompt.value = f; go(); } })));
             followups.hidden = false;
             chips.hidden = true;
@@ -974,7 +1050,7 @@
             if (/^(what can you do|help|\?|what('?s| is) (available|in there)|ماذا تستطيع|ما الذي تستطيع|مساعدة)/i.test(text)) {
                 bubble('me', text);
                 prompt.value = '';
-                bubble('ai', say('Here is what I can do:', 'هذا ما أستطيع فعله:'), A.abilities(uiLang()));
+                bubble('ai', say('Here is what I can do:', 'هذا ما أستطيع فعله:'), A.abilities(uiLang(), { voice: canVoice() }));
                 return;
             }
             busy = true;
@@ -1010,6 +1086,7 @@
                 if (voice.checked) req.voice = true;
                 let content = A.plan(req);
                 content = await remotePlan(req, content);
+                if (content.voice && !canVoice()) { content.voice = false; content.notes.push(say('Reading aloud is not available on this site, so the video has no voice-over — you can record your own voice with Create ▸ Record your voice', 'القراءة بصوت غير متاحة في هذا الموقع، فالفيديو بدون تعليق صوتي — يمكنك تسجيل صوتك من إنشاء ▸ سجّل صوتك')); }
                 if (content.voice && !VOICE_FOR[content.lang]) content.notes.push(say('There is no Arabic reading voice yet, so I left the voice out', 'لا يوجد صوت قراءة عربي بعد، فلم أضف القراءة'));
                 dialog.status(say('Making your video…', 'أصنع الفيديو…'));
                 const built = await build(content, chat.ids, dialog.status);
@@ -1041,11 +1118,10 @@
         dialog = app.openDialog({
             title: '✨ AI video maker',
             wide: true,
-            intro: 'Describe a video and I write it and make it with this editor’s own tools. Add your photos, videos or sound and I build around them. Everything stays editable.',
             body: [log, chips, followups, prompt,
                 el('div', { className: 'ai-row' }, [el('button', { type: 'button', className: 'ghost', text: '📎 Add photos, videos or sound', onclick: function () { fileInput.click(); } }), fileInput, fileList]),
                 el('details', { className: 'ai-options' }, [el('summary', { text: 'Options' }), shape, length,
-                    el('label', { className: 'check' }, [voice, 'Read the words aloud (English and other languages; the voice downloads once, about 30 MB)'])]),
+                    canVoice() ? el('label', { className: 'check' }, [voice, 'Read the words aloud (English and other languages; the voice downloads once, about 30 MB)']) : null]),
                 el('p', { className: 'hint', text: 'Tip: put exact words in "quotes". Ask “what can you do?” to see everything I can use.' })],
             actions: [
                 { label: 'Close' },
@@ -1062,10 +1138,6 @@
     if (bar && !document.getElementById('ai-maker')) {
         const b = el('button', { type: 'button', id: 'ai-maker', className: 'ai-btn', 'aria-label': 'AI video maker', title: 'AI video maker: describe a video, add your photos, and it is made for you', onclick: open }, [el('span', { text: '✨' }), el('span', { className: 'hide-narrow', text: ' AI' })]);
         bar.parentNode.insertBefore(b, bar);
-    }
-    const hint = document.getElementById('stage-hint');
-    if (hint && !hint.querySelector('.ai-start')) {
-        hint.append(el('div', null, [el('button', { type: 'button', className: 'ai-start', text: '✨ Or describe a video and let AI make it', onclick: open })]));
     }
     Object.assign(window.ReelAI, { open, build, chat });
 }());

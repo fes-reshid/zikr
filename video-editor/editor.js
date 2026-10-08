@@ -4796,7 +4796,9 @@
         addTitleTrack: function (p, name) { const id = T.nextTrackId(p, 'text'); return { project: T.addTrack(p, 'text', name), id: id }; },
         showAbout: showAbout,
         /** Adds a command to the Tools menu: { section, label, run }. */
-        addTool: function (tool) { tools.push(tool); }
+        addTool: function (tool) { tools.push(tool); },
+        /** Runs the first added tool whose label matches `re`; false when there is none. */
+        runTool: function (re) { const t = tools.find((x) => re.test(x.label)); if (!t) return false; t.run(); return true; }
     };
 
     /* ------------------------------------------------------------------ start */
