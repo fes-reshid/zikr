@@ -196,6 +196,10 @@ async function makePhotos(page) {
     await page.waitForSelector('#export-dialog:not([hidden]) .dialog');
     await settle();
     await shot('first-export', page.locator('#export-dialog .dialog'));
+    await page.locator('#export-targets button', { hasText: 'YouTube Shorts' }).click();
+    await settle();
+    await shot('export-made-for', page.locator('#export-dialog .dialog'));
+    await page.locator('#export-targets button', { hasText: 'Anywhere' }).click();
     await page.click('#export-cancel');
 
     /* Reference pictures: the whole screen, the timeline, the side panel's sections and each tool's window. */

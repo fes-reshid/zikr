@@ -636,9 +636,24 @@ async function probeFile(page, bytes) {
             check('with the full length', approx(probe.d, expected, 0.15), probe.d.toFixed(2) + ' vs ' + expected.toFixed(2));
             check('and sound in it', bytes.includes(Buffer.from('A_OPUS')) || bytes.includes(Buffer.from('mp4a')) || bytes.includes(Buffer.from('Opus')));
             check('a finished export offers sharing to WhatsApp and Telegram', fast.shareButtons.includes('WhatsApp') && fast.shareButtons.includes('Telegram'), fast.shareButtons.join(', '));
+            check('and posting on YouTube, Shorts, TikTok, Instagram and Facebook', ['YouTube', 'YouTube Shorts', 'TikTok', 'Instagram Reels', 'Facebook'].every((b) => fast.shareButtons.includes(b)), fast.shareButtons.join(', '));
             check('fast export ran', true, fast.choice.text + ', ' + bytes.length + ' bytes in ' + fast.seconds.toFixed(1) + 's for ' + expected.toFixed(1) + 's of video');
             fs.unlinkSync(fast.file);
         }
+        await page.click('#export');
+        await page.waitForFunction(() => !document.getElementById('export-start').disabled, null, { timeout: 20000 });
+        await page.locator('#export-targets button', { hasText: 'YouTube Shorts' }).click();
+        const shortsFit = await page.locator('#export-fit').innerText();
+        await page.locator('#export-targets button', { hasText: /^YouTube$/ }).click();
+        const youtubeFit = await page.locator('#export-fit').innerText();
+        const picked = await page.evaluate(() => { const s = document.getElementById('export-format'); return s.options[s.selectedIndex].text + ' ' + document.getElementById('export-quality').value; });
+        check('Made for YouTube Shorts warns about a wide frame and offers to change it', /needs a tall 9:16 frame/.test(shortsFit) && /Change the frame to 9:16/.test(shortsFit), shortsFit);
+        check('and for YouTube the wide video is ready, as MP4 at high quality where the browser can',
+            /^Ready for YouTube: 16:9/.test(youtubeFit) && /12000000$/.test(picked) && (!/MP4/.test(fast.options.map((o) => o.text).join()) || /MP4/.test(picked)), youtubeFit + ' · ' + picked);
+        await page.locator('#export-targets button', { hasText: 'Anywhere' }).click();
+        check('Anywhere hides the check', await page.locator('#export-fit').isHidden());
+        await page.selectOption('#export-quality', '6000000');
+        await page.click('#export-cancel');
         const rt = await exportWith(page, (o) => /Real time/.test(o.group));
         if (rt.file) {
             const bytes = fs.readFileSync(rt.file);

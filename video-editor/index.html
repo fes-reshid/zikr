@@ -151,6 +151,14 @@ input[type="range"] { accent-color: var(--accent); min-width: 0; }
 .library-blank { display: grid; place-items: center; color: var(--muted); font-size: 28px; }
 .library-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+/* Export: where the video will be posted */
+.export-targets { display: flex; flex-wrap: wrap; gap: 6px; }
+.export-targets button { padding: 6px 12px; border-radius: 999px; }
+.export-targets button[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.export-fit { display: grid; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line-2); font-size: 13px; }
+.export-fit.ok { border-color: #2f7d5b; }
+.export-fit.warn { border-color: #b7791f; }
+.export-fit .fit-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 /* Keyframes */
 .clip-key { position: absolute; bottom: 4px; width: 9px; height: 9px; margin-left: -4px; background: #ffd27a; border: 1px solid #5a3d00; transform: rotate(45deg); pointer-events: none; z-index: 2; }
 .key-list { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -283,7 +291,7 @@ body.preview-wide .col-resizer, body.drawing-focus .col-resizer, body.drawing-fo
 .group { display: grid; gap: 8px; }
 .group-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
 .field { display: grid; grid-template-columns: 84px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
-.field > label { color: var(--muted); }
+.field > label, .field > .label { color: var(--muted); }
 .field output { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; }
 .field.wide { grid-template-columns: 84px minmax(0, 1fr); }
 .field textarea { resize: vertical; min-height: 64px; }
@@ -818,6 +826,8 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="export-title">
         <h2 id="export-title">Export video</h2>
         <div id="export-setup" class="group">
+            <div class="field"><span class="label">Made for</span><div id="export-targets" class="export-targets" role="radiogroup" aria-label="Where the video will be posted"></div></div>
+            <div id="export-fit" class="export-fit" hidden></div>
             <div class="field"><label for="export-format">Format</label><select id="export-format"></select></div>
             <div class="field"><label for="export-quality">Quality</label>
                 <select id="export-quality">

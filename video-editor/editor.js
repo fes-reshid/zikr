@@ -4067,6 +4067,104 @@
     $('export-watermark').nextSibling.textContent = ' Add the ' + WATERMARK + ' watermark';
     refreshPlan();
 
+    /*
+     * Where the video will be posted. Each choice checks the frame shape and
+     * length against what that site accepts, picks MP4 at a good quality, and
+     * after export offers to post it there: on a phone through the share sheet
+     * (straight into the app), on a computer by opening the site's upload page.
+     */
+    const TARGETS = [
+        { id: 'any', label: 'Anywhere' },
+        { id: 'youtube', label: 'YouTube', shapes: ['16:9'], size: [1920, 1080], upload: 'https://www.youtube.com/upload',
+            how: 'YouTube Studio opens: press Select files and choose the downloaded video.' },
+        { id: 'shorts', label: 'YouTube Shorts', shapes: ['9:16', '1:1'], size: [1080, 1920], max: 180, tag: '#Shorts', upload: 'https://www.youtube.com/upload',
+            how: 'YouTube Studio opens: choose the downloaded video. A tall or square video of 3 minutes or less becomes a Short.' },
+        { id: 'tiktok', label: 'TikTok', shapes: ['9:16'], size: [1080, 1920], max: 600, upload: 'https://www.tiktok.com/upload',
+            how: 'TikTok opens: choose the downloaded video on the upload page.' },
+        { id: 'instagram', label: 'Instagram Reels', shapes: ['9:16'], size: [1080, 1920], max: 180, upload: 'https://www.instagram.com/',
+            how: 'Instagram opens: press ＋ Create and choose the downloaded video.' },
+        { id: 'facebook', label: 'Facebook', shapes: ['16:9', '9:16', '1:1', '4:5'], size: [1080, 1920], upload: 'https://www.facebook.com/',
+            how: 'Facebook opens: press Reel (or Photo/video) and choose the downloaded video.' }
+    ];
+    const SHAPES = { '16:9': 16 / 9, '9:16': 9 / 16, '1:1': 1, '4:5': 4 / 5 };
+    const TARGET_KEY = 'reel.exportTarget';
+    let exportTarget = TARGETS.find((t) => t.id === storage((s) => s.getItem(TARGET_KEY))) || TARGETS[0];
+
+    /** 3:05 — minutes and seconds, for lengths people read. */
+    function clock(t) {
+        const r = Math.round(t);
+        return Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0');
+    }
+
+    function shapeOf(w, h) {
+        return Object.keys(SHAPES).find((k) => Math.abs(w / h - SHAPES[k]) < 0.02) || (w + '×' + h);
+    }
+
+    function renderTargets() {
+        const box = $('export-targets');
+        box.textContent = '';
+        TARGETS.forEach(function (t) {
+            box.append(el('button', {
+                type: 'button', role: 'radio', text: t.label, 'aria-checked': String(t === exportTarget),
+                onclick: function () {
+                    exportTarget = t;
+                    storage((s) => s.setItem(TARGET_KEY, t.id));
+                    renderTargets();
+                    suitTarget();
+                }
+            }));
+        });
+        checkTarget();
+    }
+
+    /** MP4 and the high quality suit every one of these sites. */
+    function suitTarget() {
+        if (exportTarget.id === 'any') return;
+        const i = exportChoices.findIndex((f) => f.ext === 'mp4');
+        if (i >= 0) $('export-format').value = String(i);
+        $('export-quality').value = '12000000';
+        updateExportNote();
+    }
+
+    /** Says whether the frame and length suit the chosen site, with a one-tap fix. */
+    function checkTarget() {
+        const box = $('export-fit');
+        const t = exportTarget;
+        box.textContent = '';
+        box.className = 'export-fit';
+        if (t.id === 'any') { box.hidden = true; return; }
+        const p = state.project;
+        const shape = shapeOf(p.width, p.height);
+        const len = duration();
+        const notes = [];
+        const fixes = [];
+        if (t.shapes.indexOf(shape) < 0) {
+            const want = t.shapes[0];
+            notes.push(t.label + ' needs a ' + (SHAPES[want] < 1 ? 'tall ' : 'wide ') + want + ' frame; this video is ' + shape + '.');
+            fixes.push(el('button', {
+                type: 'button', className: 'primary', text: 'Change the frame to ' + want,
+                onclick: function () {
+                    const size = SHAPES[want] < 1 ? [1080, 1920] : SHAPES[want] === 1 ? [1080, 1080] : [1920, 1080];
+                    const resize = window.ReelEffects && window.ReelEffects.resizeProject;
+                    apply(resize ? resize(state.project, size[0], size[1], 'blur') : Object.assign(T.clone(state.project), { width: size[0], height: size[1] }));
+                    openExport(); // the formats this browser can make depend on the frame size
+                    toast('Changed to ' + want + '. Check the preview — Undo puts it back.');
+                }
+            }));
+            if (SHAPES[want] < 1 && window.ReelShort) {
+                fixes.push(el('button', { type: 'button', text: 'Make a Short (follows faces)…', onclick: function () { closeExport(); window.ReelShort.openShort(); } }));
+            }
+        }
+        if (t.max && len > t.max + 0.05) {
+            notes.push(t.label + ' takes videos up to ' + clock(t.max) + '; this one is ' + clock(len) + '. Trim it first, or choose another site.');
+        }
+        if (!notes.length) notes.push('Ready for ' + t.label + ': ' + shape + ', ' + clock(len) + ' long' + (exportChoices.some((f) => f.ext === 'mp4') ? ', saved as MP4.' : '.'));
+        box.classList.add(fixes.length || notes.length > 1 || (t.max && len > t.max + 0.05) ? 'warn' : 'ok');
+        notes.forEach((n) => box.append(el('span', { text: n })));
+        if (fixes.length) box.append(el('div', { className: 'fit-actions' }, fixes));
+        box.hidden = false;
+    }
+
     async function openExport() {
         if (!state.project.clips.length) { toast('Add something to the timeline first.'); return; }
         pause();
@@ -4103,6 +4201,8 @@
         }
         $('export-start').disabled = !exportChoices.length;
         updateExportNote();
+        renderTargets();
+        suitTarget();
         sel.focus();
     }
 
@@ -4313,7 +4413,51 @@
             type: 'button', text: 'Telegram', title: 'Send the video on Telegram',
             onclick: canShareFile ? share : function () { open('https://t.me/share/url?url=' + encodeURIComponent(CONFIG.siteUrl) + '&text=' + encodeURIComponent(text), 'Telegram'); }
         }));
-        return el('div', { className: 'share-row' }, [el('span', { className: 'hint', text: 'Share:' })].concat(buttons));
+        return el('div', {}, [
+            el('div', { className: 'share-row' }, [el('span', { className: 'hint', text: 'Share:' })].concat(buttons)),
+            postRow(file, canShareFile)
+        ]);
+    }
+
+    /**
+     * Post on YouTube, Shorts, TikTok, Instagram or Facebook. These sites only
+     * take uploads from their own apps and pages, so: on a phone the video goes
+     * through the share sheet straight into the app; on a computer the site's
+     * upload page opens for the file that was just downloaded. Either way a
+     * caption is copied, ready to paste.
+     */
+    /** The project's name, or else the first title in the video, for the caption. */
+    function captionTitle() {
+        const name = (state.project.name || '').trim();
+        if (name && !/^Untitled/i.test(name)) return name;
+        const title = state.project.clips.filter((c) => c.type === 'text' && (c.text || '').trim()).sort((x, y) => x.start - y.start)[0];
+        return title ? title.text.trim().split('\n')[0].slice(0, 90) : 'My video';
+    }
+
+        function postRow(file, canShareFile) {
+        const site = CONFIG.siteUrl.replace(/^https?:\/\//, '');
+        const post = async function (t) {
+            const caption = captionTitle() + (t.tag ? ' ' + t.tag : '') + '\n\nMade with ' + site;
+            let copied = false;
+            try { await navigator.clipboard.writeText(caption); copied = true; } catch (err) { /* not allowed here */ }
+            if (canShareFile) {
+                toast('Choose ' + t.label.replace(' Reels', '').replace(' Shorts', '') + ' in the list.' + (copied ? ' The caption is copied — paste it there.' : ''), 5000);
+                try { await navigator.share({ files: [file], title: state.project.name, text: caption }); }
+                catch (err) { if (err && err.name !== 'AbortError') toast('Sharing did not work here. Open ' + t.label + ' and choose the downloaded video.'); }
+                return;
+            }
+            window.open(t.upload, '_blank', 'noopener');
+            toast(t.how + (copied ? ' The caption is copied — paste it there.' : ''), 7000);
+        };
+        const sites = TARGETS.filter((t) => t.upload);
+        sites.sort((x, y) => (y === exportTarget) - (x === exportTarget)); // the chosen site first
+        const buttons = sites.map(function (t) {
+            return el('button', {
+                type: 'button', className: 'post' + (t === exportTarget ? ' primary' : ''), text: t.label,
+                title: 'Post this video on ' + t.label, onclick: function () { post(t); }
+            });
+        });
+        return el('div', { className: 'share-row post-row' }, [el('span', { className: 'hint', text: 'Post on:' })].concat(buttons));
     }
 
     function cancelExport() {
