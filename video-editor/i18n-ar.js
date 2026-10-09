@@ -3,6 +3,14 @@
  * Add a row whenever new words appear in the editor; anything not listed stays in English.
  */
 window.REEL_AR = [
+    // PowerPoint
+    ['Open a PowerPoint (.pptx) as a video…', 'افتح عرض باوربوينت (.pptx) كفيديو…'], ['Save as PowerPoint (.pptx)…', 'احفظ كباوربوينت (.pptx)…'], ['Save as PowerPoint…', 'احفظ كباوربوينت…'], ['Save as PowerPoint', 'احفظ كباوربوينت'],
+    ['Save this video as a PowerPoint presentation instead', 'احفظ هذا الفيديو كعرض باوربوينت بدلًا من ذلك'], ['Open PowerPoint as a video', 'افتح الباوربوينت كفيديو'],
+    ['How long each slide shows', 'مدة ظهور كل شريحة'], ['Slide timing', 'توقيت الشرائح'], ['As in the presentation', 'كما في العرض'], ['3 seconds a slide', '3 ثوانٍ للشريحة'], ['5 seconds a slide', '5 ثوانٍ للشريحة'], ['8 seconds a slide', '8 ثوانٍ للشريحة'], ['12 seconds a slide', '12 ثانية للشريحة'],
+    ['Fade from one slide to the next', 'تلاشٍ من شريحة إلى التالية'], ['Show the speaker notes as captions', 'اعرض ملاحظات المتحدث كترجمة'], ['Make the video', 'اصنع الفيديو'], ['Save .pptx', 'احفظ .pptx'],
+    ['Titles stay editable text boxes, with their font, size and colour.', 'تبقى العناوين مربعات نص قابلة للتعديل بخطها وحجمها ولونها.'],
+    ['Pictures, videos, drawings and stickers become each slide’s background picture.', 'تصبح الصور والفيديوهات والرسوم والملصقات صورة خلفية لكل شريحة.'],
+    ['Slides move on by themselves with the same timing as the video.', 'تنتقل الشرائح وحدها بنفس توقيت الفيديو.'], ['Sound is not included — export the video (MP4) for that.', 'الصوت غير مضمّن — صدّر الفيديو (MP4) لذلك.'],
     // First-visit tour and timeline size
     ['Welcome to NoorEditor 👋', 'مرحبًا بك في نور إديتور 👋'], ['A quick tour of the editor — a few short tips. You can skip it any time, and find it again in Help ▸ Take the tour.', 'جولة سريعة في المحرر — بضع نصائح قصيرة. يمكنك تخطيها في أي وقت، وتجدها مجددًا في مساعدة ▸ جولة تعريفية.'],
     ['Bring in your files', 'أحضر ملفاتك'], ['Import videos, photos and sound — or drop them anywhere on the page. They stay on your device; nothing is uploaded.', 'استورد الفيديوهات والصور والصوت — أو أفلتها في أي مكان من الصفحة. تبقى على جهازك ولا يُرفع شيء.'],
@@ -60,6 +68,7 @@ window.REEL_AR = [
     ['File', 'ملف'], ['Edit', 'تحرير'], ['View', 'عرض'], ['Create', 'إنشاء'], ['Tools', 'أدوات'], ['Help', 'مساعدة'], ['Export', 'تصدير'],
     ['Media', 'الوسائط'], ['Import', 'استيراد'], ['Drop files here', 'أفلت الملفات هنا'],
     ['Video, audio and images. They stay on this device — nothing is uploaded.', 'فيديو وصوت وصور. تبقى على هذا الجهاز — لا يُرفع شيء.'],
+    ['Video, audio, images and PowerPoint. They stay on this device — nothing is uploaded.', 'فيديو وصوت وصور وباوربوينت. تبقى على هذا الجهاز — لا يُرفع شيء.'],
     ['Your next video starts here. Import clips, or pick a template from the Create menu.', 'فيديوك القادم يبدأ هنا. استورد مقاطع، أو اختر قالبًا من قائمة «إنشاء».'],
     ['Edit text', 'تحرير النص'], ['Inspector', 'التفاصيل'], ['Project', 'المشروع'], ['Untitled project', 'مشروع بلا عنوان'], ['Background', 'الخلفية'],
     ['Watermark', 'العلامة المائية'], ['Show the NoorEditor.web.app watermark', 'إظهار العلامة المائية NoorEditor.web.app'],
@@ -351,5 +360,10 @@ window.REEL_AR_PATTERNS = [
     [/^(.+) takes videos up to (\S+); this one is (\S+)\. Trim it first, or choose another site\.$/, (m, tr) => tr(m[1]) + ' يقبل فيديوهات حتى ' + m[2] + '؛ وهذا ' + m[3] + '. قصّه أولًا أو اختر موقعًا آخر.'],
     [/^Post this video on (.+)$/, (m, tr) => 'نشر هذا الفيديو على ' + tr(m[1])],
     [/^Download (.+)$/, (m) => 'تنزيل ' + m[1]],
-    [/^Remove (.+)$/, (m) => 'إزالة ' + m[1]]
+    [/^Remove (.+)$/, (m) => 'إزالة ' + m[1]],
+    [/^(\d+) slides? found in (.+?)\. Each slide becomes editable parts of the video: its background, its pictures and every text box as a title you can change\.$/, (m) => 'وُجدت ' + m[1] + ' شريحة في ' + m[2] + '. تصبح كل شريحة أجزاءً قابلة للتعديل من الفيديو: خلفيتها وصورها وكل مربع نص كعنوان يمكنك تغييره.'],
+    [/^Your video becomes a PowerPoint presentation: (\d+) slides?, one for each change of picture\.$/, (m) => 'يصبح الفيديو عرض باوربوينت: ' + m[1] + ' شريحة، واحدة لكل تغيير في الصورة.'],
+    [/^Making slide (\d+) of (\d+)…$/, (m) => 'أصنع الشريحة ' + m[1] + ' من ' + m[2] + '…'],
+    [/^PowerPoint saved: (\d+) slides\.$/, (m) => 'حُفظ الباوربوينت: ' + m[1] + ' شريحة.'],
+    [/^(\d+) slides are on the timeline \((.+)\)\. Click any text or picture to change it; File ▸ Save as PowerPoint makes a \.pptx again\.$/, (m) => 'أصبحت ' + m[1] + ' شريحة على الخط الزمني (' + m[2] + '). انقر أي نص أو صورة لتغييرها؛ ملف ▸ احفظ كباوربوينت يعيدها ملف .pptx.']
 ];

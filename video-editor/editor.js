@@ -597,7 +597,7 @@
      */
     function drawFrame(t, opts) {
         const o = opts || {};
-        const p = state.project;
+        const p = o.project || state.project;
         const W = p.width;
         const H = p.height;
         const c = o.ctx || ctx;
@@ -1020,7 +1020,8 @@
      * the edge.
      */
     function layoutText(c, clip, text, size, W) {
-        const maxW = W * 0.9;
+        // `wrap` (a share of the frame width) keeps a title inside its own box, e.g. a PowerPoint text box.
+        const maxW = W * (clip.wrap > 0.05 && clip.wrap <= 1 ? clip.wrap : 0.9);
         let s = size;
         for (let tries = 0; tries < 4; tries += 1) {
             c.font = fontCss(clip, s);
@@ -1576,7 +1577,13 @@
         const o = options || {};
         const ids = [];
         let added = false;
-        const incoming = Array.from(list || []);
+        let incoming = Array.from(list || []);
+        // PowerPoint files open as slides on the timeline (slides.js).
+        const decks = incoming.filter((f) => /\.pptx$/i.test(f.name) || f.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+        if (decks.length && !o.noSlides && window.ReelSlides && window.ReelSlides.openDeck) {
+            incoming = incoming.filter((f) => decks.indexOf(f) === -1);
+            setTimeout(() => window.ReelSlides.openDeck(decks[0]), 0);
+        }
         for (const file of incoming) {
             const type = mediaType(file);
             if (!type) { toast(file.name + ' is not a video, audio or image file.'); continue; }
@@ -4877,6 +4884,29 @@
         /** Adds a command to the Tools menu: { section, label, run }. */
         addTool: function (tool) { tools.push(tool); },
         removeHand: removeHand,
+        /**
+         * Draws the frame at `t` onto `ctx` once the pictures and videos it shows are ready;
+         * `o.project` draws a variant of the project (e.g. without its titles).
+         */
+        renderStill: async function (t, ctx, o) {
+            syncMedia(t, false);
+            const waits = T.mediaAt(state.project, t).map(function (m) {
+                const e = pool.get(m.clip.id);
+                if (!e || !e.el) return null;
+                if (!e.el.seeking && e.el.readyState >= 2) return null;
+                return waitFor(e.el, e.el.seeking ? 'seeked' : 'loadeddata', 4000).catch(() => null);
+            }).filter(Boolean);
+            // Pictures not shown yet are still loading.
+            T.renderLayers(state.project, t).forEach(function (l) {
+                const m = l.clip.mediaId && T.getMedia(state.project, l.clip.mediaId);
+                if (!m || m.type !== 'image') return;
+                const img = imageFor(l.clip.mediaId);
+                if (img && !(img.complete && img.naturalWidth)) waits.push(waitFor(img, 'load', 4000).catch(() => null));
+            });
+            await Promise.all(waits);
+            await new Promise((r) => requestAnimationFrame(() => r()));
+            drawFrame(t, Object.assign({ ctx: ctx }, o));
+        },
         setTimelineHeight: setTimelineHeight,
         timelineHeight: timelineHeight,
         /** Where hands were drawn in the last preview frame, in frame pixels: [{ id, x, y, w, h }]. */

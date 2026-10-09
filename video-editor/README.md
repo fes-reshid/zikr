@@ -25,6 +25,7 @@ real-time export. Fast export, offline use and the Qur'ān tool need HTTP.
 | | |
 | --- | --- |
 | **✨ AI video maker** | Coming soon. The gold ✨ AI button says so until a host switches the assistant on with `REEL_CONFIG.features.ai = true`. The groundwork is in `ai.js`: a planner that turns a description (and your own photos, videos and sound) into a video built with the editor's tools, and a hook (`REEL_CONFIG.ai.endpoint`) for connecting a language model, whose plan is checked against the editor's own lists. |
+| **PowerPoint** | Open a .pptx as an editable video: each slide's background, pictures (in place, at size) and text boxes (as titles with their font size, colour, bold and alignment), with the presentation's timings or a chosen one, an optional fade, and speaker notes as captions. Save any video as a .pptx: one slide per change of picture, the picture as the slide background, titles as editable text boxes, and the video's timing as each slide's auto-advance. JSZip 3.10 (MIT, `vendor/jszip.min.js`) is loaded only for this. |
 | **Import** | Video, audio and images from the Import button, or dropped on the page or onto a track. |
 | **Timeline** | Titles, overlay, video and audio tracks, and you can add more. Tracks can be hidden, muted, ducked, or removed when empty. |
 | **Editing** | Move clips (singly or as a group), trim, split, duplicate, delete, or delete and close the gap. Copy and paste works at the playhead. Clips snap to edges, markers and the playhead. Undo and redo cover every edit. |
@@ -84,6 +85,7 @@ Keyboard shortcuts and a user guide are in [help.html](help.html).
 | `quran.js` | The Qur'ān verse video tool (Quran.com API) |
 | `captions.js` | Auto captions (Whisper), captions timed from a pasted text, and subtitle import/export |
 | `occasions.js`, `reframe.js`, `speak.js` + `speak-worker.js`, `mobile.js` | Occasion videos, auto-reframe, Read aloud, the phone layout |
+| `slides.js` | PowerPoint in and out: reading .pptx (pure, DOMParser) and writing .pptx (pure, unit tested), and the editor's open and save dialogs |
 | `ai.js` | The AI video maker: the planner (pure, unit tested) and the builder that makes the video with the editor's tools |
 | `pauses.js` | Sync to the voice: pictures on the pauses, cut at pauses, jump cuts |
 | `transcribe-worker.js` | The Whisper worker, shared with the audio editor |

@@ -823,13 +823,13 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
             <span>Media</span>
             <button id="import"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Import</button>
             <button id="mobile-close-bin" class="show-narrow icon ghost" aria-label="Close media" title="Close media">×</button>
-            <input id="import-input" type="file" multiple accept="video/*,audio/*,image/*" hidden>
+            <input id="import-input" type="file" multiple accept="video/*,audio/*,image/*,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
         </div>
         <div class="panel-body">
             <div id="restore-banner" class="banner" hidden></div>
             <div id="media-empty" class="media-empty">
                 <strong>Drop files here</strong>
-                Video, audio and images. They stay on this device — nothing is uploaded.
+                Video, audio, images and PowerPoint. They stay on this device — nothing is uploaded.
             </div>
             <div id="media-list" class="media-list"></div>
         </div>
@@ -962,6 +962,7 @@ body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px
 <script src="speak.js?v=dev"></script>
 <script src="ai.js?v=dev"></script>
 <script src="tour.js?v=dev"></script>
+<script src="slides.js?v=dev"></script>
 <script src="mobile.js?v=dev"></script>
 <script src="i18n-ar.js?v=dev"></script>
 <script src="i18n.js?v=dev"></script>

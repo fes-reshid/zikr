@@ -503,6 +503,23 @@ async function makePhotos(page) {
     await settle();
     await shot('reframe-result');
 
+    /* 11c. PowerPoint in and out */
+    await page.evaluate(() => { document.querySelectorAll('.modal.generic').forEach((m) => m.remove()); window.ReelApp.apply(window.ReelApp.T.createProject({ width: 1280, height: 720, fps: 30 })); });
+    await page.setInputFiles('#import-input', path.join(SRC, 'test', 'fixtures', 'sample.pptx'));
+    await page.waitForSelector('.modal.generic', { timeout: 20000 });
+    await settle();
+    await shot('pptx-open', dialog());
+    await dialog().getByRole('button', { name: 'Make the video' }).click();
+    await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+    await page.evaluate(() => window.Reel.select(null));
+    await seek(5);
+    await settle();
+    await shot('pptx-made');
+    await menu('file', /Save as PowerPoint/);
+    await settle();
+    await shot('pptx-save', dialog());
+    await closeDialog();
+
     /* 12. On a phone */
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     await phone.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());

@@ -1875,6 +1875,58 @@ async function probeFile(page, bytes) {
         check('and back to English', await ram.evaluate(() => document.getElementById('file').textContent.trim() === 'File' && document.documentElement.lang === 'en'));
         await ram.close();
 
+        /* ------------------------------------------------------- PowerPoint */
+        const JSZip = require(path.join(ROOT, 'vendor', 'jszip.min.js'));
+        const pp = await context.newPage();
+        await pp.goto(base + '/video-editing/');
+        await pp.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+        await pp.evaluate(() => { document.querySelectorAll('.modal.generic').forEach((m) => m.remove()); window.ReelApp.apply(window.ReelApp.T.createProject({ width: 1280, height: 720, fps: 30 })); });
+        await pp.setInputFiles('#import-input', path.join(ROOT, 'test', 'fixtures', 'sample.pptx'));
+        await pp.waitForSelector('.modal.generic', { timeout: 20000 });
+        const ppIntro = await pp.locator('.modal.generic .dialog').textContent();
+        check('importing a .pptx asks how to make the video', /4 slides found in sample\.pptx/.test(ppIntro) && await pp.locator('.modal.generic select').inputValue() === 'deck', ppIntro.slice(0, 120));
+        await pp.locator('.modal.generic').getByText('Show the speaker notes as captions').click();
+        await pp.locator('.modal.generic').getByRole('button', { name: 'Make the video' }).click();
+        await pp.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+        const deck = await pp.evaluate(() => { const p = window.Reel.project; const name = (c) => (p.media.find((m) => m.id === c.mediaId) || {}).name || ''; return {
+            w: p.width, h: p.height, len: window.ReelApp.T.projectDuration(p), texts: p.clips.filter((c) => c.type === 'text').map((c) => ({ t: c.text, color: c.color, align: c.align, font: c.font, start: c.start, wrap: c.wrap })),
+            bgs: p.clips.filter((c) => /^Slide background/.test(name(c))).map((c) => name(c) + '@' + c.start), pic: p.clips.filter((c) => name(c) === 'image1.png').map((c) => ({ scale: c.scale, x: c.x, y: c.y })) }; });
+        const tx = (t) => deck.texts.find((x) => x.t === t);
+        check('each slide becomes part of the video, with its own timing, in the slides’ shape', deck.w === 1920 && deck.h === 1080 && approx(deck.len, 20, 0.01) &&
+            deck.bgs.length === 4 && deck.bgs.some((b) => /103d33/.test(b)), JSON.stringify(deck.bgs) + ' ' + deck.len);
+        check('titles, bullet points and text boxes become editable titles with their colour, alignment and font',
+            !!tx('Welcome to the class') && !!tx('• Be patient\n• Be kind\n• Keep learning') && tx('A golden caption') && tx('A golden caption').color === '#f2d27a' &&
+            tx('A golden caption').align === 'right' && tx('A golden caption').font === 'serif' && tx('بسم الله الرحمن الرحيم') && tx('بسم الله الرحمن الرحيم').font === 'naskh', JSON.stringify(deck.texts.map((x) => x.t)));
+        check('pictures keep their place and size on the slide', deck.pic.length === 1 && approx(deck.pic[0].scale, 0.3, 0.02) && approx(deck.pic[0].x, 0.225, 0.01) && approx(deck.pic[0].y, 0.267, 0.01), JSON.stringify(deck.pic));
+        check('speaker notes can become captions', !!tx('Greet everyone and introduce the topic.') && approx(tx('Greet everyone and introduce the topic.').start, 0, 0.01));
+        // Change a title, then save as PowerPoint.
+        await pp.evaluate(() => { const app = window.ReelApp; const c = app.state.project.clips.find((x) => x.text === 'Welcome to the class'); app.apply(app.T.updateClip(app.state.project, c.id, { text: 'Welcome back' })); });
+        await pp.click('#export');
+        check('the Export window offers Save as PowerPoint too', await pp.locator('#export-pptx').isVisible());
+        await pp.click('#export-pptx');
+        const ppDl = pp.waitForEvent('download', { timeout: 90000 });
+        await pp.locator('.modal.generic').getByRole('button', { name: 'Save .pptx' }).click();
+        const ppFile = await ppDl;
+        const ppPath = path.join(os.tmpdir(), 'reel-test-' + Date.now() + '.pptx');
+        await ppFile.saveAs(ppPath);
+        const outZip = await JSZip.loadAsync(fs.readFileSync(ppPath));
+        const outSlides = Object.keys(outZip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+        const outXml = await Promise.all(outSlides.map((n) => outZip.file(n).async('string')));
+        check('Save as PowerPoint makes a .pptx with a slide for each part, the same timings, and the words as text',
+            /\.pptx$/.test(ppFile.suggestedFilename()) && outSlides.length === 4 && /advTm="4000"/.test(outXml[0]) && /advTm="6000"/.test(outXml[1]) &&
+            outXml[0].includes('<a:t>Welcome back</a:t>') && outXml[2].includes('A golden caption') && outXml[3].includes('بسم الله') && !!outZip.file('ppt/media/image1.jpeg'),
+            outSlides.length + ' slides');
+        // And open it again.
+        await pp.evaluate(() => { document.querySelectorAll('.modal.generic').forEach((m) => m.remove()); window.ReelApp.apply(window.ReelApp.T.createProject({ width: 1280, height: 720, fps: 30 })); });
+        await pp.setInputFiles('#import-input', ppPath);
+        await pp.waitForSelector('.modal.generic', { timeout: 20000 });
+        await pp.locator('.modal.generic').getByRole('button', { name: 'Make the video' }).click();
+        await pp.waitForSelector('.modal.generic', { state: 'detached', timeout: 30000 });
+        const again = await pp.evaluate(() => ({ texts: window.Reel.project.clips.filter((c) => c.type === 'text').map((c) => c.text), len: window.ReelApp.T.projectDuration(window.Reel.project) }));
+        check('a PowerPoint saved here opens again as the same video', again.texts.includes('Welcome back') && again.texts.includes('A golden caption') && approx(again.len, 20, 0.05), JSON.stringify(again));
+        fs.unlinkSync(ppPath);
+        await pp.close();
+
         /* ------------------------------------------------- first-visit tour */
         const tourCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
         const tour = await tourCtx.newPage();
