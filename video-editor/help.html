@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Editor Help &amp; Tutorials — NoorEditor</title>
+<meta name="description" content="Step-by-step tutorials with pictures for the free NoorEditor video editor: your first video, titles in Arabic, Qur’ān verse videos with each word lit up, Ramadan and Eid videos, captions in Afaan Oromoo, Amharic and Somali, Shorts, menus and keyboard shortcuts.">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Marcellus&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink-navy:#1c2b46; --ink-brown:#3c2f26; --muted:#6b5a3f;
+    --parchment:#faf3e0; --parchment-deep:#f2e6c9;
+    --gold:#a97c25; --gold-soft:#d3ac5c;
+    --green:#2e6b58; --green-dark:#1f4f40; --green-bg:#e4efe6;
+    --orange:#c8641e;
+    --surface:#fff; --page:#e9e2cd; --warn-bg:#fff4e6; --wave-bg:#fffaf0; --chip:#fffaf0cc;
+    --ui:'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme=light]){ --ink-navy:#e3e9f2; --ink-brown:#e6dac4; --muted:#b0a286; --parchment:#1e2226; --parchment-deep:#2a2f35; --gold:#d6b061; --gold-soft:#6b5830;
+    --green:#3f9a7c; --green-dark:#8fd3b9; --green-bg:#1d3a30; --surface:#262b31; --page:#111315; --warn-bg:#3a2a18; --wave-bg:#15181b; --chip:rgba(21,24,27,.9); color-scheme:dark; } }
+  :root[data-theme=dark]{ --ink-navy:#e3e9f2; --ink-brown:#e6dac4; --muted:#b0a286; --parchment:#1e2226; --parchment-deep:#2a2f35; --gold:#d6b061; --gold-soft:#6b5830;
+    --green:#3f9a7c; --green-dark:#8fd3b9; --green-bg:#1d3a30; --surface:#262b31; --page:#111315; --warn-bg:#3a2a18; --wave-bg:#15181b; --chip:rgba(21,24,27,.9); color-scheme:dark; }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth; scroll-padding-top:80px;}
+  html,body{overflow-x:hidden;}
+  body{margin:0; background:var(--page); color:var(--ink-brown); font-family:var(--ui); font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;}
+  a{color:var(--green-dark);}
+  kbd{font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.8em; background:var(--surface); border:1px solid var(--gold-soft); border-bottom-width:2px; border-radius:4px; padding:0 5px; white-space:nowrap;}
+  .m{font-weight:600; color:var(--ink-navy); white-space:nowrap;} /* menu path */
+
+  header.site{position:sticky; top:0; z-index:50; background:var(--parchment); backdrop-filter:blur(6px); border-bottom:1px solid var(--gold-soft);}
+  .nav-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; max-width:1200px; margin:0 auto;}
+  .brand{display:flex; align-items:center; gap:10px; text-decoration:none;}
+  .brand-mark{width:36px; height:36px; border-radius:50%; background:var(--green); color:var(--parchment); display:flex; align-items:center; justify-content:center; font-size:18px; flex:none;}
+  .brand-text{font-family:'Marcellus'; font-size:20px; color:var(--ink-navy); line-height:1.1;}
+  .brand-text small{display:block; font-family:'Cormorant Garamond'; font-size:14px; color:var(--gold);}
+  .head-actions{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;}
+  .pill{font-size:14px; text-decoration:none; color:var(--green-dark); border:1px solid var(--gold-soft); border-radius:20px; padding:6px 14px; background:var(--surface); white-space:nowrap;}
+  .pill.primary{background:var(--green); color:var(--parchment); border-color:var(--green);}
+
+  .hero{max-width:1200px; margin:0 auto; padding:34px 16px 10px;}
+  .hero h1{font-family:'Marcellus'; font-weight:400; color:var(--ink-navy); font-size:clamp(28px,4vw,40px); margin:0 0 6px;}
+  .hero p{font-family:'Cormorant Garamond'; font-size:20px; color:var(--muted); margin:0; max-width:760px;}
+  .search{margin-top:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+  .search input{flex:1 1 280px; max-width:520px; font:inherit; padding:10px 14px; border:1.5px solid var(--gold-soft); border-radius:24px; background:var(--surface);}
+  .search span{font-size:14px; color:var(--muted);}
+
+  .layout{max-width:1200px; margin:0 auto; padding:16px 16px 80px; display:grid; grid-template-columns:250px minmax(0,1fr); gap:28px; align-items:start;}
+  nav.toc{position:sticky; top:84px; max-height:calc(100vh - 100px); overflow:auto; background:var(--parchment); border:1.5px solid var(--gold-soft); border-radius:14px; padding:12px 8px; font-size:14px;}
+  nav.toc h2{font-family:'Marcellus'; font-weight:400; font-size:16px; color:var(--ink-navy); margin:4px 10px 6px;}
+  nav.toc a{display:block; text-decoration:none; color:var(--ink-brown); padding:4px 10px; border-radius:6px;}
+  nav.toc a:hover{background:var(--green-bg);}
+  nav.toc a.sub{padding-left:22px; font-size:13.5px; color:var(--muted);}
+  nav.toc a.on{background:var(--green-bg); color:var(--green-dark); font-weight:600;}
+  details.toc-mobile{display:none;}
+  @media (max-width:900px){
+    .layout{grid-template-columns:minmax(0,1fr);}
+    nav.toc{display:none;}
+    details.toc-mobile{display:block; background:var(--parchment); border:1.5px solid var(--gold-soft); border-radius:12px; padding:10px 14px; margin-bottom:6px;}
+    details.toc-mobile summary{font-weight:600; cursor:pointer; color:var(--ink-navy);}
+    details.toc-mobile a{display:block; padding:3px 0; text-decoration:none;}
+  }
+
+  section.card{background:var(--parchment); border:1.5px solid var(--gold-soft); border-radius:14px; box-shadow:0 6px 18px rgba(60,45,20,.07); padding:22px 24px; margin-bottom:22px;}
+  section.card.hidden{display:none;}
+  section.card h2{font-family:'Marcellus'; font-weight:400; color:var(--ink-navy); font-size:26px; margin:0 0 8px;}
+  section.card h3{font-family:'Marcellus'; font-weight:400; color:var(--ink-navy); font-size:19px; margin:22px 0 6px;}
+  .lead{color:var(--muted); margin:0 0 12px;}
+  .tut-head{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;}
+  .tag{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--gold); border:1px solid var(--gold-soft); border-radius:999px; padding:1px 9px; background:var(--surface);}
+  ol.steps{counter-reset:step; list-style:none; padding:0; margin:12px 0 0;}
+  ol.steps > li{counter-increment:step; position:relative; padding:4px 0 10px 44px;}
+  ol.steps > li::before{content:counter(step); position:absolute; left:0; top:2px; width:30px; height:30px; border-radius:50%; background:var(--green); color:var(--parchment); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;}
+  .tip, .warn{border-radius:10px; padding:10px 14px; margin:12px 0 0; font-size:15px;}
+  .tip{background:var(--green-bg); border:1px solid #b9d3c3;}
+  .warn{background:var(--warn-bg); border:1px solid #e2a15a;}
+  .tip b, .warn b{color:var(--ink-navy);}
+  table{width:100%; border-collapse:collapse; font-size:14.5px; margin-top:8px;}
+  th, td{text-align:left; padding:7px 8px; border-bottom:1px solid rgba(169,124,37,.22); vertical-align:top;}
+  th{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--gold); font-weight:600;}
+  td:first-child{white-space:nowrap; font-weight:600; color:var(--ink-navy);}
+  .table-wrap{overflow-x:auto;}
+  .grid2{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:14px; margin-top:12px;}
+  .mini{background:var(--surface); border:1px solid var(--gold-soft); border-radius:12px; padding:12px 14px;}
+  .mini h4{margin:0 0 4px; font-size:15px; color:var(--ink-navy);}
+  .mini p{margin:0; font-size:14px; color:var(--muted);}
+  .mini a{font-size:14px;}
+
+
+  figure{margin:16px 0 18px;}
+  figure img{display:block; width:100%; height:auto; border-radius:10px; border:1px solid var(--gold-soft); background:#14161a;}
+  figure.small img{max-width:460px;} figure.medium img{max-width:680px;} figure.panel img{max-width:300px;} figure.phone img{max-width:280px;}
+  figcaption{font-size:14px; color:var(--muted); margin-top:6px;}
+  .phones{display:flex; gap:18px; flex-wrap:wrap;}
+  .mini{display:flex; flex-direction:column;}
+  .mini img{width:100%; aspect-ratio:16/10; object-fit:cover; object-position:top; border-radius:8px; margin:0 0 8px; border:1px solid var(--gold-soft); background:#14161a;}
+  .mini .tag{align-self:flex-start; margin-bottom:6px;}
+  .mini a{margin-top:auto; padding-top:6px;}
+  .chips{display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 4px;}
+  .chips button{font:inherit; font-size:14px; border:1px solid var(--gold-soft); background:var(--surface); color:var(--ink-brown); border-radius:999px; padding:5px 14px; cursor:pointer;}
+  .chips button.on{background:var(--green); border-color:var(--green); color:var(--parchment);}
+  .map{position:relative; margin-top:10px;}
+  .map img{display:block; width:100%; height:auto; border-radius:10px; border:1px solid var(--gold-soft);}
+  .map .pin{position:absolute; transform:translate(-50%,-50%); width:28px; height:28px; border-radius:50%; background:var(--orange); color:#fff; border:2px solid #fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; text-decoration:none; box-shadow:0 2px 8px rgba(0,0,0,.4);}
+  .map .pin:hover{transform:translate(-50%,-50%) scale(1.15);}
+  ol.legend{margin:12px 0 0; padding-left:24px;} ol.legend li{margin:3px 0;}
+  footer{background:var(--ink-navy); color:#c9d2e0; padding:26px 16px; text-align:center; font-size:14px;}
+  footer a{color:#fff;}
+  .noresults{display:none; text-align:center; color:var(--muted); padding:30px;}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="nav-row">
+    <a class="brand" href="./">
+      <span class="brand-mark">▶</span>
+      <span class="brand-text">Video Editor Help<small>NoorEditor</small></span>
+    </a>
+    <div class="head-actions">
+      <a class="pill primary" href="./">Open the editor</a>
+      <a class="pill" href="../audio-editor/help.html">Audio editor help</a>
+      <a class="pill" href="/">NoorEditor</a>
+    </div>
+  </div>
+</header>
+
+<div class="hero">
+  <h1>Help &amp; Tutorials</h1>
+  <p>Everything the video editor can do, explained step by step with pictures — from your first video to Qur’ān verse videos, captions in your language and Shorts.</p>
+  <div class="search">
+    <input id="q" type="search" placeholder="Search the help — e.g. Qur’ān, captions, split, watermark…" aria-label="Search the help">
+    <span id="qInfo"></span>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="toc" id="toc" aria-label="Contents"></nav>
+  <main id="content">
+    <details class="toc-mobile" id="tocMobile"><summary>Contents</summary><div></div></details>
+
+<section class="card" id="start">
+<h2>Getting started</h2>
+<p class="lead">The editor in one picture. Hover a number to see what it is.</p>
+<div class="map">
+  <img src="help-img/screen-map.jpg" width="1440" height="900" alt="The video editor, with numbered parts">
+  <a class="pin" style="left:17%;top:2.6%" href="#t-save" title="Projects and frame size">1</a>
+  <a class="pin" style="left:80%;top:2.6%" href="#menus" title="The menu bar">2</a>
+  <a class="pin" style="left:95.5%;top:7.5%" href="#t-export" title="Export">3</a>
+  <a class="pin" style="left:8%;top:42%" href="#t-first" title="Media">4</a>
+  <a class="pin" style="left:49%;top:20%" href="#t-titles" title="Preview">5</a>
+  <a class="pin" style="left:43%;top:60.8%" href="#t-first" title="Play controls">6</a>
+  <a class="pin" style="left:90%;top:42%" href="#t-titles" title="Details of the selected clip">7</a>
+  <a class="pin" style="left:24%;top:66.2%" href="#t-edit" title="Timeline tools">8</a>
+  <a class="pin" style="left:60%;top:85%" href="#t-edit" title="The timeline">9</a>
+</div>
+<ol class="legend">
+  <li><b>Project tabs, name and frame size</b> — work on up to five videos at once.</li>
+  <li><b>Menu bar</b> — File, Edit, View, Create, Tools and Help.</li>
+  <li><b>Export</b> — make the video file.</li>
+  <li><b>Media</b> — your imported videos, photos and sounds. Double-click one to add it.</li>
+  <li><b>Preview</b> — drag titles and pictures here to move them; drag the corner to resize.</li>
+  <li><b>Play controls</b> — play, step frame by frame, and save the frame as a picture.</li>
+  <li><b>Details</b> — the settings of the selected clip, or of the project when nothing is selected.</li>
+  <li><b>Timeline tools</b> — Split, Delete, Duplicate, Title, Write, Draw, Marker and new tracks.</li>
+  <li><b>Timeline</b> — titles on top, then video and pictures, then sound. Drag clips to move and trim them.</li>
+</ol>
+<div class="tip"><b>New here?</b> A short tour shows the parts of the screen the first time you open the editor (again any time from <span class="m">Help ▸ Take the tour</span>). Then try <a href="#t-first">Your first video in five minutes</a>.</div>
+<div class="tip"><b>Timeline too small or too big?</b> Press the <b>▲</b> / <b>▼</b> buttons at the right end of the timeline toolbar, or drag the bar between the video and the timeline.</div>
+<div class="tip"><b>العربية / Arabic:</b> choose <span class="m">View ▸ Language ▸ العربية</span> (on a phone: <b>☰ ▸ Language</b>). Menus, buttons, the details panel and windows switch to Arabic and read right to left; the preview and timeline stay left to right. Your choice is remembered.</div>
+</section>
+<section class="card" id="tutorials">
+<h2>Tutorials</h2>
+<p class="lead">Pick a topic, or search above.</p>
+<div class="chips" id="chips"></div>
+<div class="grid2" id="tutIndex"></div>
+</section>
+<section class="card tut" id="t-ai" data-title="✨ AI video maker — coming soon" data-tag="AI" data-thumb="help-img/menus-create.jpg">
+<div class="tut-head"><h2>✨ AI video maker — coming soon</h2><span class="tag">AI</span></div>
+<p class="lead">Coming soon, in shā’ Allāh: describe a video, add your photos, videos and sound, and the AI will make it for you. The gold <b>✨ AI</b> button at the top will open it.</p>
+<div class="tip">Until then, <span class="m">Create ▸ Templates</span>, <a href="#t-trends">Trending templates</a> and <span class="m">Create ▸ Occasion video</span> make a ready video in a few clicks.</div>
+</section>
+<section class="card tut" id="t-first" data-title="Your first video in five minutes" data-tag="Beginner" data-thumb="help-img/first-title.jpg">
+<div class="tut-head"><h2>Your first video in five minutes</h2><span class="tag">Beginner</span></div>
+<p class="lead">You need a few photos or clips, and a voice, recitation or nasheed.</p>
+<ol class="steps">
+<li>Press <b>Import</b> (top left), or <span class="m">File ▸ Import video, audio or pictures…</span>, and choose your files — or drop them anywhere on the page. They appear under <b>Media</b>.</li>
+<li><b>Double-click</b> each photo or clip to put it on the timeline, one after another. Photos fade in and zoom slowly by themselves.</li>
+</ol><figure><img src="help-img/first-photos.jpg" width="1440" height="900" loading="lazy" alt="Photos in the media list (left) and on the video track V1 (bottom)."><figcaption>Photos in the media list (left) and on the video track V1 (bottom).</figcaption></figure><ol class="steps" start="3" style="counter-reset:step 2">
+<li>Double-click the sound too: it goes on the audio track <b>A1</b>, where you can see its waveform.</li>
+<li>Move the red playhead to where a title should appear and press <b>Title</b> (or <kbd>T</kbd>). Type your words straight away; change the font, size and colour on the right.</li>
+</ol><figure><img src="help-img/first-title.jpg" width="1440" height="900" loading="lazy" alt="A title on track T1. Drag it on the picture to move it; its settings are on the right."><figcaption>A title on track T1. Drag it on the picture to move it; its settings are on the right.</figcaption></figure><ol class="steps" start="5" style="counter-reset:step 4">
+<li>Press <kbd>Space</kbd> to watch it. Drag the ends of a clip to make it longer or shorter.</li>
+<li>Press <b>Export</b>, choose the format and quality, and press <b>Export</b> again. The video is made on your device and saved to your Downloads.</li>
+</ol><figure class="small"><img src="help-img/first-export.jpg" width="440" height="404" loading="lazy" alt="The Export window."><figcaption>The Export window.</figcaption></figure><div class="tip"><b>Where does it go?</b> Exported videos go to your browser’s <em>Downloads</em> folder. Nothing is uploaded.</div>
+</section>
+
+<section class="card tut" id="t-pptx" data-title="PowerPoint: open slides as a video, save a video as slides" data-tag="Beginner" data-thumb="help-img/pptx-made.jpg">
+<div class="tut-head"><h2>PowerPoint: open slides as a video, and save any video as slides</h2><span class="tag">Beginner</span></div>
+<h3>Open a PowerPoint as an editable video</h3>
+<ol class="steps">
+<li>Press <b>Import</b> and choose a <b>.pptx</b> file — or drop it on the page, or use <span class="m">File ▸ Open a PowerPoint (.pptx) as a video…</span>.</li>
+<li>Choose how long each slide shows (or keep the presentation’s own timings), whether slides fade into each other, and whether the speaker notes become captions.<figure class="medium"><img src="help-img/pptx-open.jpg" width="440" height="342" loading="lazy" alt="Opening a PowerPoint: slide timing, fade and speaker notes."><figcaption>Choose the timing, fade and speaker notes.</figcaption></figure></li>
+<li>Press <b>Make the video</b>. Each slide’s background, pictures and text boxes are placed on the timeline — every text box is a title you can edit, move, restyle or animate, and every picture can be moved or resized.<figure><img src="help-img/pptx-made.jpg" width="1440" height="900" loading="lazy" alt="A presentation on the timeline: backgrounds, pictures and text on their own tracks."><figcaption>Slides on the timeline: backgrounds, pictures and text on their own tracks.</figcaption></figure></li>
+</ol>
+<h3>Save any video as a PowerPoint</h3>
+<ol class="steps">
+<li>Use <span class="m">File ▸ Save as PowerPoint (.pptx)…</span>, or <b>Save as PowerPoint…</b> in the Export window. It works for every video — one made here, a template, a Qur’an or Eid video, or an opened presentation.</li>
+<li>Each change of picture becomes a slide. Titles stay editable text boxes with their font, size and colour; pictures, videos, drawings and stickers become the slide’s background picture; slides advance by themselves with the video’s timing.<figure class="medium"><img src="help-img/pptx-save.jpg" width="440" height="346" loading="lazy" alt="Save as PowerPoint."><figcaption>Save as PowerPoint.</figcaption></figure></li>
+</ol>
+<div class="tip">Not brought in from PowerPoint yet: charts, tables, SmartArt, drawn shapes without text, animations and sound. A saved PowerPoint has no sound — export the video (MP4) for that.</div>
+</section>
+<section class="card tut" id="t-edit" data-title="Cut, trim, split, move and delete clips" data-tag="Beginner" data-thumb="help-img/edit-timeline.jpg">
+<div class="tut-head"><h2>Cut, trim, split, move and delete clips</h2><span class="tag">Beginner</span></div>
+<ol class="steps">
+<li><b>Select</b> a clip by clicking it. <kbd>Shift</kbd>- or <kbd>Ctrl</kbd>-click to select more; <kbd>Ctrl</kbd>+<kbd>A</kbd> selects everything.</li>
+<li><b>Move</b> it by dragging — also onto another track of the same kind. Clips snap to edges, markers and the playhead; turn this off with <b>Snap</b>.</li>
+<li><b>Trim</b> by dragging either end of a clip.</li>
+<li><b>Split</b> at the playhead with <b>Split</b> or <kbd>S</kbd>. The clip becomes two that you can move, delete or style separately.</li>
+</ol><figure><img src="help-img/edit-timeline.jpg" width="1440" height="360" loading="lazy" alt="dawn.png split at the playhead into two clips; the first one is selected."><figcaption>dawn.png split at the playhead into two clips; the first one is selected.</figcaption></figure><ol class="steps" start="5" style="counter-reset:step 4">
+<li><b>Delete</b> with <kbd>Del</kbd>. <kbd>Shift</kbd>+<kbd>Del</kbd> also closes the gap, pulling everything after it to the left.</li>
+<li><b>Copy and paste</b> with <kbd>Ctrl</kbd>+<kbd>C</kbd> and <kbd>Ctrl</kbd>+<kbd>V</kbd> (pastes at the playhead), or <b>Duplicate</b> with <kbd>Ctrl</kbd>+<kbd>D</kbd>.</li>
+<li><b>Undo</b> anything with <kbd>Ctrl</kbd>+<kbd>Z</kbd>; redo with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>.</li>
+</ol><div class="tip"><b>More:</b> select a video or audio clip to change its <b>Speed</b> (¼× to 4×, voices keep their pitch). Put the playhead on a video and press <kbd>F</kbd> for a <b>freeze frame</b>. Press <kbd>M</kbd> to add a <b>marker</b>; <span class="m">Edit ▸ Copy chapters for YouTube</span> turns markers into chapters.</div>
+</section>
+
+<section class="card tut" id="t-titles" data-title="Titles in English and Arabic" data-tag="Beginner" data-thumb="help-img/title-inspector.jpg">
+<div class="tut-head"><h2>Titles in English and Arabic — fonts, styles and animation</h2><span class="tag">Beginner</span></div>
+<ol class="steps">
+<li>Press <b>Title</b> (<kbd>T</kbd>) to add a title at the playhead and type in the box on the right. Arabic is written right to left by itself.</li>
+<li>Choose a <b>title style</b> in one click — Big title, Lower-third bar, Subtitle, Quote card or Arabic verse — or set the <b>Font</b>, size, colour, box and outline yourself. For Arabic choose <b>Amiri</b>, <b>Scheherazade New</b>, <b>Noto Naskh Arabic</b>, <b>Reem Kufi</b> or <b>Cairo</b>.</li>
+</ol><figure class="panel"><img src="help-img/title-inspector.jpg" width="290" height="485" loading="lazy" alt="A title’s settings: styles, text, Write by hand, font, size and colour."><figcaption>A title’s settings: styles, text, Write by hand, font, size and colour.</figcaption></figure><ol class="steps" start="3" style="counter-reset:step 2">
+<li>Under <b>Animation</b> choose how it comes in — fade, rise, pop, slide, drop, zoom, spin, flip, blur, bounce, swing, typewriter, word by word or handwriting — and how it leaves (<b>Exit</b>).</li>
+<li>Drag the title on the picture to move it; drag the corner handle to resize it. Double-click it to edit the words right there.</li>
+</ol><div class="tip"><b>Readable over busy pictures:</b> turn on <b>Box</b> or <b>Outline</b>.</div>
+</section>
+
+<section class="card tut" id="t-transitions" data-title="Transitions between clips" data-tag="Beginner" data-thumb="help-img/transitions.jpg">
+<div class="tut-head"><h2>Transitions between clips</h2><span class="tag">Beginner</span></div>
+<ol class="steps">
+<li>Put two clips next to each other on the same track so they touch (they snap together).</li>
+<li>Select the second clip and choose a transition under <b>Transition in</b> — crossfade, dip to black, slide, push, wipe, zoom, iris or blur — and its length.</li>
+<li>Or open <span class="m">Tools ▸ Transition gallery…</span> to watch each one first and apply it to the selected cut or to every cut.</li>
+</ol><figure class="medium"><img src="help-img/transitions.jpg" width="680" height="520" loading="lazy" alt="The transition gallery: each one plays as a preview."><figcaption>The transition gallery: each one plays as a preview.</figcaption></figure><div class="tip"><span class="m">Edit ▸ Transition on every cut…</span> puts the same transition between all touching clips in one step.</div>
+</section>
+
+<section class="card tut" id="t-export" data-title="Export and share your video" data-tag="Beginner" data-thumb="help-img/first-export.jpg">
+<div class="tut-head"><h2>Export and share your video</h2><span class="tag">Beginner</span></div>
+<ol class="steps">
+<li>Press <b>Export</b> (top right).</li>
+<li>Under <b>Made for</b>, pick where it will go: <b>YouTube</b>, <b>YouTube Shorts</b>, <b>TikTok</b>, <b>Instagram Reels</b> or <b>Facebook</b> (or <b>Anywhere</b>). The editor checks the frame and the length for that site, picks MP4 at high quality, and if the shape is wrong offers <b>Change the frame to 9:16</b> (or 16:9) — or <b>Make a Short</b>, which follows faces.<figure class="small"><img src="help-img/export-made-for.jpg" width="440" height="544" loading="lazy" alt="Made for YouTube Shorts: this wide video needs a tall frame, with a one-tap fix."><figcaption>Made for YouTube Shorts: this wide video needs a tall frame, with a one-tap fix.</figcaption></figure></li>
+<li>Choose the <b>format</b>: <b>Fast</b> formats render every frame exactly and usually finish quicker than the video plays. Chrome, Edge and Safari make MP4; Firefox makes WebM.</li>
+<li>Choose the <b>quality</b> and press <b>Export</b>. You can switch to another tab while a fast export works.</li>
+<li>When it is done, download it, or press <b>Share video…</b>, <b>WhatsApp</b> or <b>Telegram</b>. On phones the video itself goes to the app you choose.</li>
+<li>To post it, press a button under <b>Post on</b>. <b>On a phone</b> the share list opens: pick YouTube, TikTok, Instagram or Facebook and the video goes straight into that app. <b>On a computer</b> the site’s upload page opens: choose the video you just downloaded. A caption (the title, plus <em>#Shorts</em> for Shorts) is copied for you — paste it in.<figure class="small"><img src="help-img/export-post.jpg" width="440" height="310" loading="lazy" alt="After export: share, or post on YouTube, Shorts, TikTok, Instagram or Facebook."><figcaption>After export: share, or post on YouTube, Shorts, TikTok, Instagram or Facebook.</figcaption></figure></li>
+</ol><div class="tip">The camera button under the preview saves the current frame as a picture — handy for a thumbnail.</div><div class="tip"><b>Why not post directly?</b> YouTube, TikTok, Instagram and Facebook only accept uploads through their own apps and websites, so NoorEditor hands the finished video to them. Your video never passes through NoorEditor’s servers.</div><div class="warn"><b>Watermark:</b> videos carry a small NoorEditor.web.app mark in the top-right corner. NoorEditor Pro removes it.</div>
+</section>
+
+<section class="card tut" id="t-save" data-title="Save your work and continue later" data-tag="Beginner" data-thumb="help-img/projects.jpg">
+<div class="tut-head"><h2>Save your work, continue later and work on several videos</h2><span class="tag">Beginner</span></div>
+<ol class="steps">
+<li>Your project is <b>saved in this browser as you work</b>, with copies of the files you imported, so it opens again just as you left it.</li>
+<li><span class="m">File ▸ My projects…</span> shows every project you have made in this browser, with a picture, its length and when it was changed. Open one, <b>Duplicate</b> it or <b>Delete</b> it.</li>
+</ol><figure class="medium"><img src="help-img/projects.jpg" width="680" height="442" loading="lazy" alt="My projects."><figcaption>My projects.</figcaption></figure><ol class="steps" start="3" style="counter-reset:step 2">
+<li>The <b>+</b> next to the project name opens another project in a <b>new tab</b>: up to five videos at once, each with its own timeline and undo.</li>
+<li><span class="m">File ▸ Save as a file</span> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) downloads the project as a small file to keep or move to another computer; open it there with <span class="m">File ▸ Open a project file…</span> and import the same media again.</li>
+</ol><div class="warn">Clearing your browser’s site data removes the saved projects. Save important projects as a file, and keep your exported videos.</div>
+</section>
+
+<section class="card tut" id="t-quran" data-title="A Qur’ān video with each word lit up" data-tag="Islamic" data-thumb="help-img/quran-frame.jpg">
+<div class="tut-head"><h2>A Qur’ān verse video with each word lit up</h2><span class="tag">Islamic</span></div>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Qur’ān verse video…</span>.</li>
+<li>Choose the sūrah, the first and last āyah, the reciter (Quran.com’s reciters and more from EveryAyah) and a translation — over thirty languages, including Afaan Oromoo, Amharic, Somali, Hausa and Swahili.</li>
+<li>Tick <b>Highlight each word as it is recited</b>, choose the frame (vertical for Reels and Shorts), background and Arabic font, then press <b>Make video</b>.</li>
+</ol><figure class="medium"><img src="help-img/quran-dialog.jpg" width="680" height="418" loading="lazy" alt="The Qur’ān verse video window."><figcaption>The Qur’ān verse video window.</figcaption></figure><p>The recitation, the Arabic with its āyah number and the translation are placed āyah by āyah, and the word being recited glows gold.</p><figure><img src="help-img/quran-frame.jpg" width="900" height="485" loading="lazy" alt="The word being recited is lit up."><figcaption>The word being recited is lit up.</figcaption></figure><div class="tip">Everything it adds is ordinary clips: change fonts, colours or timing like any title. It is one step to undo.</div>
+</section>
+
+<section class="card tut" id="t-quran-scenes" data-title="A Qur’ān video with a new background each āyah" data-tag="Islamic" data-thumb="help-img/quran-scenes-result.jpg">
+<div class="tut-head"><h2>A Qur’ān video with a new background each āyah</h2><span class="tag">Islamic</span></div>
+<ol class="steps">
+<li>In <span class="m">Create ▸ Qur’ān verse video…</span>, choose the sūrah, āyāt and reciter as usual.</li>
+<li>Under <b>Background</b> choose one of <b>A new background each āyah</b>: painted scenes (Nature, Jumu‘ah, Ramadan, Laylat al-Qadr, Hajj), or <b>My photos</b> once you have imported two or more pictures.</li>
+</ol><figure class="medium"><img src="help-img/quran-scenes-dialog.jpg" width="680" height="418" loading="lazy" alt="Background: painted Jumu‘ah scenes, a new one each āyah."><figcaption>Background: painted Jumu‘ah scenes, a new one each āyah.</figcaption></figure><ol class="steps" start="3" style="counter-reset:step 2">
+<li>Press <b>Make video</b>. Each picture starts exactly where the reciter begins its āyah, with a slow zoom and a crossfade.</li>
+</ol><figure><img src="help-img/quran-scenes-result.jpg" width="1440" height="900" loading="lazy" alt="Each picture on track V3 starts with its āyah."><figcaption>Each picture on track V3 starts with its āyah.</figcaption></figure>
+</section>
+
+<section class="card tut" id="t-occasion" data-title="A Ramadan, Eid, Jumu‘ah or Hajj video" data-tag="Islamic" data-thumb="help-img/occasion-result.jpg">
+<div class="tut-head"><h2>A Ramadan, Eid, Jumu‘ah or Hajj video in one click</h2><span class="tag">Islamic</span></div>
+<ol class="steps">
+<li>Put a recitation or nasheed on the timeline (optional — without one each scene stays four seconds).</li>
+<li>Open <span class="m">Create ▸ Occasion video…</span> and choose Ramadan, Eid al-Fitr, Eid al-Adha, Jumu‘ah, Hajj, Laylat al-Qadr or Nature. Its five painted scenes show straight away.</li>
+<li>Change the greeting, the Arabic, the second line and the closing line if you like.</li>
+</ol><figure class="medium"><img src="help-img/occasion-dialog.jpg" width="680" height="454" loading="lazy" alt="Occasion video: the painted scenes for Ramadan and the greeting."><figcaption>Occasion video: the painted scenes for Ramadan and the greeting.</figcaption></figure><ol class="steps" start="4" style="counter-reset:step 3">
+<li>Press <b>Make video</b>. The scenes change on the pauses of the voice, with the greeting on top.</li>
+</ol><figure><img src="help-img/occasion-result.jpg" width="1440" height="900" loading="lazy" alt="The greeting over the first scene."><figcaption>The greeting over the first scene.</figcaption></figure>
+</section>
+
+<section class="card tut" id="t-trends" data-title="Trending templates and text designs" data-tag="Design" data-thumb="help-img/trends-examples.jpg">
+<div class="tut-head"><h2>Trending templates and text designs</h2><span class="tag">Design</span></div>
+<p>Ten short-video styles with fast cuts and bold captions — a bold hook, a photo dump, a 3-2-1 reveal, neon, before &amp; after, a highlighted quote, film memories, word-by-word captions, a spotlight announcement and a travel intro. They are made in NoorEditor from scratch, in the styles people love on Reels, Shorts and TikTok.</p>
+<ol class="steps">
+<li><b>Import your pictures or videos first</b> (Media ▸ Import) if the template has photo slots — the newest ones go into the slots. Without them, painted backgrounds fill in.</li>
+<li>Open <span class="m">Create ▸ Trending templates (Reels, Shorts, TikTok)…</span>, pick a style, and change the three lines.<figure class="medium"><img src="help-img/trends.jpg" width="680" height="766" loading="lazy" alt="The trending templates: each card shows its style and how many photo slots it has."><figcaption>The trending templates: each card shows its style and how many photo slots it has.</figcaption></figure></li>
+<li>Press <b>Use template</b>. In an empty project you choose the shape first (tall 9:16 is ready for Reels, Shorts and TikTok); otherwise it is added after what is on your timeline.<figure class=""><img src="help-img/trends-examples.jpg" width="1100" height="400" loading="lazy" alt="Bold hook, Neon nights, Before &amp; after, Highlighted quote and Spotlight announcement."><figcaption>Bold hook, Neon nights, Before &amp; after, Highlighted quote and Spotlight announcement.</figcaption></figure></li>
+<li>Click any part to change it — words, pictures, timing, transitions. One <b>Undo</b> takes the whole template off.</li>
+</ol>
+<h3>Text designs</h3>
+<ol class="steps">
+<li>Select a title and, in the details panel, press <b>✦ Text designs…</b>.</li>
+<li>Tap a design: bold caption, yellow hook, neon pink or blue, highlighter, red label, comic pop, elegant gold, typewriter note, word by word, Arabic gold, soft pastel or big number.<figure class="medium"><img src="help-img/text-designs.jpg" width="680" height="634" loading="lazy" alt="Each design is shown with your own words."><figcaption>Each design is shown with your own words.</figcaption></figure></li>
+<li>Fine-tune it in the details panel: size, colours, outline, and the new <b>Neon glow</b> with its colour.</li>
+</ol>
+<div class="tip">These are NoorEditor’s own designs — nothing is copied from other apps, so everything you make is yours to post.</div>
+</section>
+<section class="card tut" id="t-ramadan" data-title="Ramadan pack: greetings and 30 daily reminders" data-tag="Islamic" data-thumb="help-img/ramadan-day.jpg">
+<div class="tut-head"><h2>Ramadan pack: a greeting for someone, and a reminder for every day</h2><span class="tag">Islamic</span></div>
+<h3>A greeting with their name</h3>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Occasion greeting for someone (with their name)…</span>.</li>
+<li>Choose the occasion — Ramadan, Eid al-Fitr, Eid al-Adha, Laylat al-Qadr or Jumu‘ah — and type who it is <b>To</b> and who it is <b>From</b>. Change the message if you like.</li>
+<li>Pick the <b>Shape</b>: <em>Phone status, Reels, Shorts</em> (tall), a square post, or YouTube (wide). Press <b>Make greeting</b>.<figure class="small"><img src="help-img/ramadan-greeting.jpg" width="739" height="450" loading="lazy" alt="A tall Eid greeting for Amina, ready for WhatsApp Status."><figcaption>A tall Eid greeting for Amina, ready for WhatsApp Status.</figcaption></figure></li>
+<li>Press <kbd>Space</kbd> to watch, then <b>Export</b> and send it — see <a href="#t-export">Export and share</a>.</li>
+</ol>
+<h3>Ramadan daily reminders (30 days)</h3>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Ramadan daily reminders (30 days)…</span> and choose the <b>Day</b>. Each day has its own theme and an ayah or hadith with its reference.<figure class="medium"><img src="help-img/ramadan-series.jpg" width="680" height="494" loading="lazy" alt="The reminder for day 5, ready to change."><figcaption>The reminder for day 5, ready to change.</figcaption></figure></li>
+<li>Change any line — use your own translation or your own language. Add your channel or masjid to the <b>Closing line</b> (your brand kit’s name is filled in for you).</li>
+<li>Choose the shape and press <b>Make this day’s video</b>.<figure class="medium"><img src="help-img/ramadan-day.jpg" width="739" height="450" loading="lazy" alt="Day 5: the theme, the ayah and its reference on a painted Ramadan scene."><figcaption>Day 5: the theme, the ayah and its reference on a painted Ramadan scene.</figcaption></figure></li>
+<li>Come back each day for the next one. If your project already has something in it, the new video opens in its own tab, so nothing is lost.</li>
+</ol>
+<div class="tip"><b>More for Ramadan and Eid:</b> <span class="m">Create ▸ Templates…</span> now has an iftar invitation, a suhoor reminder, taraweeh times, a Ramadan timetable, Ramadan goals, a Qur’an completion (khatm), a Zakat al-Fitr reminder, an Eid prayer announcement and an Eid greeting from your family.</div>
+<div class="warn">The reminders are short English renderings with their references. Check the wording against your trusted source before sharing, and keep the reference with the text.</div>
+</section>
+<section class="card tut" id="t-hadith" data-title="A hadith video" data-tag="Islamic" data-thumb="help-img/hadith.jpg">
+<div class="tut-head"><h2>A hadith video</h2><span class="tag">Islamic</span></div>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Hadith video…</span>.</li>
+<li>Choose a hadith, the languages to show and the look, then press the button to make it.</li>
+</ol><figure class="medium"><img src="help-img/hadith.jpg" width="680" height="820" loading="lazy" alt="The hadith video window."><figcaption>The hadith video window.</figcaption></figure><div class="tip">The hadith is laid out as titles you can edit, so you can add your own recitation, background or brand kit afterwards.</div>
+</section>
+
+<section class="card tut" id="t-lyrics" data-title="Nasheed lyrics on screen" data-tag="Islamic" data-thumb="help-img/lyrics.jpg">
+<div class="tut-head"><h2>Nasheed lyrics on screen</h2><span class="tag">Islamic</span></div>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Nasheed lyrics…</span>.</li>
+<li>Choose one of the original verses in English or Arabic, or type your own, and choose how each line appears: highlighted word by word, faded in, or written by hand.</li>
+<li>Add your own vocal recording for the sound. <span class="m">Create ▸ Sync lyrics to vocals…</span> times the lines to the voice on your device.</li>
+</ol><figure class="medium"><img src="help-img/lyrics.jpg" width="680" height="794" loading="lazy" alt="Nasheed lyrics."><figcaption>Nasheed lyrics.</figcaption></figure><div class="tip">No songs or instruments are included — only the words, and your own voice.</div>
+</section>
+
+<section class="card tut" id="t-templates" data-title="Start from a template" data-tag="Creative" data-thumb="help-img/templates.jpg">
+<div class="tut-head"><h2>Start from a template — posters, invitations and reminders</h2><span class="tag">Creative</span></div>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Templates…</span> and pick one: lectures, halaqas, Ramadan and Eid, Zoom classes, competitions and many more.</li>
+<li>Fill in the title, speaker, date and place underneath, choose the format (video, poster or story) and press <b>Use template</b>.</li>
+</ol><figure class="medium"><img src="help-img/templates.jpg" width="680" height="868" loading="lazy" alt="Some of the templates."><figcaption>Some of the templates.</figcaption></figure><div class="tip">Templates add to the end of your timeline and never change what is already there. Tick <b>Use my brand kit</b> to use your colours and logo.</div>
+</section>
+
+<section class="card tut" id="t-handwrite" data-title="A title written by hand" data-tag="Creative" data-thumb="help-img/handwrite.jpg">
+<div class="tut-head"><h2>A title written by hand</h2><span class="tag">Creative</span></div>
+<ol class="steps">
+<li>Move the playhead and press <b>Write</b> (<kbd>W</kbd>) under the picture, then type your words.</li>
+<li>Press Play: a hand writes the words out. For a title you already have, press <b>✍ Write by hand</b> under its text box.</li>
+<li>Choose the hand (realistic, emoji ✍️ or sketch), its size and skin colour, the pen colour and the <b>Write time</b> on the right.</li>
+</ol><figure><img src="help-img/handwrite.jpg" width="1440" height="900" loading="lazy" alt="A hand writing “Be patient”."><figcaption>A hand writing “Be patient”.</figcaption></figure><div class="tip"><b>⌨ Type with hand</b> types the title letter by letter with a tapping finger instead.</div>
+<div class="tip"><b>Don’t want the hand?</b> Pause where the hand shows and click it on the picture, then press <b>✋ Remove hand</b> — or select the title and press <b>✋ Remove hand</b> in its details. The words still write themselves. <b>✋ Add hand</b> brings it back. This works for drawings too. No sound is added; choose one under <b>Animation ▸ Writing sound</b> if you want it.</div>
+</section>
+
+<section class="card tut" id="t-draw" data-title="Draw on your video" data-tag="Creative" data-thumb="help-img/drawing.jpg">
+<div class="tut-head"><h2>Draw on your video, with a hand drawing it</h2><span class="tag">Creative</span></div>
+<ol class="steps">
+<li>Press <b>Draw</b> (<kbd>D</kbd>). The picture gets bigger and the drawing bar appears above it.</li>
+<li>Choose the pen, highlighter, line, arrow, box or circle, a colour and a thickness, and draw.</li>
+<li>Press <b>Done</b> to keep it, or <b>Play</b> to keep it and watch a hand draw it stroke by stroke.</li>
+</ol><figure><img src="help-img/drawing.jpg" width="1440" height="900" loading="lazy" alt="Drawing a circle and an arrow. The drawing is on the timeline as you draw."><figcaption>Drawing a circle and an arrow. The drawing is on the timeline as you draw.</figcaption></figure><div class="tip">Double-click the drawing (or press <b>Edit drawing</b>) to add to it or rub parts out with the eraser.</div>
+</section>
+
+<section class="card tut" id="t-stickers" data-title="Animated stickers and decorations" data-tag="Creative" data-thumb="help-img/stickers.jpg">
+<div class="tut-head"><h2>Animated stickers, arrows and decorations</h2><span class="tag">Creative</span></div>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Animated stickers & arrows…</span>.</li>
+<li>Pick one of about fifty — arrows, rings, stars, crescents, lanterns, masjids, the Kaaba, books, a camel, dates, a qibla compass, thumbs up and more.</li>
+<li>Choose its colour, movement (pop, pulse, float, wiggle, bounce, spin, swing or drift), size, angle, place and how long it stays, then press <b>Add sticker</b>.</li>
+</ol><figure class="small"><img src="help-img/stickers.jpg" width="440" height="566" loading="lazy" alt="Adding a crescent sticker."><figcaption>Adding a crescent sticker.</figcaption></figure><div class="tip"><span class="m">Create ▸ Background images…</span>, <span class="m">Decorative shapes…</span> and <span class="m">Drawing images…</span> add ready-made pictures in the same way.</div>
+</section>
+
+<section class="card tut" id="t-keyframes" data-title="Animate anything with keyframes" data-tag="Creative" data-thumb="help-img/keyframes.jpg">
+<div class="tut-head"><h2>Animate anything with keyframes</h2><span class="tag">Creative</span></div>
+<ol class="steps">
+<li>Select a clip — a title, photo, video, drawing or sticker.</li>
+<li>Move the playhead to where the movement starts and press <b>◆ Add keyframe here</b> under <b>Keyframes</b>.</li>
+<li>Move the playhead later and change <b>Position</b>, <b>Scale</b>, <b>Opacity</b> or <b>Turn</b>: a second keyframe is added there. Play — the clip glides between them.</li>
+</ol><figure class="panel"><img src="help-img/keyframes.jpg" width="290" height="485" loading="lazy" alt="Keyframes, Animation and Motion in the panel on the right."><figcaption>Keyframes, Animation and Motion in the panel on the right.</figcaption></figure><div class="tip"><b>Quick animation</b> sets up a ready-made movement — move across, float up, grow, spin, swing or fly across. Keyframes show as diamonds on the clip.</div>
+</section>
+
+<section class="card tut" id="t-effects" data-title="Colour looks and effects" data-tag="Creative" data-thumb="help-img/effects.jpg">
+<div class="tut-head"><h2>Colour looks, effects and picture-in-picture</h2><span class="tag">Creative</span></div>
+<ol class="steps">
+<li>Select a photo or video clip.</li>
+<li>Under <b>Look</b> choose a style in one click — Warm, Cool, Golden hour, Vintage, Black &amp; white, Vivid, Faded, Dramatic or Night — then fine-tune the colour.</li>
+<li>Under <b>Transform</b> mirror, flip, rotate or crop it; under <b>Frame</b> add rounded corners, a border and a shadow — great with a smaller <b>Scale</b> for picture-in-picture.</li>
+</ol><figure class="panel"><img src="help-img/effects.jpg" width="290" height="485" loading="lazy" alt="Look and the other effects for the selected photo."><figcaption>Look and the other effects for the selected photo.</figcaption></figure><div class="tip"><b>Hide an area</b> blurs, pixelates or covers a face, a number plate or anything that should not be shown.</div>
+</section>
+
+<section class="card tut" id="t-brand" data-title="Your brand kit" data-tag="Creative" data-thumb="help-img/brand-kit.jpg">
+<div class="tut-head"><h2>Your brand kit — logo, colours, intro and outro</h2><span class="tag">Creative</span></div>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Brand kit…</span> and add your name, logo, colours, font and intro and outro words. Press <b>Save kit</b>.</li>
+<li><b>Save and apply</b> puts your logo in a corner of every frame, your font and colours on every title, and optionally a 3-second intro and 4-second outro.</li>
+</ol><figure class="medium"><img src="help-img/brand-kit.jpg" width="680" height="506" loading="lazy" alt="The brand kit, saved in this browser."><figcaption>The brand kit, saved in this browser.</figcaption></figure><div class="tip">Templates and Shorts can use the kit: tick <b>Use my brand kit</b>.</div>
+</section>
+
+<section class="card tut" id="t-sound" data-title="Volume, ducking and cleaning up a voice" data-tag="Sound" data-thumb="help-img/sound-inspector.jpg">
+<div class="tut-head"><h2>Volume, ducking under speech and cleaning up a voice</h2><span class="tag">Sound</span></div>
+<ol class="steps">
+<li>Select an audio or video clip. Set its <b>Volume</b> (up to 200%) and fades, or mute it.</li>
+<li><b>Normalise loudness</b> makes a quiet phone recording as loud as it can be without distorting.</li>
+<li><b>Clean up voice</b> removes background noise with a small speech-trained model, on your device. The original is kept.</li>
+<li>For a nasheed or nature sound under a talk, tick <b>Duck … under speech</b> (or press <b>▁▃▅</b> on its track): it gets quieter by itself whenever someone speaks.</li>
+</ol><figure class="panel"><img src="help-img/sound-inspector.jpg" width="290" height="485" loading="lazy" alt="Sound settings for the selected recording."><figcaption>Sound settings for the selected recording.</figcaption></figure><div class="tip"><b>Edit in audio editor</b> opens the clip in NoorEditor’s <a href="../audio-editor/">audio editor</a> for detailed work; its <span class="m">File ▸ Send to Video Editor</span> brings it back.</div>
+</section>
+
+<section class="card tut" id="t-sounds" data-title="Nature, animal, water and chalk sounds (no music)" data-tag="Sound" data-thumb="help-img/sounds.jpg">
+<div class="tut-head"><h2>Nature sounds and sound effects — no music</h2><span class="tag">Sound</span></div>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Sound library (no music)…</span>.</li>
+<li>Press <b>▶ Listen</b> to hear rain, wind, waves, a stream, birds, crickets, a fire or a fountain, or effects such as whoosh, pop, ding, typing and page turn.</li>
+<li><b>Animals</b>: doves, a rooster, hens and chicks, sheep, goats, a cow, a camel, a horse, a donkey, a cat, a dog, a lion, a tiger, a bear, an elephant, a wolf, monkeys, an owl, an eagle, a crow, a parrot, a duck, a turkey, seagulls, frogs, bees, a mosquito, a snake, a mouse, a dolphin and a whale.</li>
+<li><b>Water &amp; air</b>: pouring water, bubbles, a splash, a dripping tap, bubbling water, a gust and blowing air. <b>Chalk &amp; writing</b>: chalk on a board, a chalk tap, the board eraser and a pencil.</li>
+<li>Press <b>Add</b> to put it at the playhead. Nature sounds can be 15 seconds to 2 minutes long.</li>
+</ol>
+<h3>A writing sound in time with a title</h3>
+<ol class="steps">
+<li>Select a title. In its details, under <b>Animation</b>, press <b>Writing sound</b>: <b>Chalk</b>, <b>Pencil</b> or <b>Keys</b>.</li>
+<li>A sound is added under the title with one chalk stroke, pencil stroke or key press as each letter appears — for <em>Typewriter</em>, <em>Word by word</em> and <em>Handwriting</em> entrances.</li>
+<li>No sound is added unless you choose one: <b>✍ Write by hand</b> and <b>⌨ Type with real hand</b> are silent until you press a Writing sound. Pressing another one swaps it.</li>
+<li>Once a title has a writing sound, <b>Sound volume</b> (0–200%) appears under it to make it quieter or louder, with <b>✕ Remove sound</b> to take it off. If you change the words, press the sound again so it fits.</li>
+</ol>
+<div class="tip">Every sound is made on your device from simple tones and noise, so it is free to use anywhere. Animal calls are close imitations rather than recordings.</div><figure class="medium"><img src="help-img/sounds.jpg" width="680" height="868" loading="lazy" alt="The sound library. Every sound is made on your device."><figcaption>The sound library. Every sound is made on your device.</figcaption></figure>
+</section>
+
+<section class="card tut" id="t-pauses" data-title="A slideshow that changes on every pause" data-tag="Sound" data-thumb="help-img/pauses-result.jpg">
+<div class="tut-head"><h2>A slideshow that changes on every pause — and jump cuts</h2><span class="tag">Sound</span></div>
+<ol class="steps">
+<li>Put the recitation or talk on the timeline and select it.</li>
+<li>Open <span class="m">Create ▸ Pictures on the pauses &amp; jump cuts…</span>. It listens to the voice and says how many pauses it found.</li>
+<li>Tick the photos to use, choose a transition and set <b>Shortest scene</b>.</li>
+</ol><figure class="medium"><img src="help-img/pauses-dialog.jpg" width="680" height="634" loading="lazy" alt="5 pauses found, so 6 scenes from 4 photos."><figcaption>5 pauses found, so 6 scenes from 4 photos.</figcaption></figure><ol class="steps" start="4" style="counter-reset:step 3">
+<li>Press <b>Apply</b>: each photo starts exactly in a pause of the voice.</li>
+</ol><figure><img src="help-img/pauses-result.jpg" width="1440" height="900" loading="lazy" alt="Photos on track V3 change on the pauses of the voice on A1."><figcaption>Photos on track V3 change on the pauses of the voice on A1.</figcaption></figure><div class="tip">The same window can <b>cut</b> a clip at each pause, <b>remove the pauses</b> (jump cuts, for talks), or add a <b>marker</b> at each one.</div>
+</section>
+
+<section class="card tut" id="t-record" data-title="Record your voice, screen or camera" data-tag="Sound" data-thumb="help-img/record.jpg">
+<div class="tut-head"><h2>Record your voice, your screen or your camera</h2><span class="tag">Sound</span></div>
+<ol class="steps">
+<li><span class="m">Create ▸ Record your voice…</span> records from the microphone; listen back before adding the take.</li>
+<li><span class="m">Create ▸ Record screen &amp; camera…</span> records your screen with your camera in a round bubble in a corner — ideal for lessons — or only the screen, or only the camera.</li>
+<li>Choose the corner, shape, size and ring colour and press <b>Start recording</b>. After a 3-2-1 countdown, use <b>Pause</b> and <b>Stop</b>. The recording goes onto the timeline.</li>
+</ol><figure class="small"><img src="help-img/record.jpg" width="440" height="498" loading="lazy" alt="Record screen &amp;amp; camera."><figcaption>Record screen &amp; camera.</figcaption></figure><div class="tip">Recordings never leave your device. Screen recording works on computers; phones can record the camera.</div>
+</section>
+
+<section class="card tut" id="t-captions" data-title="Captions in Afaan Oromoo, Amharic, Somali and more" data-tag="Captions" data-thumb="help-img/captions-result.jpg">
+<div class="tut-head"><h2>Captions in Afaan Oromoo, Amharic, Somali and more</h2><span class="tag">Captions</span></div>
+<ol class="steps">
+<li>Select the clip with the voice and open <span class="m">Tools ▸ Auto captions (speech to text)…</span>.</li>
+<li>Choose <b>Afaan Oromoo</b>: paste what is said, one sentence per line — each line is timed to the voice by its pauses.</li>
+</ol><figure class="small"><img src="help-img/captions-oromo.jpg" width="440" height="596" loading="lazy" alt="For Afaan Oromoo you paste the words."><figcaption>For Afaan Oromoo you paste the words.</figcaption></figure><ol class="steps" start="3" style="counter-reset:step 2">
+<li>Press <b>Make captions</b>. Each line becomes a caption on a new <b>Captions</b> track.</li>
+</ol><figure><img src="help-img/captions-result.jpg" width="900" height="485" loading="lazy" alt="The second line appears as the second phrase begins."><figcaption>The second line appears as the second phrase begins.</figcaption></figure><ol class="steps" start="4" style="counter-reset:step 3">
+<li>For <b>Amharic</b>, <b>Somali</b>, English, Arabic and many more, choose the language and the speech recogniser writes the words for you (it downloads once).</li>
+</ol><figure class="small"><img src="help-img/captions-amharic.jpg" width="440" height="460" loading="lazy" alt="Amharic and Somali use the most accurate model."><figcaption>Amharic and Somali use the most accurate model.</figcaption></figure><div class="tip"><span class="m">Tools ▸ Timed captions from your text…</span> works for any language. <span class="m">Tools ▸ Save a titles track as subtitles…</span> saves an .srt file for YouTube; <span class="m">Tools ▸ Import subtitles…</span> reads .srt and .vtt files.</div>
+</section>
+
+<section class="card tut" id="t-short" data-title="Make a Short for YouTube, Reels or TikTok" data-tag="Social" data-thumb="help-img/short-result.jpg">
+<div class="tut-head"><h2>Make a Short for YouTube Shorts, Reels, TikTok or WhatsApp Status</h2><span class="tag">Social</span></div>
+<ol class="steps">
+<li>Open <span class="m">Create ▸ Make a Short from this video…</span> and choose the part of the video (up to 3 minutes) and a big title.</li>
+<li>Choose <b>Fill the tall frame</b> — <b>Follow the speaker’s face</b> keeps the speaker in the middle — or fit with a blurred background. Add a progress bar, an end card and your brand kit.</li>
+</ol><figure class="small"><img src="help-img/short-dialog.jpg" width="440" height="512" loading="lazy" alt="Make a Short."><figcaption>Make a Short.</figcaption></figure><ol class="steps" start="3" style="counter-reset:step 2">
+<li>Press <b>Make Short</b>. It opens in a new tab; your original video is not changed.</li>
+</ol><figure><img src="help-img/short-result.jpg" width="1440" height="900" loading="lazy" alt="The Short in its own tab, ready to export."><figcaption>The Short in its own tab, ready to export.</figcaption></figure>
+</section>
+
+<section class="card tut" id="t-reframe" data-title="Keep the speaker in a tall frame" data-tag="Social" data-thumb="help-img/reframe-result.jpg">
+<div class="tut-head"><h2>Keep the speaker in a tall frame (auto-reframe)</h2><span class="tag">Social</span></div>
+<ol class="steps">
+<li>With a wide video in a tall or square project, open <span class="m">Tools ▸ Auto-reframe — follow the face…</span>.</li>
+<li>Press <b>Follow the face</b>. The picture glides to keep the face in the middle, and holds still while the speaker stays near the centre.</li>
+</ol><figure class="small"><img src="help-img/reframe-dialog.jpg" width="440" height="240" loading="lazy" alt="Auto-reframe."><figcaption>Auto-reframe.</figcaption></figure><figure><img src="help-img/reframe-result.jpg" width="1440" height="900" loading="lazy" alt="The speaker walked to the right; the tall frame followed. The diamonds on the clip are keyframes."><figcaption>The speaker walked to the right; the tall frame followed. The diamonds on the clip are keyframes.</figcaption></figure><div class="tip">Faces are found on your device. Offline it estimates from skin colour, which beige walls or sand can fool — check it and adjust <b>Position X</b> if needed.</div>
+</section>
+
+<section class="card tut" id="t-resize" data-title="Change the shape: 9:16, 16:9, square" data-tag="Social" data-thumb="help-img/resize.jpg">
+<div class="tut-head"><h2>Change the shape for each social network</h2><span class="tag">Social</span></div>
+<ol class="steps">
+<li>Open <span class="m">Tools ▸ Resize for social media…</span> (or choose a <b>Frame size</b> under <b>View</b>).</li>
+<li>Pick WhatsApp Status / Reels (9:16), YouTube (16:9), Instagram square (1:1) or portrait (4:5), and how clips fit: blurred background, plain bars, or crop.</li>
+</ol><figure class="small"><img src="help-img/resize.jpg" width="440" height="462" loading="lazy" alt="Resize for social media."><figcaption>Resize for social media.</figcaption></figure><div class="tip">Timing stays the same. Check where your titles and stickers sit afterwards; undo goes back.</div>
+</section>
+
+<section class="card tut" id="t-phone" data-title="Editing on a phone" data-tag="Settings" data-thumb="help-img/phone-layout.jpg">
+<div class="tut-head"><h2>Editing on your phone</h2><span class="tag">Settings</span></div>
+<ol class="steps">
+<li>Everything fits on the screen: <b>+</b> at the top is the Create menu, <b>☰</b> holds File, Edit, View, Tools and Help, the folder shows your media, the sliders show the details of what you selected, and the arrow is Export.</li>
+<li>When you have typed your words or changed the details, press the big <b>✓ Done</b> button at the bottom (or <b>×</b> at the top). Your changes are saved as you make them; Done closes the details and shows the picture again.</li>
+<li>The picture takes only the room it needs; the rest is timeline. Pinch the timeline with two fingers to zoom, and drag the blue bar to give either more room.</li>
+</ol><div class="phones"><figure class="phone"><img src="help-img/phone-layout.jpg" width="390" height="844" loading="lazy" alt="The editor on a phone."><figcaption>The editor on a phone.</figcaption></figure><figure class="phone"><img src="help-img/phone-menu.jpg" width="390" height="844" loading="lazy" alt="The Create menu as a sheet."><figcaption>The Create menu as a sheet.</figcaption></figure></div>
+</section>
+
+<section class="card" id="menus">
+<h2>Menu reference</h2>
+<p class="lead">Everything is in the menu bar at the top right, next to <b>Export</b>. Point at one menu, then at the next, or use the arrow keys.</p>
+<figure class="medium"><img src="help-img/menus-create.jpg" width="800" height="880" loading="lazy" alt="The menu bar with the Create menu open."><figcaption>The menu bar with the Create menu open.</figcaption></figure>
+<h3>File</h3><div class="table-wrap"><table><tr><th>Item</th><th>What it does</th></tr>
+<tr><td>New project · New tab</td><td>Start again, or open another project beside this one</td></tr>
+<tr><td>Open a project file… · Save as a file</td><td>Open or download a project file (<kbd>Ctrl</kbd>+<kbd>S</kbd>)</td></tr>
+<tr><td>My projects…</td><td>Every project kept in this browser</td></tr>
+<tr><td>Import video, audio or pictures…</td><td>Add files to Media</td></tr>
+<tr><td>Save this frame as a picture</td><td>A PNG of the picture at the playhead</td></tr>
+<tr><td>Export video…</td><td>Make the video file</td></tr></table></div>
+<h3>Edit</h3><div class="table-wrap"><table><tr><th>Item</th><th>What it does</th></tr>
+<tr><td>Undo · Redo</td><td>Step back or forward</td></tr>
+<tr><td>Cut · Copy · Paste · Duplicate</td><td>Copy clips; paste at the playhead</td></tr>
+<tr><td>Split at the playhead</td><td>Cut the selected clip in two (<kbd>S</kbd>)</td></tr>
+<tr><td>Delete · Delete and close the gap</td><td><kbd>Del</kbd> · <kbd>Shift</kbd>+<kbd>Del</kbd></td></tr>
+<tr><td>Select all</td><td>Every clip</td></tr>
+<tr><td>Add a marker · Copy chapters for YouTube</td><td>Mark moments and turn them into YouTube chapters</td></tr>
+<tr><td>Transition on every cut…</td><td>One transition between all touching clips</td></tr></table></div>
+<h3>View</h3><div class="table-wrap"><table><tr><th>Item</th><th>What it does</th></tr>
+<tr><td>Expand the preview · Hide the side panels</td><td>Give the picture more room (<kbd>Esc</kbd> to come back)</td></tr>
+<tr><td>Preview size</td><td>Small, medium or large</td></tr>
+<tr><td>Frame size</td><td>16:9, 9:16, square or 4:5</td></tr>
+<tr><td>Fit the whole project · Snap</td><td>Zoom the timeline to fit; snap to edges and the playhead</td></tr></table></div>
+<h3>Create</h3><div class="table-wrap"><table><tr><th>Group</th><th>Items</th></tr>
+<tr><td>Add</td><td>Title, Colour or gradient card, Title written by hand, Drawing</td></tr>
+<tr><td>Islamic videos</td><td>Qur’ān verse video, Nasheed lyrics, Hadith video, Occasion video</td></tr>
+<tr><td>Ready-made designs</td><td>Templates, My templates, Drawing images, Animated stickers &amp; arrows, Background images, Decorative shapes</td></tr>
+<tr><td>Sound and recording</td><td>Record your voice, Sync lyrics to vocals, Sound library, Record screen &amp; camera, Pictures on the pauses &amp; jump cuts</td></tr>
+<tr><td>Share and brand</td><td>Brand kit, Make a Short</td></tr></table></div>
+<h3>Tools</h3><div class="table-wrap"><table><tr><th>Group</th><th>Items</th></tr>
+<tr><td>Captions</td><td>Auto captions, Timed captions from your text, Import subtitles, Save a titles track as subtitles</td></tr>
+<tr><td>Timeline</td><td>Transition gallery, Resize for social media</td></tr>
+<tr><td>Video</td><td>Auto-reframe — follow the face</td></tr>
+<tr><td>Effects</td><td>Remove / replace background</td></tr></table></div>
+<h3>Help</h3><p>This guide, keyboard shortcuts and About (version and contact).</p>
+</section>
+
+<section class="card" id="keys">
+<h2>Keyboard shortcuts</h2>
+<div class="table-wrap"><table><tr><th>Keys</th><th>Action</th></tr>
+<tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+<tr><td><kbd>S</kbd></td><td>Split at the playhead</td></tr>
+<tr><td><kbd>Del</kbd> · <kbd>Shift</kbd>+<kbd>Del</kbd></td><td>Delete · delete and close the gap</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>X</kbd> / <kbd>V</kbd></td><td>Copy, cut, paste at the playhead</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> · <kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Duplicate · select all clips</td></tr>
+<tr><td><kbd>T</kbd> · <kbd>W</kbd> · <kbd>D</kbd></td><td>Title · title written by hand · draw</td></tr>
+<tr><td><kbd>M</kbd> · <kbd>F</kbd></td><td>Marker · freeze frame</td></tr>
+<tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>One frame back or forward (<kbd>Shift</kbd>: one second; <kbd>Alt</kbd>: nudge the selected clips)</td></tr>
+<tr><td><kbd>Home</kbd> · <kbd>End</kbd></td><td>Start · end</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Undo · redo</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save the project as a file</td></tr>
+<tr><td><kbd>+</kbd> <kbd>−</kbd> · <kbd>Ctrl</kbd>+wheel</td><td>Zoom the timeline</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Close a menu or window; leave the expanded preview</td></tr></table></div>
+</section>
+
+<section class="card" id="faq">
+<h2>Questions &amp; troubleshooting</h2>
+<h3>Is it free? Are my videos uploaded?</h3>
+<p>Yes, it is free, and no — your videos, photos and recordings are opened and exported on your own device. Only the parts the tools download (fonts, Qur’ān recitations, the captions model) come from the internet.</p>
+<h3>How do I remove the watermark?</h3>
+<p>Free videos carry a small <b>NoorEditor.web.app</b> mark in the top-right corner. NoorEditor Pro removes it: untick it in the Export window and the Pro offer appears.</p>
+<h3>Export is slow or stops</h3>
+<p>Choose a <b>Fast</b> format (MP4 in Chrome, Edge or Safari). Very long or 1080p videos take longer on phones; close other tabs, or export on a computer. Real-time formats need the tab to stay in front.</p>
+<h3>There is no sound in the exported video</h3>
+<p>Check the clip and its track are not muted (the speaker buttons), and that the clip’s volume is above 0. Background sound set to <b>duck</b> goes quiet while someone speaks — that is expected.</p>
+<h3>My file will not import</h3>
+<p>Use common formats: MP4, WebM or MOV video, MP3, WAV, M4A or OGG audio, and JPG, PNG or WebP pictures. Some iPhone HEVC videos only play in Safari; convert them to MP4 first if needed.</p>
+<h3>The captions or Qur’ān recitation do not download</h3>
+<p>They need the internet the first time. Check your connection and try again. For the Qur’ān tool you can also import your own recitation and choose it under <i>Your own recitation</i>.</p>
+<h3>Does it work offline?</h3>
+<p>Yes, once it has been opened: the editor keeps itself on your device. Tools that download models need the internet the first time.</p>
+<h3>Where did my project go?</h3>
+<p>Projects are kept in this browser, on this device — open <span class="m">File ▸ My projects…</span>. They are not shared between browsers or devices; use <span class="m">File ▸ Save as a file</span> to move one.</p>
+</section>
+<section class="card" id="about">
+<h2>About</h2>
+<p><span class="m">Help ▸ About</span> shows the version, who made the editor and how to get in touch. Qur’ān text, translations and recitations come from Quran.com and EveryAyah. Export uses mediabunny; captions use Whisper and voice clean-up uses RNNoise, downloaded when first used.</p>
+</section>
+
+    <p class="noresults" id="noResults">Nothing found. Try another word, or <a href="mailto:fesbackups@gmail.com">ask us</a>.</p>
+  </main>
+</div>
+
+<footer>
+  <a href="./">Open the video editor</a> · <a href="../audio-editor/help.html">Audio editor help</a> · <a href="/">NoorEditor</a> · © <span id="year"></span> NoorEditor
+</footer>
+<script>
+(() => {
+  document.getElementById('year').textContent = new Date().getFullYear();
+  const cards = [...document.querySelectorAll('section.card')];
+  const tuts = cards.filter(c => c.classList.contains('tut'));
+
+  // Tutorial index cards
+  const idx = document.getElementById('tutIndex');
+  tuts.forEach(t => {
+    const first = t.querySelector('ol.steps li');
+    const d = document.createElement('div'); d.className = 'mini'; d.dataset.tag = t.dataset.tag;
+    d.innerHTML = `${t.dataset.thumb ? `<img src="${t.dataset.thumb}" alt="" loading="lazy">` : ''}<span class="tag"></span><h4></h4><p></p><a href="#${t.id}">Open tutorial →</a>`;
+    d.querySelector('.tag').textContent = t.dataset.tag;
+    d.querySelector('h4').textContent = t.dataset.title;
+    d.querySelector('p').textContent = (first ? first.textContent : '').slice(0, 110).trim() + '…';
+    idx.appendChild(d);
+  });
+
+  // Topic filter
+  const chips = document.getElementById('chips');
+  ['All'].concat([...new Set(tuts.map(t => t.dataset.tag))]).forEach((tag, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = tag; if (!i) b.className = 'on';
+    b.addEventListener('click', () => {
+      chips.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      idx.querySelectorAll('.mini').forEach(m => { m.style.display = tag === 'All' || m.dataset.tag === tag ? '' : 'none'; });
+    });
+    chips.appendChild(b);
+  });
+
+  // Contents (sidebar + mobile)
+  const toc = document.getElementById('toc'), mob = document.querySelector('#tocMobile div');
+  const add = (href, text, sub) => {
+    for (const box of [toc, mob]) { const a = document.createElement('a'); a.href = href; a.textContent = text; if (sub) a.className = 'sub'; box.appendChild(a); }
+  };
+  toc.innerHTML = '<h2>Contents</h2>';
+  cards.forEach(c => {
+    if (c.classList.contains('tut')) add('#' + c.id, c.dataset.title, true);
+    else add('#' + c.id, c.querySelector('h2').textContent, false);
+  });
+  mob.addEventListener('click', e => { if (e.target.tagName === 'A') document.getElementById('tocMobile').open = false; });
+  // The index above was built after load and moved everything down: go to the requested section again.
+  if (location.hash) { const t = document.getElementById(location.hash.slice(1)); if (t) requestAnimationFrame(() => t.scrollIntoView({ behavior: 'instant', block: 'start' })); }
+
+  // Highlight the section on screen
+  const links = [...toc.querySelectorAll('a')];
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id));
+  }), { rootMargin: '-20% 0px -70% 0px' });
+  cards.forEach(c => io.observe(c));
+
+  // Search
+  const q = document.getElementById('q'), info = document.getElementById('qInfo'), none = document.getElementById('noResults');
+  q.addEventListener('input', () => {
+    const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
+    let shown = 0;
+    cards.forEach(c => {
+      const hit = !words.length || words.every(w => c.textContent.toLowerCase().includes(w));
+      c.classList.toggle('hidden', !hit); if (hit) shown++;
+    });
+    info.textContent = words.length ? `${shown} section${shown === 1 ? '' : 's'} found` : '';
+    none.style.display = shown ? 'none' : 'block';
+  });
+})();
+</script>
+</body>
+</html>

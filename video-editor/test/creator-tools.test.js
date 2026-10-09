@@ -1,0 +1,8 @@
+const test=require('node:test');const assert=require('node:assert/strict');const {alignLyrics}=require('../creator-tools');
+const chunks=(words,offset=0)=>words.split(' ').map((text,i)=>({text,timestamp:[offset+i*.5,offset+i*.5+.4]}));
+test('aligns written lines with vocal word timestamps, including an intro',()=>{const r=alignLyrics(['A kinder word','a helping hand'],chunks('A kinder word a helping hand',2),10);assert.equal(r.matched,6);assert.equal(r.cues[0].start,2);assert.equal(r.cues[1].start,3.5);assert.deepEqual(r.cues[0].wordTimes,[0,.5,1]);});
+test('Arabic diacritics and punctuation do not break vocal matching',()=>{const r=alignLyrics(['يَا رَبّ نَوِّرْ دَرْبَنَا','وازرع سلاماً بيننا'],chunks('يا رب نور دربنا وازرع سلاما بيننا'),6);assert.equal(r.matched,7);assert.equal(r.cues.length,2);});
+test('refuses a different song instead of inventing timing',()=>{assert.throws(()=>alignLyrics(['A grateful heart today'],chunks('these are completely different words'),5),/Too few/);});
+test('requires evidence for each line',()=>{assert.throws(()=>alignLyrics(['one two three four five six','unheard line'],chunks('one two three four five six'),5),/line 2/);});
+test('interpolates a missed word between detected words',()=>{const r=alignLyrics(['one little kind word'],chunks('one kind word'),5);assert.equal(r.matched,3);assert(r.cues[0].wordTimes[1]>0);assert(r.cues[0].wordTimes[1]<r.cues[0].wordTimes[2]);});
+test('handles segment timestamps and repeated lyric phrases',()=>{const r=alignLyrics(['give thanks','give thanks'],[{text:'give thanks give thanks',timestamp:[1,5]}],6);assert.equal(r.cues[0].start,1);assert.equal(r.cues[1].start,3);assert(r.cues[1].start>=r.cues[0].end);});

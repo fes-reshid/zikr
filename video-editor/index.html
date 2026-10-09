@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Editor — NoorEditor</title>
+<meta name="description" content="A free video editor that runs entirely in the browser: cut, trim and layer clips, add Arabic and English titles, Qur’an verse videos with recitation, captions and background sound, and export MP4. Nothing is uploaded.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#151920">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Video Editor">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Scheherazade+New:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Reem+Kufi:wght@400;700&family=Cairo:wght@400;700&family=Cormorant+Garamond:wght@600;700&family=Marcellus&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #0e1014;
+    --panel: #151920;
+    --panel-2: #1b2029;
+    --panel-3: #232a35;
+    --line: #2a313d;
+    --line-2: #394253;
+    --text: #e7eaf0;
+    --muted: #8d95a5;
+    --faint: #5d6576;
+    --accent: #5b8cff;
+    --accent-ink: #0b1633;
+    --playhead: #ff4d6d;
+    --warn: #f2b84b;
+    --danger: #ff6b6b;
+    --video: #3c5ea3;
+    --image: #2f7a6c;
+    --audio: #2e7a4d;
+    --text-clip: #7d56a0;
+    --radius: 6px;
+    --head-w: 132px;
+    --row-h: 56px;
+    --ruler-h: 26px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) 6px var(--timeline-h, max(280px, 40vh));
+    /* An explicit column, or the timeline's wide content would widen the page. */
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+    background: var(--panel-3);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
+    padding: 5px 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.icon { padding: 5px 7px; }
+button.ghost { background: transparent; border-color: transparent; }
+button.ghost:hover:not(:disabled) { background: var(--panel-3); border-color: var(--line-2); }
+button[aria-pressed="true"] { background: #2b3c63; border-color: var(--accent); }
+svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+input[type="text"], input[type="number"], select, textarea {
+    background: var(--bg);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
+    padding: 5px 8px;
+    min-width: 0;
+}
+input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid var(--line-2); border-radius: var(--radius); background: none; }
+input[type="range"] { accent-color: var(--accent); min-width: 0; }
+[hidden] { display: none !important; }
+
+/* Pinned to rows, so hiding the resizer on phones cannot shift the rest up. */
+.topbar { grid-row: 1; }
+.workspace { grid-row: 2; }
+.resizer { grid-row: 3; }
+.timeline-panel { grid-row: 4; }
+
+/* ---------------------------------------------------------------- top bar */
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+    overflow-x: auto;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .02em; margin-right: 6px; }
+.brand-mark { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), var(--playhead)); display: grid; place-items: center; }
+.brand-mark svg { width: 12px; height: 12px; fill: #fff; stroke: none; }
+#project-name { width: 180px; background: transparent; border-color: transparent; font-weight: 600; }
+#project-name:hover, #project-name:focus { border-color: var(--line-2); background: var(--bg); }
+.topbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.topbar .spacer { flex: 1; }
+.topbar > * { flex: none; }
+
+/* -------------------------------------------------------------- workspace */
+.workspace {
+    display: grid;
+    grid-template-columns: var(--bin-w, 250px) minmax(0, 1fr) var(--insp-w, 290px);
+    min-height: 0;
+    position: relative;
+}
+/* Sound library, recording bar, project library, sharing */
+.sound-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; margin-bottom: 10px; }
+.sound-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.sound-row span { flex: 1; }
+.record-bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 14px; background: var(--panel); border: 1px solid #e5484d; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.record-thumb { width: 128px; height: 72px; border-radius: 6px; background: #000; }
+.record-dot { width: 12px; height: 12px; border-radius: 50%; background: #e5484d; animation: rec-blink 1s infinite; }
+.record-bar.paused .record-dot { animation: none; opacity: .4; }
+@keyframes rec-blink { 50% { opacity: .25; } }
+.record-time { font-family: var(--mono); min-width: 120px; }
+.record-countdown { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; font-size: 160px; font-weight: 800; color: #fff; background: rgba(0,0,0,.55); pointer-events: none; }
+.sync-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; max-height: 190px; overflow: auto; margin: 6px 0; }
+.sync-photo { display: flex; align-items: center; gap: 6px; font-size: 12px; background: var(--panel-2, rgba(255,255,255,.05)); border-radius: 6px; padding: 4px; cursor: pointer; min-width: 0; }
+.sync-photo img { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; flex: none; }
+.sync-photo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-group { border-top: 1px solid rgba(255,255,255,.1); padding-top: 8px; margin-top: 6px; }
+.sync-found { font-weight: 600; }
+.occasion-preview { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 4px 0 8px; }
+.occasion-preview canvas { width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line-2); }
+.library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.library-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--panel-2, var(--panel)); min-width: 0; }
+.library-card.current { border-color: var(--accent); }
+.library-card img, .library-blank { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; border-radius: 8px; }
+.library-blank { display: grid; place-items: center; color: var(--muted); font-size: 28px; }
+.library-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+/* Export: where the video will be posted */
+.export-targets { display: flex; flex-wrap: wrap; gap: 6px; }
+.export-targets button { padding: 6px 12px; border-radius: 999px; }
+.export-targets button[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.export-fit { display: grid; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line-2); font-size: 13px; }
+.export-fit.ok { border-color: #2f7d5b; }
+.export-fit.warn { border-color: #b7791f; }
+.export-fit .fit-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Keyframes */
+.clip-key { position: absolute; bottom: 4px; width: 9px; height: 9px; margin-left: -4px; background: #ffd27a; border: 1px solid #5a3d00; transform: rotate(45deg); pointer-events: none; z-index: 2; }
+.key-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.key-chip { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; }
+.key-chip button { padding: 3px 6px; font-size: 12px; }
+/* Project tabs: several videos open at once. */
+.project-tabs { display: flex; align-items: center; gap: 3px; min-width: 0; max-width: 46vw; overflow-x: auto; scrollbar-width: none; }
+.project-tab { display: flex; align-items: center; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel-2, var(--panel)); flex: none; max-width: 170px; }
+.project-tab.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.project-tab button { background: none; border: 0; min-width: 0; color: var(--muted); }
+.project-tab .tab-name { padding: 4px 8px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.project-tab.active .tab-name { color: var(--text); font-weight: 600; }
+.project-tab .tab-close { padding: 2px 7px 2px 0; font-size: 15px; line-height: 1; }
+.project-tab .tab-close:hover { color: #fff; }
+.tab-add { flex: none; width: 28px; height: 28px; min-width: 0; padding: 0; border-radius: 8px; font-size: 17px; line-height: 1; }
+/* Drag handles around the video: see workspace-resize.js. */
+.col-resizer { position: absolute; top: 0; bottom: 0; width: 9px; z-index: 6; cursor: col-resize; touch-action: none; }
+.col-resizer.left { left: calc(var(--bin-w, 250px) - 5px); }
+.col-resizer.right { right: calc(var(--insp-w, 290px) - 4px); }
+.col-resizer::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: transparent; transition: background .15s; }
+.col-resizer:hover::after, .col-resizer.active::after, .col-resizer:focus-visible::after { background: var(--accent); width: 3px; left: 3px; }
+.stage-grip {
+    position: absolute; right: 6px; bottom: 6px; z-index: 4; width: 24px; height: 24px; min-width: 0; padding: 3px;
+    border-radius: 6px; background: rgba(0,0,0,.35); border: 1px solid var(--line-2); color: var(--muted); cursor: nwse-resize; touch-action: none;
+}
+.stage-grip svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.6; fill: none; }
+.stage-grip:hover, .stage-grip.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+body.resizing, body.resizing * { cursor: inherit; user-select: none; }
+body.preview-wide .col-resizer, body.drawing-focus .col-resizer, body.drawing-focus .stage-grip, body.preview-expanded .col-resizer { display: none; }
+.panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
+.panel + .panel { border-left: 1px solid var(--line); }
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    min-height: 42px;
+}
+.panel-head button { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--text); }
+.panel-body { flex: 1; overflow: auto; min-height: 0; }
+
+/* media bin */
+.media-list { padding: 8px; display: grid; gap: 6px; align-content: start; }
+.media-empty {
+    margin: 8px;
+    padding: 28px 16px;
+    border: 1px dashed var(--line-2);
+    border-radius: 10px;
+    text-align: center;
+    color: var(--muted);
+}
+.media-empty strong { display: block; color: var(--text); margin-bottom: 4px; font-weight: 600; }
+.media-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    padding: 5px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor: grab;
+    user-select: none;
+}
+.media-item:hover { background: var(--panel-2); border-color: var(--line); }
+.media-thumb {
+    width: 64px; height: 36px; border-radius: 4px; background: var(--panel-3) center/cover no-repeat;
+    display: grid; place-items: center; color: var(--muted); overflow: hidden;
+}
+.media-meta { min-width: 0; }
+.media-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-info { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+.media-item.missing .media-thumb { outline: 1px dashed var(--warn); }
+.media-item.missing .media-info { color: var(--warn); font-family: inherit; }
+.media-actions { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; gap: 2px; background: var(--panel-2); border-radius: var(--radius); }
+.media-item:not(.missing) .media-actions { opacity: 0; }
+.media-item:hover .media-actions, .media-item:focus-within .media-actions { opacity: 1; }
+.banner { margin: 8px; padding: 10px 12px; border-radius: 8px; background: #3a2f16; color: #f6dfab; border: 1px solid #5b4a22; }
+.banner button { margin-top: 8px; }
+
+/* viewer */
+.viewer { background: #0a0c0f; }
+.stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 12px; position: relative; }
+#preview, .draw-layer { grid-area: 1 / 1; }
+.draw-layer { touch-action: none; cursor: crosshair; z-index: 2; }
+.draw-layer.erasing { cursor: cell; }
+.stage.drawing #preview { box-shadow: 0 0 0 2px var(--accent), 0 10px 40px rgba(0,0,0,.5); }
+.stage.drawing .stage-hint { display: none; }
+.draw-bar {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3;
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center;
+    max-width: calc(100% - 16px); padding: 6px 8px; border-radius: 10px;
+    background: var(--panel); border: 1px solid var(--line-2); box-shadow: 0 6px 24px rgba(0,0,0,.45);
+}
+.draw-bar .draw-tools { display: flex; gap: 2px; }
+.draw-bar .draw-tool { padding: 5px; }
+.draw-bar .draw-tool[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.draw-bar input[type=color] { width: 32px; height: 28px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: none; }
+.draw-bar select { width: auto; }
+.draw-swatches { display: flex; gap: 3px; }
+.swatch { width: 18px; height: 18px; min-width: 0; padding: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,.45); }
+.draw-sep { width: 1px; align-self: stretch; background: var(--line-2); margin: 0 2px; }
+.draw-bar .spacer { flex: 1; }
+@media (max-width: 700px) { .draw-swatches { display: none; } }
+#preview { background: #000; box-shadow: 0 0 0 1px var(--line), 0 10px 40px rgba(0,0,0,.5); display: block; }
+.stage-hint {
+    position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+    color: var(--faint); text-align: center; padding: 20px;
+}
+.transport {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 8px 12px; border-top: 1px solid var(--line); background: var(--panel); flex-wrap: wrap;
+}
+.timecode { font-family: var(--mono); font-size: 13px; min-width: 190px; text-align: center; color: var(--muted); }
+.timecode b { color: var(--text); font-weight: 500; }
+#play { width: 40px; justify-content: center; }
+
+/* inspector */
+.inspector-body { padding: 12px; display: grid; gap: 14px; align-content: start; }
+.insp-title { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.insp-title span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; padding: 2px 6px; border-radius: 4px; background: var(--panel-3); color: var(--muted); flex: none; }
+.group { display: grid; gap: 8px; }
+.group-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.field { display: grid; grid-template-columns: 84px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
+.field > label, .field > .label { color: var(--muted); }
+.field output { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; }
+.field.wide { grid-template-columns: 84px minmax(0, 1fr); }
+.field textarea { resize: vertical; min-height: 64px; }
+.check { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.row-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; color: var(--muted); }
+kbd { justify-self: start; font-family: var(--mono); font-size: 11px; background: var(--panel-3); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--text); white-space: nowrap; }
+
+/* ------------------------------------------------------------- timeline */
+.resizer { background: var(--panel); border-top: 1px solid var(--line); cursor: row-resize; }
+.resizer:hover, .resizer.active { background: var(--accent); }
+.timeline-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
+.tl-toolbar {
+    display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-bottom: 1px solid var(--line);
+    overflow-x: auto; flex: none;
+}
+.tl-toolbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px; flex: none; }
+.tl-toolbar .spacer { flex: 1; }
+.tl-toolbar label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+#zoom { width: 120px; }
+/* Touch gestures (pan, pinch, drag) are handled in script. */
+.timeline { flex: 1; overflow: auto; position: relative; min-height: 0; background: var(--bg); outline: none; touch-action: none; }
+.tl-inner { position: relative; min-height: 100%; }
+.tl-rulerrow { display: flex; position: sticky; top: 0; z-index: 5; height: var(--ruler-h); }
+.tl-corner {
+    position: sticky; left: 0; z-index: 6; width: var(--head-w); flex: none;
+    background: var(--panel); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; align-items: center; padding: 0 8px;
+}
+.tl-ruler { position: relative; flex: none; background: var(--panel); border-bottom: 1px solid var(--line); cursor: ew-resize; overflow: hidden; }
+.tick { position: absolute; bottom: 0; width: 1px; background: var(--line-2); height: 6px; }
+.tick.major { height: 11px; background: var(--muted); }
+.tick span { position: absolute; left: 4px; bottom: 9px; font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.tl-row { display: flex; height: var(--row-h); border-bottom: 1px solid var(--line); }
+.tl-head {
+    position: sticky; left: 0; z-index: 4; width: var(--head-w); flex: none; background: var(--panel);
+    border-right: 1px solid var(--line); display: flex; align-items: center; gap: 2px; padding: 0 4px 0 8px;
+}
+.tl-head .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 12px; }
+.tl-head .name small { display: block; font-weight: 400; color: var(--faint); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.tl-head button { padding: 3px; }
+.tl-head button svg { width: 14px; height: 14px; }
+.tl-head button.on { color: var(--warn); }
+.tl-lane { position: relative; flex: none; }
+.tl-row.drop-target .tl-lane { background: rgba(91, 140, 255, .08); }
+.tl-row.dim .tl-lane { opacity: .45; }
+.clip {
+    position: absolute; top: 4px; bottom: 4px; border-radius: 5px; overflow: hidden; cursor: grab;
+    background: var(--video); border: 1px solid rgba(255,255,255,.14); color: #fff; user-select: none; touch-action: none;
+}
+.clip.k-image { background: var(--image); }
+.clip.k-audio { background: var(--audio); }
+.clip.k-text { background: var(--text-clip); }
+.clip.missing { background: repeating-linear-gradient(45deg, #4a3a1c 0 8px, #3a2d15 8px 16px); }
+.clip.selected { border-color: #fff; box-shadow: 0 0 0 1px #fff, 0 0 0 3px rgba(91,140,255,.6); z-index: 2; }
+.clip.dragging { opacity: .85; cursor: grabbing; z-index: 3; }
+.clip-thumbs { position: absolute; inset: 16px 0 0; background-repeat: repeat-x; background-size: auto 100%; opacity: .55; }
+.clip-wave { position: absolute; left: 0; bottom: 0; width: 100%; height: calc(100% - 16px); opacity: .9; }
+.clip-label {
+    position: absolute; left: 8px; right: 8px; top: 1px; font-size: 11px; font-weight: 600; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.6); pointer-events: none;
+}
+.clip-fade { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+.clip-fade.in { left: 0; background: linear-gradient(to top right, rgba(0,0,0,.45) 50%, transparent 50%); }
+.clip-fade.out { right: 0; background: linear-gradient(to top left, rgba(0,0,0,.45) 50%, transparent 50%); }
+.handle { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 1; }
+.handle.l { left: 0; }
+.handle.r { right: 0; }
+.clip:hover .handle, .clip.selected .handle { background: rgba(255,255,255,.22); }
+.handle::after { content: ""; position: absolute; top: 35%; bottom: 35%; left: 3px; width: 2px; border-radius: 1px; background: rgba(255,255,255,.7); }
+.tl-playhead { position: absolute; top: 0; bottom: 0; width: 0; z-index: 3; pointer-events: none; }
+.tl-playhead::before { content: ""; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--playhead); }
+.tl-playhead::after {
+    content: ""; position: absolute; top: 0; left: -7px; border: 7px solid transparent; border-top: 9px solid var(--playhead); border-bottom: 0;
+}
+.tl-snapline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--warn); z-index: 3; pointer-events: none; }
+
+/* ------------------------------------------------------------ overlays */
+.drop-overlay {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; pointer-events: none;
+    background: rgba(14, 16, 20, .82); border: 3px dashed var(--accent); font-size: 18px; font-weight: 600;
+}
+.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0,0,0,.6); padding: 16px; }
+.dialog {
+    width: min(440px, 100%); background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px;
+    padding: 20px; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.dialog h2 { margin: 0; font-size: 16px; }
+.dialog p { margin: 0; color: var(--muted); }
+.dialog .field { grid-template-columns: 90px minmax(0, 1fr); }
+.dialog .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+progress { width: 100%; height: 8px; accent-color: var(--accent); }
+.export-result a { color: var(--accent); font-weight: 600; }
+.toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 70;
+    background: var(--panel-3); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); max-width: calc(100% - 32px);
+}
+.media-host { position: fixed; left: -10px; top: -10px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+
+/* ------------------------------------------------ markers and badges */
+.marker {
+    position: absolute; top: 0; bottom: 0; width: 0; z-index: 2; cursor: grab;
+}
+.marker::before {
+    content: ""; position: absolute; top: 2px; left: -1px; width: 12px; height: 12px;
+    background: var(--warn); clip-path: polygon(0 0, 100% 0, 100% 60%, 0 100%);
+}
+.marker span {
+    position: absolute; top: 1px; left: 14px; font-size: 10px; color: var(--warn); white-space: nowrap;
+    max-width: 140px; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+.marker.selected::before { background: #fff; }
+.marker.selected span { color: #fff; }
+.tl-markerline { position: absolute; top: var(--ruler-h); bottom: 0; width: 1px; background: rgba(242, 184, 75, .35); z-index: 1; pointer-events: none; }
+.clip.primary { box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--accent); }
+.clip.freeze { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 6px, transparent 6px 12px); }
+.clip-tr {
+    position: absolute; left: 0; top: 0; bottom: 0; pointer-events: none;
+    background: linear-gradient(to right, rgba(255,255,255,.35), rgba(255,255,255,0));
+    border-left: 2px solid #fff;
+}
+.clip-badge { position: absolute; right: 10px; top: 1px; font-size: 11px; pointer-events: none; opacity: .9; }
+.marker-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.marker-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marker-row button:first-child { font-family: var(--mono); font-size: 11px; }
+.hint { margin: 0; color: var(--faint); font-size: 12px; line-height: 1.45; }
+
+/* --------------------------------------------------------- tools menu */
+.menu-wrap { position: relative; }
+.menu {
+    position: fixed; z-index: 80; width: max-content; min-width: 240px; max-width: min(360px, calc(100vw - 16px));
+    max-height: 70vh; overflow: auto; padding: 6px;
+    background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px;
+    box-shadow: 0 16px 50px rgba(0,0,0,.55);
+}
+.menu-section { padding: 8px 10px 4px; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.menu-item { display: flex; width: 100%; background: transparent; border-color: transparent; padding: 7px 10px; text-align: left; white-space: normal; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--panel-3); border-color: var(--line-2); }
+/* The menu bar, on the right of the top bar. */
+.menubar { display: flex; align-items: center; gap: 2px; }
+.menubar button { background: transparent; border-color: transparent; padding: 6px 11px; font-weight: 500; color: var(--muted); }
+.menubar button:hover, .menubar button[aria-expanded="true"] { background: var(--panel-3); border-color: var(--line-2); color: var(--text); }
+.menubar #create { color: var(--text); }
+.topbar .moved { display: none !important; }
+.menu-item[disabled] { opacity: .4; }
+@media (max-width: 900px) { .menubar button { background: var(--panel-2); border-color: var(--line-2); color: var(--text); min-width: 38px; min-height: 38px; justify-content: center; padding: 6px 8px; } }
+/* The Create buttons now live in the Create menu; modules still register them here. */
+.studio-bar, .workspace-size-bar { display: none !important; }
+.preview-restore { display: none; position: absolute; top: 10px; right: 10px; z-index: 5; }
+body.preview-expanded .preview-restore { display: inline-flex; }
+
+/* ------------------------------------------------------ generic dialogs */
+.dialog.wide { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.dialog-body { display: grid; gap: 10px; }
+.dialog-body .field.wide { grid-template-columns: 110px minmax(0, 1fr); }
+.dialog-body .field .hint { grid-column: 2; }
+.dialog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px 18px; }
+.field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.field-pair .field.wide { grid-template-columns: 70px minmax(0, 1fr); }
+.dialog-status { min-height: 1.4em; color: var(--text) !important; }
+.about p { margin: 0 0 8px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.about strong { color: var(--text); }
+.about a { color: var(--accent); }
+.dialog-body > p { margin: 0 0 8px; color: var(--muted); line-height: 1.55; }
+.dialog-status:empty { display: none; }
+
+/* ----------------------------------------- purpose reminder (consent.js) */
+dialog#consentGate {
+    width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line-2); border-radius: 12px;
+    padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+dialog#consentGate::backdrop { background: rgba(5, 7, 10, .8); }
+dialog#consentGate h1 { font-family: "Marcellus", Georgia, serif; font-weight: 400; font-size: 21px; margin: 0 0 10px; }
+dialog#consentGate h1:focus-visible { outline: none; }
+.consent-bismillah { margin: 0 0 14px; text-align: center; font-family: "Amiri", serif; font-size: 26px; font-weight: 700; color: #f2d27a; }
+#consentBody, #consentCancelled p { font-size: 14px; line-height: 1.55; color: var(--muted); }
+#consentBody p { margin: 0 0 10px; }
+#consentBody strong { color: var(--text); }
+#consentBody blockquote { margin: 0 0 10px; padding: 8px 12px; border-inline-start: 3px solid #c99a3a; background: var(--panel-2); border-radius: 0 8px 8px 0; }
+#consentBody blockquote p { margin: 0 0 4px; font-style: italic; }
+#consentBody blockquote p:last-child { margin-bottom: 0; font-style: normal; color: var(--faint); font-size: 13px; }
+#consentBody blockquote p[lang=ar] { font-family: "Amiri", serif; font-size: 17px; font-style: normal; color: var(--text); margin-bottom: 6px; }
+#consentBody cite { font-style: normal; }
+.consent-check-row { display: flex; margin-top: 14px; }
+.consent-check-row label { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; font-weight: 600; color: var(--text); }
+.consent-check-row input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.consent-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+@media (max-width: 480px) { .consent-actions { flex-direction: column-reverse; } .consent-actions button { width: 100%; justify-content: center; } }
+
+/* ------------------------------------------------------------ touch */
+@media (pointer: coarse) {
+    :root { --row-h: 64px; }
+    .handle { width: 18px; }
+    .handle::after { left: 8px; }
+    button.icon { padding: 8px 10px; }
+}
+
+/* ------------------------------------------------------------ narrow */
+@media (max-width: 900px) {
+    body { grid-template-rows: auto minmax(0, 1fr) 0 minmax(220px, 40vh); }
+    .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(200px, 1fr) auto; overflow: auto; }
+    .bin, .inspector { display: none; }
+    .workspace.show-bin .bin, .workspace.show-inspector .inspector { display: flex; max-height: 40vh; border-left: 0; border-top: 1px solid var(--line); }
+    .resizer { display: none; }
+    .topbar { gap: 4px; }
+    .brand { margin-right: 0; }
+    #project-name { display: none; }
+    #resolution { width: 84px; }
+    .hide-narrow { display: none !important; }
+    :root { --head-w: 96px; }
+}
+.panel-foot { display: none; }
+/* Trending templates and text designs */
+.sound-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.sound-chips button { padding: 5px 12px; border-radius: 999px; }
+.sound-chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.sound-section[hidden], .sound-row[hidden] { display: none !important; }
+.trend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; max-height: 46vh; overflow: auto; padding: 2px; }
+.trend-grid.designs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 60vh; }
+/* AI video maker */
+#ai-maker { color: #202b22; background: linear-gradient(120deg, #f2d27a, #e3b85a); border-color: #e3b85a; font-weight: 650; padding: 6px 12px; flex-shrink: 0; }
+#ai-maker:hover { filter: brightness(1.06); }
+.tl-size { display: inline-flex; gap: 2px; margin-left: 2px; }
+/* First-visit tour */
+.tour-ring { position: fixed; z-index: 2000; border-radius: 10px; box-shadow: 0 0 0 3px #f2d27a, 0 0 0 9999px rgba(4,8,12,.55); pointer-events: none; transition: all .25s ease; }
+.tour-ring.center { width: 0; height: 0; box-shadow: 0 0 0 9999px rgba(4,8,12,.55); }
+.tour-pop { position: fixed; z-index: 2001; width: min(340px, calc(100vw - 24px)); background: var(--panel); color: var(--text); border: 1px solid #e3b85a; border-radius: 14px; padding: 14px 16px 12px; box-shadow: 0 18px 50px rgba(0,0,0,.55); }
+.tour-pop h3 { margin: 0 0 6px; font-size: 16px; }
+.tour-pop p { margin: 0 0 8px; color: var(--muted); line-height: 1.5; font-size: 13.5px; }
+.tour-pop .tour-extra { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
+.tour-pop .tour-foot { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.tour-pop .tour-count { font-size: 12px; color: var(--muted); margin-right: auto; }
+.tour-pop button { min-height: 32px; }
+.hand-menu { position: absolute; z-index: 30; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line-2); box-shadow: 0 10px 30px rgba(0,0,0,.45); min-width: 150px; }
+.hand-menu button { justify-content: center; min-height: 34px; }
+#ai-maker .ai-soon-badge { margin-left: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 999px; background: rgba(32,43,34,.18); }
+.ai-soon { font-size: 18px; font-weight: 650; color: #f2d27a; margin: 4px 0 8px; }
+.ai-log { display: flex; flex-direction: column; gap: 8px; max-height: 38vh; min-height: 90px; overflow-y: auto; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.ai-msg { max-width: 92%; padding: 8px 11px; border-radius: 12px; line-height: 1.45; }
+.ai-msg strong { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.ai-msg p { margin: 0; }
+.ai-msg ul { margin: 6px 0 0; padding-inline-start: 18px; font-size: 12.5px; color: var(--muted); }
+.ai-msg.ai { align-self: flex-start; background: var(--panel-3); border: 1px solid var(--line-2); }
+.ai-msg.me { align-self: flex-end; background: #2b4a3d; color: #eef7f0; }
+.ai-welcome { max-width: 100%; }
+.ai-guide { margin-top: 8px; border-top: 1px solid var(--line-2); padding-top: 6px; }
+.ai-guide summary { cursor: pointer; font-weight: 650; color: var(--text); padding: 2px 0; }
+.ai-guide ul { margin: 6px 0 2px; }
+.ai-guide p { margin: 6px 0; color: var(--muted); font-size: 13px; }
+.ai-guide small { display: block; color: var(--muted); margin-top: 6px; }
+.ai-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ai-tools button { font-size: 12px; min-height: 30px; border: 1px solid var(--line-2); background: var(--panel-2); border-radius: 999px; padding: 4px 12px; }
+.ai-tools button.ai-pro { background: linear-gradient(120deg, #f2d27a, #e3b85a); border-color: #e3b85a; color: #202b22; font-weight: 650; }
+.ai-ask { margin-top: 10px !important; font-weight: 600; }
+.ai-prompt { width: 100%; resize: vertical; font: inherit; margin-top: 8px; }
+.ai-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.ai-files { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-file { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--panel-3); border: 1px solid var(--line-2); font-size: 12px; }
+.ai-file button { padding: 0 8px; min-height: 24px; }
+.ai-options { margin-top: 6px; }
+.ai-options select { margin: 6px 6px 0 0; }
+.ai-examples button, .ai-followups button { font-size: 12px; border: 1px solid var(--line-2); background: var(--panel-2); min-height: 30px; }
+.ai-examples button:hover, .ai-followups button:hover { border-color: #e3b85a; }
+@media (max-width: 900px) { .ai-log { max-height: 34vh; } #ai-maker { min-width: 34px; min-height: 38px; padding: 4px 6px; justify-content: center; } .ai-examples, .ai-followups { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } .ai-examples button, .ai-followups button { flex: 0 0 auto; white-space: nowrap; } .ai-prompt { min-height: 64px; } }
+.trend-card { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; background: var(--panel-2); border: 2px solid transparent; text-align: center; }
+.trend-card canvas { width: 100%; height: auto; border-radius: 6px; display: block; }
+.trend-card[aria-pressed="true"] { border-color: var(--accent); }
+.trend-card strong { font-size: 12px; font-weight: 600; }
+/* Arabic: text panels and windows read right to left; the preview and timeline stay left to right. */
+.ui-rtl .menu, .ui-rtl .dialog, .ui-rtl .inspector-body, .ui-rtl .panel-head, .ui-rtl .toast, .ui-rtl .bin .panel-body, .ui-rtl .consent-box { direction: rtl; text-align: right; }
+.ui-rtl .dialog input[type=range], .ui-rtl .inspector-body input[type=range], .ui-rtl .dialog .timecode { direction: ltr; }
+@media (min-width: 901px) { .show-narrow { display: none !important; } }
+
+/* Creative tools stay within reach on both phones and computers. */
+.studio-bar { max-height:110px; overflow-y:auto; display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:9px 12px; border-bottom:1px solid var(--line); background:linear-gradient(110deg,#16332e,#1c2630); flex-shrink:0; }
+.studio-label { font-size:9px; letter-spacing:.13em; color:#aecfc0; margin-right:4px; }
+.studio-bar button { font-size:11px; padding:7px 10px; border-color:#486357; background:#223b32; color:#e9f4eb; min-height:32px; }
+.studio-bar button:hover { background:#355744; }
+.studio-bar #studio-templates { background:#e3c681; color:#202b22; border-color:#e3c681; font-weight:650; }
+.studio-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:22px; }
+.studio-grid.transitions { grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+.studio-card { display:flex; flex-direction:column; padding:0 0 12px; overflow:hidden; text-align:left; border-radius:12px; background:#222931; border:2px solid transparent; min-width:0; gap:0; transition:border-color .15s,transform .15s; }
+.studio-card:hover { border-color:#7b998d; transform:translateY(-2px); }
+.studio-card[aria-pressed=true] { border-color:#e3c681; background:#30372f; }
+.studio-card canvas { width:100%; height:auto; display:block; margin-bottom:12px; }
+.studio-card strong { padding:0 12px; font-size:13px; line-height:1.4; white-space:normal; }
+.studio-tag { color:#b1cdbf; font-size:9px; letter-spacing:.08em; padding:0 12px 4px; }
+.resize-card { min-height:80px; white-space:normal; font-size:15px; border:1px solid #60806c; background:#203d32; }
+.studio-template-detail { padding:16px; background:#1a2228; border:1px solid #354047; border-radius:12px; display:grid; gap:12px; }
+.personal-template-row { display:flex; align-items:center; gap:10px; padding:14px 0; border-bottom:1px solid var(--line); }
+.personal-template-row>div { flex:1; min-width:0; overflow-wrap:anywhere; }
+.personal-template-row p { margin:4px 0 0; }
+.studio-lyrics { width:100%; min-height:175px; font-size:18px; line-height:1.75; margin:12px 0; padding:14px; }
+.studio-lyrics:dir(rtl) { font-family:Amiri,serif; }
+.dialog-body input[type=file] { max-width:100%; }
+@media(max-width:650px) {
+    .studio-bar { gap:5px; padding:7px 8px; }
+    .studio-bar button { font-size:11px; min-height:36px; flex:1 1 auto; padding:7px 8px; }
+    .studio-label { display:none; }
+    .studio-grid,.studio-grid.transitions { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .studio-card strong { font-size:12px; padding:0 8px; }
+    .studio-tag { font-size:8px; padding:0 8px 4px; }
+    .dialog-grid { grid-template-columns:minmax(0,1fr); }
+    .studio-template-detail { padding:10px; }
+}
+@media(prefers-reduced-motion:reduce) { .studio-card { transition:none; } .studio-card:hover { transform:none; } }
+
+
+#preview {touch-action:none;cursor:move;}
+.preview-edit-bar {display:flex;align-items:center;gap:6px;font-size:11px;margin-right:auto;}
+.preview-edit-bar select {max-width:200px;min-width:110px;font-size:12px;}
+.preview-edit-bar button {font-size:12px;}
+#snapshot {margin-left:auto;}
+.preview-selection {position:absolute;border:2px solid #e8c777;pointer-events:none;box-sizing:border-box;z-index:4;}
+.preview-resize {position:absolute;right:-8px;bottom:-8px;width:17px;height:17px;padding:0;border:2px solid #fff;background:#b18737;pointer-events:auto;touch-action:none;cursor:nwse-resize;}
+.preview-text-editor {position:absolute;z-index:8;background:#182421;padding:10px;border:1px solid #e8c777;border-radius:8px;box-shadow:0 8px 25px #0008;}
+.preview-text-editor textarea {width:100%;min-height:90px;background:#fff;color:#172e25;font:20px sans-serif;padding:8px;box-sizing:border-box;}
+.preview-text-editor>div {display:flex;gap:8px;margin-top:6px;}
+
+.workspace-size-bar {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 12px;background:#172521;border-bottom:1px solid var(--line);font-size:12px;flex-shrink:0;}
+.workspace-size-bar label {display:flex;align-items:center;gap:8px;}
+.workspace-size-bar input {width:105px;}
+body.preview-wide .workspace {grid-template-columns:minmax(0,1fr);}
+body.preview-wide .workspace>.bin,body.preview-wide .workspace>.inspector {display:none;}
+body.preview-expanded .viewer {position:fixed;inset:8px;z-index:35;border:1px solid var(--accent);border-radius:10px;}
+body.preview-expanded .workspace-size-bar input,body.preview-expanded .workspace-size-bar output {display:none;}
+/* While drawing, the picture gets the room: side panels and the bars above the
+   preview step aside (the timeline stays, so the drawing can be seen there). */
+body.drawing-focus .workspace {grid-template-columns:minmax(0,1fr);}
+body.drawing-focus .workspace>.bin,body.drawing-focus .workspace>.inspector,
+body.drawing-focus .workspace-size-bar,body.drawing-focus .studio-bar,body.drawing-focus .preview-edit-bar,
+body.drawing-focus .preview-selection {display:none !important;}
+body.drawing-focus .workspace .viewer {visibility:visible;}
+@media (min-width:901px) { body.drawing-focus { --timeline-h: 200px !important; } }
+body.drawing-focus .stage {padding-left:6px;padding-right:6px;padding-bottom:6px;}
+@media (min-width:901px) {
+    body.drawing-focus .draw-bar {top:6px;left:8px;right:8px;transform:none;max-width:calc(100% - 16px);width:fit-content;margin:0 auto;padding:4px 6px;gap:3px;}
+    body.drawing-focus .draw-bar .spacer {flex:0 0 8px;}
+    body.drawing-focus .draw-bar button {padding:4px 8px;}
+    body.drawing-focus .draw-bar .draw-tool {padding:4px;}
+}
+.resizer {position:relative;touch-action:none;}
+.resizer::after {content:'';display:block;width:64px;height:3px;border-radius:5px;background:var(--accent);margin:1px auto;}
+/* Phone layout: keep the preview useful, turn side panels into sheets, and
+   make every dense toolbar swipe horizontally instead of squeezing controls. */
+@media(max-width:900px){
+    :root{--head-w:76px;--row-h:54px;--ruler-h:24px;}
+    html,body{height:100%;height:100dvh;overscroll-behavior:none;}
+    body{grid-template-rows:auto minmax(0,1fr) 8px var(--timeline-h,30dvh);padding-bottom:env(safe-area-inset-bottom);}
+    button,select,input[type=color]{min-height:40px;}
+    .topbar{padding:6px max(8px,env(safe-area-inset-right)) 6px max(8px,env(safe-area-inset-left));gap:5px;scrollbar-width:none;}
+    .topbar::-webkit-scrollbar,.tl-toolbar::-webkit-scrollbar,.studio-bar::-webkit-scrollbar,.preview-edit-bar::-webkit-scrollbar,.workspace-size-bar::-webkit-scrollbar,.draw-bar::-webkit-scrollbar{display:none;}
+    .brand-mark{width:32px;height:32px;}
+    #resolution{width:106px;max-width:106px;}
+    #fps{display:none;}
+    .topbar button{min-width:40px;justify-content:center;}
+
+    .workspace{position:relative;display:block;overflow:hidden;min-height:0;}
+    .viewer{height:100%;width:100%;}
+    .bin,.inspector{display:none;position:absolute;inset:0;z-index:32;max-height:none!important;border:0!important;background:var(--panel);}
+    .workspace.show-bin .bin,.workspace.show-inspector .inspector{display:flex;}
+    .workspace.show-bin .viewer,.workspace.show-inspector .viewer{visibility:hidden;}
+    .panel-head{min-height:50px;padding:8px 12px;font-size:12px;}
+    .panel-body{padding-bottom:max(12px,env(safe-area-inset-bottom));}
+    .inspector-body{padding:12px max(12px,env(safe-area-inset-right)) 20px max(12px,env(safe-area-inset-left));}
+    /* A big Done button at the foot of the media and details sheets, always in reach. */
+    .panel-foot{display:flex;flex:none;padding:10px max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));border-top:1px solid var(--line);background:var(--panel);}
+    .panel-foot button{flex:1;justify-content:center;min-height:48px;font-size:16px;}
+    .panel-head .show-narrow.icon{min-width:44px;min-height:44px;font-size:22px;}
+
+    .preview-edit-bar{flex-wrap:nowrap;overflow-x:auto;padding:4px 8px;min-height:42px;}
+    .preview-edit-bar>*{flex:none;}
+    .stage{padding:4px;}
+    .transport{padding:5px 6px;gap:2px;flex-wrap:nowrap;overflow-x:auto;min-height:48px;}
+    .transport button{min-width:38px;min-height:38px;justify-content:center;}
+    .timecode{min-width:132px;font-size:11px;}
+    #play{width:42px;}
+
+    .resizer{display:block;height:8px;}
+    .resizer::after{width:74px;height:4px;margin:1px auto;}
+    .timeline-panel{min-height:0;}
+    .tl-toolbar{padding:4px 6px;gap:2px;min-height:46px;scrollbar-width:none;}
+    .tl-toolbar button{min-width:40px;min-height:38px;justify-content:center;padding:6px 8px;}
+    .tl-toolbar .sep{margin:0 2px;}
+    #zoom{width:86px;}
+    .tl-head{padding:0 2px 0 5px;}
+    .tl-head .name{font-size:10px;}
+    .tl-head button{min-width:34px;min-height:34px;padding:6px;}
+    .clip{top:3px;bottom:3px;}
+
+    .draw-bar{top:auto;bottom:8px;left:8px;right:8px;transform:none;max-width:none;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;padding:6px;}
+    .draw-bar .draw-tools,.draw-swatches{flex:none;}
+    .draw-bar button,.draw-bar select,.draw-bar input[type=color]{min-width:40px;min-height:40px;}
+    .draw-bar .spacer{display:none;}
+    .col-resizer,.stage-grip{display:none;}
+    /* While drawing, one swipeable row of tools above the picture. */
+    body.drawing-focus .draw-bar{top:4px;bottom:auto;left:4px;right:4px;padding:4px;}
+    .draw-sep{height:34px;flex:none;}
+
+    .modal{padding:0;align-items:end;}
+    .dialog,.dialog.wide{width:100%;max-width:none;max-height:90dvh;border-radius:18px 18px 0 0;padding:16px max(14px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));overflow:auto;}
+    .dialog .actions{position:sticky;bottom:0;background:var(--panel);padding-top:8px;}
+    .menu{max-height:75dvh;}
+    .preview-text-editor{left:6px!important;right:6px!important;width:auto!important;max-width:none!important;}
+}
+@media(max-width:560px){
+    .dialog .field,.dialog-body .field.wide,.field-pair .field.wide{grid-template-columns:minmax(0,1fr);gap:4px;}
+    .dialog-body .field .hint{grid-column:1;}
+    .field-pair{grid-template-columns:minmax(0,1fr);}
+    .dialog input,.dialog select,.dialog textarea{width:100%;font-size:16px;}
+    .dialog input[type=checkbox],.dialog input[type=radio]{width:auto;flex:none;min-height:0;}
+    .inspector-body input[type=text],.inspector-body input[type=number],.inspector-body input:not([type]){min-height:40px;}
+    /* While a window is open its buttons sit at the bottom: show messages at the top instead. */
+    body:has(.modal:not([hidden])) .toast{top:max(12px,env(safe-area-inset-top));bottom:auto;}
+    .studio-grid,.studio-grid.transitions{grid-template-columns:minmax(0,1fr);}
+    dialog#consentGate{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:16px;}
+}
+@media(max-width:900px) and (orientation:landscape) and (max-height:520px){
+    body{grid-template-rows:auto minmax(0,1fr) 8px var(--timeline-h,42dvh);}
+    .transport{min-height:42px;padding-block:2px;}
+}
+/* Phone: a top bar that fits without scrolling, and menus as a sheet from the bottom. */
+@media (max-width: 900px) {
+    .topbar { overflow-x: hidden; gap: 4px; }
+    .topbar > .brand, #resolution, #redo, .topbar > .sep { display: none !important; }
+    .topbar button, .menubar button { min-width: 36px; padding-left: 6px; padding-right: 6px; }
+    .project-tabs { max-width: 132px; }
+    .project-tabs .tab-add { display: none; }
+    .project-tab { max-width: 126px; }
+    .project-tab .tab-name { max-width: 98px; padding: 4px 6px; }
+    .menu { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: 100%; max-width: none; min-width: 0;
+        max-height: 78dvh !important; border-radius: 16px 16px 0 0; padding: 8px 8px max(12px, env(safe-area-inset-bottom)); }
+    .menu::before { content: ''; display: block; width: 44px; height: 4px; border-radius: 4px; background: var(--line-2); margin: 2px auto 6px; }
+    .menu-item { min-height: 46px; align-items: center; font-size: 15px; }
+    body.menu-open::after { content: ''; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 79; }
+    .preview-edit-bar { display: none; }
+}
+@media (max-width: 430px) { .project-tabs, .project-tab { max-width: 96px; } .project-tab .tab-name { max-width: 78px; } }
+</style>
+</head>
+<body>
+
+<!-- Purpose reminder, shown once per browser (consent.js), as in the site's audio editor. -->
+<dialog id="consentGate" aria-labelledby="consentTitle">
+    <p class="consent-bismillah" lang="ar" dir="rtl">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
+    <div id="consentView">
+        <h1 id="consentTitle" tabindex="-1">Before you begin — please read</h1>
+        <div id="consentBody">
+            <blockquote>
+                <p lang="ar" dir="rtl">إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى</p>
+                <p>"Actions are judged by intentions, and every person will have only what they intended." — <cite>Hadith of 'Umar ibn al-Khattab, agreed upon (Bukhari &amp; Muslim)</cite></p>
+            </blockquote>
+            <blockquote>
+                <p lang="ar" dir="rtl">فَمَن يَعْمَلْ مِثْقَالَ ذَرَّةٍ خَيْرًا يَرَهُ ﴿٧﴾ وَمَن يَعْمَلْ مِثْقَالَ ذَرَّةٍ شَرًّا يَرَهُ ﴿٨﴾</p>
+                <p>"So whoever does an atom's weight of good will see it, and whoever does an atom's weight of evil will see it." — <cite>Surah Az-Zalzalah 99:7–8</cite></p>
+            </blockquote>
+            <p>This video editor was built for <strong>halal use</strong> — Qur'an verse videos, dawah and lessons, lectures, family videos, and other permissible, work-related purposes.</p>
+            <p><strong>It is not for music or any haram use.</strong> If you use it for music or anything unlawful, that is between you and Allah — the one who made it is not responsible for it before Allah.</p>
+            <blockquote>
+                <p>"The halal is clear and the haram is clear, and between them are doubtful matters that many people do not know…" — <cite>Hadith of Nu'man ibn Bashir, agreed upon (Bukhari &amp; Muslim)</cite></p>
+            </blockquote>
+            <blockquote>
+                <p>"Fear Allah wherever you are…" — <cite>Hadith narrated by Abu Dharr (Tirmidhi)</cite></p>
+            </blockquote>
+            <p class="consent-check-row">
+                <label><input type="checkbox" id="consentCheck"> I have read this, and I agree to use this tool only for halal purposes. I understand I am responsible before Allah for how I use it.</label>
+            </p>
+        </div>
+        <div class="consent-actions">
+            <button type="button" id="consentDecline">I Do Not Agree — Cancel</button>
+            <button type="button" id="consentAgree" class="primary" disabled>I Agree &amp; Continue</button>
+        </div>
+    </div>
+    <div id="consentCancelled" hidden>
+        <h1 tabindex="-1">You have not agreed</h1>
+        <p>This tool is only for halal use, so it stays closed for you unless you agree to that. You may close this tab or browser window now.</p>
+        <div class="consent-actions">
+            <button type="button" id="consentReconsider">I Changed My Mind — Show It Again</button>
+        </div>
+    </div>
+</dialog>
+<script src="consent.js?v=dev"></script>
+
+<header class="topbar">
+    <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg></span><span class="hide-narrow">NoorEditor</span></div>
+    <div id="project-tabs" class="project-tabs" role="tablist" aria-label="Open projects"></div>
+    <input id="project-name" type="text" aria-label="Project name" spellcheck="false">
+    <select id="resolution" aria-label="Frame size" title="Frame size">
+        <option value="1280x720">1280×720 · 16:9</option>
+        <option value="1920x1080">1920×1080 · 16:9</option>
+        <option value="1080x1920">1080×1920 · 9:16</option>
+        <option value="1080x1080">1080×1080 · 1:1</option>
+        <option value="1080x1350">1080×1350 · 4:5</option>
+    </select>
+    <select id="fps" aria-label="Frame rate" title="Frame rate" class="hide-narrow">
+        <option value="24">24 fps</option>
+        <option value="25">25 fps</option>
+        <option value="30">30 fps</option>
+        <option value="60">60 fps</option>
+    </select>
+    <span class="sep hide-narrow"></span>
+    <button id="undo" class="icon ghost" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
+    <button id="redo" class="icon ghost" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></svg></button>
+    <span class="spacer"></span>
+    <nav class="menubar" aria-label="Menu">
+        <button id="file" class="hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu">File</button>
+        <button id="edit" class="hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="edit-menu">Edit</button>
+        <button id="view" class="hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu">View</button>
+        <button id="create" aria-haspopup="menu" aria-expanded="false" aria-controls="create-menu" aria-label="Create" title="Templates, Qur’ān and hadith videos, stickers, recording, Shorts…"><svg class="show-narrow" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="hide-narrow">Create</span></button>
+        <button id="tools" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="Tools"><svg class="show-narrow" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="hide-narrow">Tools</span></button>
+        <button id="help" class="hide-narrow" aria-haspopup="menu" aria-expanded="false" aria-controls="help-menu">Help</button>
+    </nav>
+    <!-- Reached from the menus; kept for their keyboard shortcuts and handlers. -->
+    <button id="quran-video" class="moved" tabindex="-1" aria-hidden="true">Qur’ān video</button>
+    <button id="toggle-bin" class="show-narrow icon" title="Media" aria-label="Show media"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+    <button id="toggle-inspector" class="show-narrow icon" title="Details" aria-label="Show details"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+    <button id="new-project" class="moved" tabindex="-1" aria-hidden="true">New</button>
+    <button id="open-project" class="moved" tabindex="-1" aria-hidden="true">Open</button>
+    <button id="save-project" class="moved" tabindex="-1" aria-hidden="true">Save</button>
+    <input id="open-input" type="file" accept=".json,application/json" hidden>
+    <button id="export" class="primary"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span class="hide-narrow">Export</span></button>
+</header>
+
+<main class="workspace" id="workspace">
+    <section class="panel bin" aria-label="Media">
+        <div class="panel-head">
+            <span>Media</span>
+            <button id="import"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Import</button>
+            <button id="mobile-close-bin" class="show-narrow icon ghost" aria-label="Close media" title="Close media">×</button>
+            <input id="import-input" type="file" multiple accept="video/*,audio/*,image/*,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
+        </div>
+        <div class="panel-body">
+            <div id="restore-banner" class="banner" hidden></div>
+            <div id="media-empty" class="media-empty">
+                <strong>Drop files here</strong>
+                Video, audio, images and PowerPoint. They stay on this device — nothing is uploaded.
+            </div>
+            <div id="media-list" class="media-list"></div>
+        </div>
+        <div class="panel-foot"><button id="mobile-done-bin" class="primary" type="button">✓ Done</button></div>
+    </section>
+
+    <section class="panel viewer" aria-label="Preview">
+        <div class="stage" id="stage">
+            <canvas id="preview" width="1280" height="720"></canvas>
+            <div class="stage-hint" id="stage-hint">Import media, then double-click it or drag it onto the timeline.</div>
+        </div>
+        <div class="transport">
+            <button id="to-start" class="icon ghost" title="Go to start (Home)" aria-label="Go to start"><svg viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M18 5l-9 7 9 7z"/></svg></button>
+            <button id="prev-frame" class="icon ghost" title="Previous frame (←)" aria-label="Previous frame"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <button id="play" class="icon" title="Play / pause (Space)" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg></button>
+            <button id="next-frame" class="icon ghost" title="Next frame (→)" aria-label="Next frame"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+            <button id="to-end" class="icon ghost" title="Go to end (End)" aria-label="Go to end"><svg viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M6 5l9 7-9 7z"/></svg></button>
+            <span class="timecode"><b id="timecode">00:00.00</b> / <span id="duration">00:00.00</span></span>
+            <button id="snapshot" class="icon ghost" title="Save this frame as a PNG" aria-label="Save frame as image"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 012-2h2l2-2h6l2 2h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        </div>
+    </section>
+
+    <section class="panel inspector" aria-label="Inspector">
+        <div class="panel-head"><span>Inspector</span><button id="mobile-close-inspector" class="show-narrow icon ghost" aria-label="Close details" title="Close details">×</button></div>
+        <div class="panel-body"><div id="inspector" class="inspector-body"></div></div>
+        <div class="panel-foot"><button id="mobile-done-inspector" class="primary" type="button">✓ Done</button></div>
+    </section>
+</main>
+
+<div class="resizer" id="resizer" role="separator" aria-orientation="horizontal" aria-label="Resize timeline"></div>
+
+<section class="timeline-panel" aria-label="Timeline">
+    <div class="tl-toolbar">
+        <button id="tool-split" class="ghost" title="Split at playhead (S)"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/></svg><span class="hide-narrow">Split</span></button>
+        <button id="tool-delete" class="ghost" title="Delete (Del) — Shift+Del closes the gap"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><span class="hide-narrow">Delete</span></button>
+        <button id="tool-duplicate" class="ghost" title="Duplicate (Ctrl+D)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg><span class="hide-narrow">Duplicate</span></button>
+        <button id="add-text" class="ghost" title="Add a title at the playhead (T)"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="hide-narrow">Title</span></button>
+        <button id="add-handwrite" class="ghost" title="Add a title that a hand writes out (W)"><svg viewBox="0 0 24 24"><path d="M3 17c2-3 3-3 4 0s2 3 4 0 2-3 3 0"/><path d="M14 13l6-6-2-2-6 6-1 3z"/></svg><span class="hide-narrow">Write</span></button>
+        <button id="add-draw" class="ghost" title="Draw on the video (D) — it is drawn on with a hand holding a pencil"><svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 7l3 3"/></svg><span class="hide-narrow">Draw</span></button>
+        <button id="add-marker" class="ghost" title="Add a marker at the playhead (M) — markers become YouTube chapters"><svg viewBox="0 0 24 24"><path d="M6 21V4h12l-3 4 3 4H6"/></svg><span class="hide-narrow">Marker</span></button>
+        <span class="sep"></span>
+        <button id="add-video-track" class="ghost hide-narrow" title="Add a video track">+ Video</button>
+        <button id="add-audio-track" class="ghost hide-narrow" title="Add an audio track">+ Audio</button>
+        <button id="add-text-track" class="ghost hide-narrow" title="Add a titles track">+ Titles</button>
+        <span class="spacer"></span>
+        <button id="snap" class="ghost" aria-pressed="true" title="Snap to clip edges and the playhead"><svg viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0012 0V3M6 7h4M14 7h4"/></svg><span class="hide-narrow">Snap</span></button>
+        <span class="sep"></span>
+        <button id="zoom-out" class="icon ghost" title="Zoom out (−)" aria-label="Zoom out"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg></button>
+        <input id="zoom" type="range" min="0" max="100" value="45" aria-label="Timeline zoom">
+        <button id="zoom-in" class="icon ghost" title="Zoom in (+)" aria-label="Zoom in"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-4-4"/></svg></button>
+        <button id="zoom-fit" class="ghost" title="Fit the whole project">Fit</button>
+        <span class="tl-size" role="group" aria-label="Timeline size">
+            <button id="timeline-bigger" class="icon ghost" title="Make the timeline bigger" aria-label="Make the timeline bigger"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+            <button id="timeline-smaller" class="icon ghost" title="Make the timeline smaller" aria-label="Make the timeline smaller"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        </span>
+    </div>
+    <div class="timeline" id="timeline" tabindex="-1"></div>
+</section>
+
+<div id="export-dialog" class="modal" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <h2 id="export-title">Export video</h2>
+        <div id="export-setup" class="group">
+            <div class="field"><span class="label">Made for</span><div id="export-targets" class="export-targets" role="radiogroup" aria-label="Where the video will be posted"></div></div>
+            <div id="export-fit" class="export-fit" hidden></div>
+            <div class="field"><label for="export-format">Format</label><select id="export-format"></select></div>
+            <div class="field"><label for="export-quality">Quality</label>
+                <select id="export-quality">
+                    <option value="2500000">Draft · 2.5 Mbps</option>
+                    <option value="6000000" selected>Good · 6 Mbps</option>
+                    <option value="12000000">High · 12 Mbps</option>
+                </select>
+            </div>
+            <label class="check"><input type="checkbox" id="export-watermark" checked> Add the NoorEditor.web.app watermark</label>
+            <p id="export-summary"></p>
+            <p id="export-note"></p>
+        </div>
+        <div id="export-progress" class="group" hidden>
+            <progress id="export-bar" max="1" value="0"></progress>
+            <p id="export-status">Starting…</p>
+        </div>
+        <div id="export-result" class="export-result group" hidden></div>
+        <div class="actions">
+            <button id="export-cancel">Cancel</button>
+            <button id="export-start" class="primary">Export</button>
+        </div>
+    </div>
+</div>
+
+<div id="file-menu" class="menu" role="menu" aria-label="File" hidden></div>
+<div id="edit-menu" class="menu" role="menu" aria-label="Edit" hidden></div>
+<div id="view-menu" class="menu" role="menu" aria-label="View" hidden></div>
+<div id="create-menu" class="menu" role="menu" aria-label="Create" hidden></div>
+<div id="tools-menu" class="menu" role="menu" aria-label="Tools" hidden></div>
+<div id="help-menu" class="menu" role="menu" aria-label="Help" hidden></div>
+<div id="drop-overlay" class="drop-overlay" hidden>Drop to import</div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<div id="media-host" class="media-host" aria-hidden="true"></div>
+
+<!-- ?v= is stamped with the release by tools/deploy-video-editor.sh, so browsers and the offline cache pick up new versions. -->
+<script src="timeline.js?v=dev"></script>
+<script src="audio-core.js?v=dev"></script>
+<script src="webm.js?v=dev"></script>
+<script src="hands.js?v=dev"></script>
+<script src="handwriting.js?v=dev"></script>
+<script src="editor.js?v=dev"></script>
+<script src="media-store.js?v=dev"></script>
+<script src="audio-mix.js?v=dev"></script>
+<script src="export-fast.js?v=dev"></script>
+<script src="quran.js?v=dev"></script>
+<script src="captions.js?v=dev"></script>
+<script src="studio.js?v=dev"></script>
+<script src="creator-tools.js?v=dev"></script>
+<script src="creative-effects.js?v=dev"></script>
+<script src="art-gallery.js?v=dev"></script>
+<script src="preview-edit.js?v=dev"></script>
+<script src="hadith.js?v=dev"></script>
+<script src="workspace-layout.js?v=dev"></script>
+<script src="workspace-resize.js?v=dev"></script>
+<script src="brand.js?v=dev"></script>
+<script src="short.js?v=dev"></script>
+<script src="sounds.js?v=dev"></script>
+<script src="record.js?v=dev"></script>
+<script src="library.js?v=dev"></script>
+<script src="pauses.js?v=dev"></script>
+<script src="occasions.js?v=dev"></script>
+<script src="ramadan.js?v=dev"></script>
+<script src="trends.js?v=dev"></script>
+<script src="reframe.js?v=dev"></script>
+<script src="speak.js?v=dev"></script>
+<script src="ai.js?v=dev"></script>
+<script src="tour.js?v=dev"></script>
+<script src="slides.js?v=dev"></script>
+<script src="mobile.js?v=dev"></script>
+<script src="i18n-ar.js?v=dev"></script>
+<script src="i18n.js?v=dev"></script>
+<script>
+// Works offline after the first visit (http only; the service worker cannot run from a file).
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {
+    window.addEventListener('load', function () {
+        var v = (document.querySelector('script[src^="editor.js"]').getAttribute('src').split('v=')[1]) || 'dev';
+        navigator.serviceWorker.register('sw.js?v=' + v).catch(function () {});
+    });
+}
+</script>
+</body>
+</html>
