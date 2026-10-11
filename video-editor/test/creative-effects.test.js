@@ -1,0 +1,7 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const {keyPixels,resizeProject,sticker}=require('../creative-effects');
+const T=require('../timeline');
+test('green screen removes green while keeping a red subject',()=>{const data=new Uint8ClampedArray([0,255,0,255,210,15,12,255,0,90,0,255]);keyPixels(data,'#00ff00',32,20,true);assert.equal(data[3],0);assert.equal(data[7],255);assert.equal(data[11],0);});
+test('blue screen respects existing transparency',()=>{const data=new Uint8ClampedArray([0,0,255,255,255,0,0,100]);keyPixels(data,'#0000ff',20,20,true);assert.equal(data[3],0);assert.equal(data[7],100);});
+test('portrait resizing preserves original, clip timing and audio settings',()=>{let p=T.createProject();p.media=[{id:'v',type:'video'},{id:'a',type:'audio'}];p.clips=[{type:'media',mediaId:'v',start:3,duration:4,fit:'cover'},{type:'media',mediaId:'a',start:0,duration:7,volume:.6},{type:'text',fontSize:72,outline:{width:3},start:0,duration:4}];const next=resizeProject(p,1080,1920,'blur');assert.equal(p.width,1280);assert.equal(next.width,1080);assert.equal(next.clips[0].start,3);assert.equal(next.clips[0].bgFill,'blur');assert.deepEqual(next.clips[1],p.clips[1]);assert.equal(next.clips[2].fontSize,40.5);assert.equal(next.clips[2].outline.width,1.6875);});
+test('crop resize selects cover and is reversible for text sizing',()=>{const p=T.createProject();p.clips=[T.textClip('T1',0,'Test')];const q=resizeProject(resizeProject(p,1080,1920,'crop'),1280,720,'fit');assert.equal(q.clips[0].fontSize,p.clips[0].fontSize);});
