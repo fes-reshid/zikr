@@ -34,7 +34,7 @@ async function makePoster(item,options){
   [options.venue||'Join us on Zoom • Add meeting ID',.81,portrait?14:14,ink]
  ];
  rows.forEach(([text,y,size,color],i)=>{
-  if(!String(text||'').trim())return;
+  if(item.blank&&!String(text||'').trim())return;
   const id=T.nextTrackId(p,'text');p=T.addTrack(p,'text',['Heading','Subtitle','Topic','Speaker','Date and time','Venue'][i]);
   p=T.addClip(p,Object.assign(T.textClip(id,start,String(text)),{duration,y,fontSize:size*unit,font:T.isArabic(text)?'amiri':'marcellus',color,bold:i===0,shadow:!light,anim:'fade',fadeIn:.65+i*.15,fadeOut:.5,box:false}));
  });
