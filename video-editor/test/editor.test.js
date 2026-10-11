@@ -1449,10 +1449,10 @@ async function probeFile(page, bytes) {
         const lionRows = await page.locator('.modal.generic .sound-row:visible').allTextContents();
         check('searching the sound library finds the lion', lionRows.length === 1 && /Lion roaring/.test(lionRows[0]), lionRows.join(' | '));
         await page.locator('.modal.generic').getByRole('searchbox', { name: 'Search sounds' }).fill('');
-        await page.locator('.modal.generic').getByRole('button', { name: 'Add Doves cooing' }).click();
+        await page.locator('.modal.generic').getByRole('button', { name: 'Add Cat', exact: true }).click();
         await page.waitForSelector('.modal.generic', { state: 'detached', timeout: 20000 });
-        check('the library has animals, water and air, and chalk', ['Animals', 'Water & air', 'Chalk & writing'].every((h) => libHeads.includes(h)) &&
-            (await project(page)).media.some((m) => /^Doves cooing/.test(m.name)), libHeads.join(' | '));
+        check('the library has real animals, water and air, and chalk', ['Animals — real recordings', 'Water & air', 'Chalk & writing'].every((h) => libHeads.includes(h)) &&
+            (await project(page)).media.some((m) => /^Cat — real recording\.mp3$/.test(m.name)), libHeads.join(' | '));
         // A typed title with a keyboard sound in time with its letters
         const typeAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
         await page.evaluate((t) => window.Reel.seek(t), typeAt);

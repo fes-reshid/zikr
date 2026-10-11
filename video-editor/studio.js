@@ -24,6 +24,10 @@
         {id:'journey',name:'Steps of goodness · English',theme:'rose',lines:['Across the road, beneath the sky','We see the days go softly by','With thankful hearts and purpose clear','We choose the good, both far and near']}
     ];
     const TEMPLATES=[
+        {id:'blank-fundraiser',name:'Ivory & gold fundraiser · blank',tag:'NEW · NO WRITING',theme:'paper',art:'blank-community-fundraiser',blank:true,title:'',subtitle:'',format:'1080x1620'},
+        {id:'blank-gold-arch',name:'Emerald arch · blank',tag:'BLANK COLLECTION',theme:'emerald',art:'blank-emerald-panel',blank:true,title:'',subtitle:''},
+        {id:'blank-ivory-arch',name:'Ivory lanterns · blank',tag:'BLANK COLLECTION',theme:'paper',art:'blank-ivory-panel',blank:true,title:'',subtitle:''},
+        {id:'blank-night-arch',name:'Midnight & gold · blank',tag:'BLANK COLLECTION',theme:'midnight',art:'blank-midnight-panel',blank:true,title:'',subtitle:''},
         {id:'muhadara-gold',name:'Emerald Muhadara',tag:'GOLD COLLECTION',theme:'emerald',art:'emerald-arch',title:'Muhadara on Zoom',subtitle:'In English & Afaan Oromo',topic:'لِكُلِّ شَيْءٍ أَجْرٌ',speaker:'By Shekh Shamsuddin'},
         {id:'moonlight-talk',name:'Moonlight lecture',tag:'GOLD COLLECTION',theme:'midnight',art:'moonlit-mosque',title:'An evening of reflection',subtitle:'Learn • Reflect • Grow',topic:'Add your lecture topic',speaker:'Speaker: add a name'},
         {id:'ivory-class',name:'Ivory learning circle',tag:'GOLD COLLECTION',theme:'paper',art:'ivory-lanterns',title:'Islamic learning circle',subtitle:'A welcoming space to learn together',topic:'Add your class topic',speaker:'Teacher: add a name'},
@@ -156,8 +160,8 @@
         app.pause();let chosen=TEMPLATES[0];
         const grid=el('div',{className:'studio-grid'}),preview=el('div',{className:'studio-template-detail'});
         const title=el('input',{type:'text',value:chosen.title,maxlength:160}),subtitle=el('input',{type:'text',value:chosen.subtitle,maxlength:200});
-        const size=select([['1080x1350','Portrait poster · 4:5'],['1280x720','Landscape · 16:9'],['1080x1920','Portrait · 9:16'],['1080x1080','Square · 1:1']],'1080x1350');
-        const topic=el('input',{value:chosen.topic||'',dir:'auto',maxlength:160}),speaker=el('input',{value:chosen.speaker||'',maxlength:120}),date=el('input',{value:'Add your date • Add your time',maxlength:120}),venue=el('input',{value:'Join us on Zoom • Add meeting ID',maxlength:160});
+        const size=select([['1080x1620','Full poster · 2:3'],['1080x1350','Portrait poster · 4:5'],['1280x720','Landscape · 16:9'],['1080x1920','Portrait · 9:16'],['1080x1080','Square · 1:1']],chosen.format||'1080x1350');
+        const topic=el('input',{value:chosen.topic||'',dir:'auto',maxlength:160}),speaker=el('input',{value:chosen.speaker||'',maxlength:120}),date=el('input',{value:chosen.blank?'':'Add your date • Add your time',maxlength:120}),venue=el('input',{value:chosen.blank?'':'Join us on Zoom • Add meeting ID',maxlength:160});
         const posterFields=el('div',{},[field('Topic / Arabic heading',topic),field('Speaker / host',speaker),field('Date and time',date),field('Venue / Zoom details',venue)]);
         const cards=[];
         TEMPLATES.forEach(item=>{
@@ -165,15 +169,15 @@
             c.textAlign='center';c.fillStyle=theme.ink;c.font='23px Georgia';
             const words=item.name.split(' '),half=Math.ceil(words.length/2);
             c.fillText(words.slice(0,half).join(' '),160,83);c.fillText(words.slice(half).join(' '),160,111);
-            const card=button('',()=>{chosen=item;title.value=item.title;subtitle.value=item.subtitle;topic.value=item.topic||'';speaker.value=item.speaker||'';posterFields.hidden=!item.art;cards.forEach(b=>b.setAttribute('aria-pressed',String(b===card)));preview.hidden=!!item.lyrics;},
+            const card=button('',()=>{chosen=item;title.value=item.title;subtitle.value=item.subtitle;topic.value=item.topic||'';speaker.value=item.speaker||'';date.value=item.blank?'':'Add your date • Add your time';venue.value=item.blank?'':'Join us on Zoom • Add meeting ID';posterFields.hidden=!item.art||!!item.blank;if(item.format)size.value=item.format;cards.forEach(b=>b.setAttribute('aria-pressed',String(b===card)));preview.hidden=!!item.lyrics;},
                 {className:'studio-card','aria-label':item.name,'aria-pressed':String(item===chosen)});
             card.append(item.art?el('img',{src:'assets/'+item.art+'.webp',alt:item.name,loading:'lazy',style:{width:'100%',height:'150px',objectFit:'cover',objectPosition:'center 25%'}}):image,el('span',{className:'studio-tag',text:item.tag}),el('strong',{text:item.name}));cards.push(card);grid.append(card);
         });
-        posterFields.hidden=!chosen.art;
+        posterFields.hidden=!chosen.art||!!chosen.blank;
         const useBrand=el('input',{type:'checkbox'});useBrand.checked=!!(window.ReelBrand&&window.ReelBrand.get());
         const brandRow=el('label',{className:'check',hidden:!(window.ReelBrand&&window.ReelBrand.get())},[useBrand,'Use my brand kit (colours, font and logo)']);
-        preview.append(field('Opening title',title),field('Subtitle',subtitle),brandRow,posterFields,field('Format',size,app.state.project.clips.length?'Uses your current project’s frame size and adds scenes at the end.':'Choose the shape of your new video.'));
-        app.openDialog({title:'Start with a template',wide:true,intro:'A little inspiration, ready to make your own. Every title, scene and transition stays editable.',
+        preview.append(field('Opening title',title,'Optional for blank templates. Leave empty for no writing.'),field('Subtitle',subtitle),brandRow,posterFields,field('Format',size,app.state.project.clips.length?'Uses your current project’s frame size and adds scenes at the end.':'Choose the shape of your new video.'));
+        app.openDialog({title:'Start with a template',wide:true,intro:'Choose a blank design with no writing, or a ready-made video. Add your own movable text and pictures in the editor.',
             body:[grid,preview],actions:[{label:'Cancel'},{label:'Use template',primary:true,run:async d=>{
                 if(chosen.lyrics){d.close();openLyrics('gratitude');return false;}
                 const before=app.state.project;

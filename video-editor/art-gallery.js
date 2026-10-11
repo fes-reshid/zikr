@@ -4,6 +4,7 @@
 const app=window.ReelApp,T=app.T,el=app.el;
 const ART=[['emerald-arch','Emerald & gold arch'],['moonlit-mosque','Moonlit mosque'],['ivory-lanterns','Ivory lantern courtyard'],['blank-emerald-panel','Blank emerald & gold panel'],['blank-ivory-panel','Blank ivory & gold panel'],['blank-midnight-panel','Blank midnight & gold panel'],['emerald-label','Emerald gold label'],['ivory-label','Ivory gold cartouche'],['gold-flourish','Gold arabesque flourish']];
 const SHAPES=['emerald-label','ivory-label','gold-flourish'];
+ART.unshift(['blank-community-fundraiser','Ivory & gold fundraiser · no writing']);
 const THEMES=[['emerald','Emerald geometry'],['midnight','Midnight geometry'],['paper','Warm paper'],['rose','Rose glow'],['sky','Soft sky']];
 async function importArt(id){
  if(!ART.some(a=>a[0]===id))throw new Error('Unknown background');
@@ -21,7 +22,10 @@ async function makePoster(item,options){
  p=T.addClip(p,Object.assign(T.clipFromMedia(T.getMedia(p,mediaId),track,start),{duration,fit:'contain',bgFill:'blur'}));
  const light=item.theme==='paper',ink=light?'#26352f':'#fff4d6',accent=light?'#78511e':'#f3cf77';
  const portrait=h>w,unit=portrait?Math.min(w/h,.8)/.8:1;
- const rows=[
+ const rows=item.blank?[
+  [options.title,.13,portrait?30:29,ink],
+  [options.subtitle,.205,portrait?15:15,ink]
+ ]:[
   [options.title||item.title,.41,portrait?30:29,ink],
   [options.subtitle||item.subtitle,.48,portrait?15:15,ink],
   [options.topic||item.topic,.575,portrait?34:32,accent],
@@ -30,10 +34,11 @@ async function makePoster(item,options){
   [options.venue||'Join us on Zoom • Add meeting ID',.81,portrait?14:14,ink]
  ];
  rows.forEach(([text,y,size,color],i)=>{
+  if(!String(text||'').trim())return;
   const id=T.nextTrackId(p,'text');p=T.addTrack(p,'text',['Heading','Subtitle','Topic','Speaker','Date and time','Venue'][i]);
   p=T.addClip(p,Object.assign(T.textClip(id,start,String(text)),{duration,y,fontSize:size*unit,font:T.isArabic(text)?'amiri':'marcellus',color,bold:i===0,shadow:!light,anim:'fade',fadeIn:.65+i*.15,fadeOut:.5,box:false}));
  });
- app.apply(p);app.seek(start+2);app.zoomToFit();app.selectOnly(p.clips[p.clips.length-6].id);app.toast('Invitation added. Every text line is editable; Undo removes the template.');
+ app.apply(p);app.seek(start+2);app.zoomToFit();app.selectOnly(p.clips[item.blank?p.clips.length-1:p.clips.length-6].id);app.toast(item.blank?'Blank template added. Use Title or Import to add your own movable text and pictures.':'Invitation added. Every text line is editable; Undo removes the template.');
 }
 function openBackgrounds(onlyShapes=false){
  onlyShapes=onlyShapes===true;

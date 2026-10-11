@@ -4,10 +4,10 @@
  * Nature sounds (rain, wind, waves, a stream, birds, crickets, a fire, a
  * fountain), short sound effects (whoosh, pop, click, typing, page turn…),
  * animal calls (doves, a lion, an elephant, a wolf, a camel, a cat…), water and air, and
- * chalk and pencil writing — also timed to a title's letters — all made on
- * this device from noise and simple tones — no music, no instruments, no
- * downloads. Each is turned into a WAV file and put on an audio track at the
- * playhead. `synth` is plain JavaScript, so it is tested under Node too.
+ * chalk and pencil writing — also timed to a title's letters.
+ * Animals use bundled CC0 field recordings, downloaded only when selected.
+ * Other effects and explicitly labelled legacy animal imitations are made
+ * on this device. Imported audio remains editable and travels with a project.
  */
 (function (root, factory) {
     const api = factory();
@@ -38,6 +38,40 @@
         turkey: ['Turkey', 1.8], snake: ['Snake hissing', 2.2], mouse: ['Mouse squeaking', 1.4], dolphin: ['Dolphin', 2.2], whale: ['Whale song', 4],
         mosquito: ['Mosquito', 2.5]
     };
+    // Never silently substitute a synthetic call if a recording fails to load.
+    // Provenance, download URLs and CC0 declarations: assets/animal-recordings.json.
+    const RECORDINGS = Object.fromEntries([
+        'rooster', 'sheep', 'cow', 'cat', 'dog', 'duck', 'owl', 'frog', 'horse',
+        'bees', 'seagull', 'lion', 'tiger', 'elephant', 'wolf', 'goat', 'donkey',
+        'camel', 'bear', 'crow', 'hens', 'chicks', 'parrot'
+    ].map((kind) => [kind, 'assets/animal-' + kind + '-v1.mp3']));
+    const RECORDED_LABELS = { bees: 'Bumblebee buzzing', parrot: 'Cockatiel parrot', hens: 'Hen calling', tiger: 'Tiger roaring' };
+
+    /** Coalesce requests; a failed download can always be retried. */
+    function createRecordingLoader(fetcher) {
+        const cache = new Map();
+        return function (kind) {
+            if (!RECORDINGS[kind]) return Promise.reject(new Error('No real recording is available for this animal.'));
+            if (!cache.has(kind)) {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 20000);
+                const request = Promise.resolve().then(() => fetcher(RECORDINGS[kind], { signal: controller.signal }))
+                    .then(async function (res) {
+                        if (!res.ok) throw new Error('Recording download failed.');
+                        const type = res.headers.get('content-type') || '';
+                        if (type && !/^(audio\/|application\/octet-stream)/i.test(type)) throw new Error('Invalid recording response.');
+                        const blob = await res.blob();
+                        if (!blob.size || blob.size > 4 * 1024 * 1024) throw new Error('Invalid recording size.');
+                        return blob;
+                    }).catch(function () {
+                        cache.delete(kind);
+                        throw new Error('The real recording could not load. Check your connection and try again.');
+                    }).finally(() => clearTimeout(timeout));
+                cache.set(kind, request);
+            }
+            return cache.get(kind);
+        };
+    }
     const WATER = {
         pour: ['Pouring water', 3], bubbles: ['Bubbles', 2.5], splash: ['Splash', 1.3], drips: ['Dripping tap', 4],
         gust: ['Gust of air', 2.2], blow: ['Blowing air', 1.6]
@@ -48,7 +82,7 @@
     };
     const WRITING = { chalk: 'Chalk on a board', pencil: 'Pencil on paper', typing: 'Keyboard typing' };
     function info(kind) { return EFFECTS[kind] || ANIMALS[kind] || WATER[kind] || CHALK[kind] || null; }
-    function label(kind) { return NATURE[kind] || (info(kind) || [kind])[0]; }
+    function label(kind) { return RECORDED_LABELS[kind] || NATURE[kind] || (info(kind) || [kind])[0]; }
 
     /** A small, seeded random generator, so a sound is the same every time. */
     function rng(seed) {
@@ -588,36 +622,75 @@
 
     /* ------------------------------------------------------------- the dialog */
 
-    if (typeof window === 'undefined' || !window.ReelApp) return { synth, writingSound, NATURE, EFFECTS, ANIMALS, WATER, CHALK, WRITING, RATE };
+    if (typeof window === 'undefined' || !window.ReelApp) return { synth, writingSound, createRecordingLoader, RECORDINGS, NATURE, EFFECTS, ANIMALS, WATER, CHALK, WRITING, RATE };
     const app = window.ReelApp;
     const T = app.T;
     const el = app.el;
     let ctx = null;
     let playing = null;
+    let previewTicket = 0;
+    let previewKind = null;
+    let previewReset = null;
+    const loadRecording = createRecordingLoader((url, options) => fetch(url, options));
 
-    function preview(kind, seconds) {
+    function stopPreview() {
+        previewTicket += 1;
+        if (playing) { try { playing.stop(); playing.disconnect(); } catch (err) { /* ended */ } }
+        playing = null;
+        previewKind = null;
+        if (previewReset) previewReset();
+        previewReset = null;
+    }
+
+    async function preview(kind, seconds, onState) {
+        stopPreview();
+        const ticket = previewTicket;
+        previewKind = kind;
+        previewReset = () => { if (onState) onState('idle'); };
+        if (onState) onState('loading');
         try {
             if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-            if (playing) { try { playing.stop(); } catch (err) { /* already stopped */ } }
-            const data = synth(kind, Math.min(seconds || 6, 6));
-            const buf = ctx.createBuffer(1, data.length, RATE);
-            buf.copyToChannel(data, 0);
+            // Resume inside the tap/click gesture, before waiting for the download (iOS).
+            const resumed = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+            let buf;
+            if (RECORDINGS[kind]) {
+                const [blob] = await Promise.all([loadRecording(kind), resumed]);
+                if (ticket !== previewTicket) return;
+                buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+            } else {
+                await resumed;
+                const data = synth(kind, Math.min(seconds || 6, 6));
+                buf = ctx.createBuffer(1, data.length, RATE);
+                buf.copyToChannel(data, 0);
+            }
+            if (ticket !== previewTicket) return;
             const src = ctx.createBufferSource();
             src.buffer = buf;
             src.connect(ctx.destination);
-            src.start();
             playing = src;
-        } catch (err) { app.toast('This browser could not play the preview.'); }
+            src.onended = () => { if (ticket === previewTicket) stopPreview(); };
+            src.start();
+            if (onState) onState('playing');
+        } catch (err) {
+            if (ticket !== previewTicket) return;
+            stopPreview();
+            app.toast(RECORDINGS[kind] ? 'The real recording could not play. Check your connection and try again.' : 'This browser could not play the preview.');
+        }
     }
 
     /** Imports samples as a WAV and puts them on a free audio track at `at` (adding a track if none is free). */
     async function placeSound(data, name, at, look) {
         const wav = window.ReelAudio.encodeWav([data], RATE);
-        const ids = await app.importFiles([new File([wav], name, { type: 'audio/wav', lastModified: Date.now() })], { noCommit: true, fresh: true });
+        return placeFile(new File([wav], name, { type: 'audio/wav', lastModified: Date.now() }), at, look, data.length / RATE);
+    }
+
+    async function placeFile(file, at, look, fallbackLength) {
+        const ids = await app.importFiles([file], { noCommit: true, fresh: true });
         if (!ids.length) throw new Error('The sound could not be added.');
         let p = app.state.project;
         const media = T.getMedia(p, ids[0]);
-        const len = media.duration || data.length / RATE;
+        const len = media && (media.duration || fallbackLength);
+        if (!Number.isFinite(len) || len <= 0) throw new Error('The sound could not be decoded. Please try again.');
         let track = p.tracks.filter((t) => t.kind === 'audio').find(function (t) {
             const s = T.findFreeStart(p, t.id, at, len, null);
             return s !== null && Math.abs(s - at) < 1e-6;
@@ -634,12 +707,19 @@
 
     /** Makes a library sound and puts it at the playhead. */
     async function addSound(kind, seconds) {
-        const data = synth(kind, seconds);
-        const name = label(kind) + (NATURE[kind] ? ' (' + Math.round(data.length / RATE) + ' s)' : '') + '.wav';
         const at = Math.round(app.state.time * 1000) / 1000;
-        const clip = await placeSound(data, name, at, { volume: NATURE[kind] ? 0.5 : 0.9, fadeIn: NATURE[kind] ? 1 : 0, fadeOut: NATURE[kind] ? 1.5 : 0 });
+        let clip;
+        if (RECORDINGS[kind]) {
+            const blob = await loadRecording(kind);
+            clip = await placeFile(new File([blob], label(kind) + ' — real recording.mp3', { type: 'audio/mpeg', lastModified: Date.now() }), at, { volume: 0.9, fadeIn: 0.008, fadeOut: 0.025 });
+        } else {
+            const data = synth(kind, seconds);
+            const name = label(kind) + (NATURE[kind] ? ' (' + Math.round(data.length / RATE) + ' s)' : '') + '.wav';
+            clip = await placeSound(data, name, at, { volume: NATURE[kind] ? 0.5 : 0.9, fadeIn: NATURE[kind] ? 1 : 0, fadeOut: NATURE[kind] ? 1.5 : 0 });
+        }
         app.selectOnly(clip.id);
         app.toast(label(kind) + ' added at the playhead.');
+        return clip;
     }
 
     /**
@@ -672,13 +752,31 @@
             .map((o) => el('option', { value: o[0], text: o[1] })));
         length.value = '30';
         let dialog = null;
-        const row = function (kind, label) {
-            return el('div', { className: 'sound-row', 'data-name': (label + ' ' + kind + ' ' + (window.ReelI18n ? window.ReelI18n.tr(label) : '')).toLowerCase() }, [
-                el('span', { text: label }),
-                el('button', { type: 'button', className: 'ghost', text: '▶ Listen', 'aria-label': 'Listen to ' + label, onclick: function () { preview(kind, Number(length.value)); } }),
+        let adding = false;
+        const row = function (kind, name) {
+            const real = !!RECORDINGS[kind];
+            if (real) name = label(kind);
+            const listen = el('button', { type: 'button', className: 'ghost', text: '▶ Listen', 'aria-label': 'Listen to ' + name, onclick: function () {
+                if (previewKind === kind) { stopPreview(); return; }
+                preview(kind, Number(length.value), function (state) {
+                    listen.textContent = state === 'loading' ? 'Cancel' : state === 'playing' ? '■ Stop' : '▶ Listen';
+                    listen.setAttribute('aria-label', (state === 'loading' ? 'Cancel loading ' : state === 'playing' ? 'Stop ' : 'Listen to ') + name);
+                    listen.setAttribute('aria-pressed', String(state !== 'idle'));
+                });
+            } });
+            return el('div', { className: 'sound-row', 'data-name': (name + ' ' + kind + ' ' + (window.ReelI18n ? window.ReelI18n.tr(name) : '')).toLowerCase() }, [
+                el('span', {}, [el('span', { text: name }), el('small', { className: 'hint', style: { display: 'block' }, text: real ? 'Real recording · CC0' : ANIMALS[kind] ? 'Generated imitation' : 'Generated effect' })]),
+                listen,
                 el('button', {
-                    type: 'button', text: 'Add', 'aria-label': 'Add ' + label, onclick: async function () {
+                    type: 'button', text: 'Add', 'aria-label': 'Add ' + name, onclick: async function (e) {
+                        if (adding) return;
+                        adding = true;
+                        const button = e.currentTarget;
+                        button.disabled = true;
+                        button.textContent = 'Adding…';
+                        stopPreview();
                         try { await addSound(kind, Number(length.value)); dialog.close(); } catch (err) { dialog.status(err.message); }
+                        finally { adding = false; button.disabled = false; button.textContent = 'Add'; }
                     }
                 })
             ]);
@@ -687,7 +785,13 @@
         const sections = [
             section('nature', 'Nature & calm', Object.keys(NATURE).filter((k) => k !== 'fountain' && k !== 'bubbling').map((k) => row(k, NATURE[k])), [app.dialogField('Length', length)]),
             section('effects', 'Sound effects', Object.keys(EFFECTS).map((k) => row(k, EFFECTS[k][0]))),
-            section('animals', 'Animals', Object.keys(ANIMALS).map((k) => row(k, ANIMALS[k][0]))),
+            section('animals', 'Animals — real recordings', Object.keys(RECORDINGS).map((k) => row(k, label(k))), [
+                el('p', { className: 'hint', text: 'Actual animal recordings, not computer-made calls. Downloaded when selected, then saved with your project. Natural background ambience may be audible.' }),
+                el('a', { href: 'assets/animal-recordings.json', target: '_blank', rel: 'noopener', text: 'Recording sources & CC0 licenses' })
+            ]),
+            section('generated', 'Animal imitations — generated', Object.keys(ANIMALS).filter(k => !RECORDINGS[k]).map((k) => row(k, ANIMALS[k][0])), [
+                el('p', { className: 'hint', text: 'Legacy artificial effects, not real animals. Choose Animals for actual recordings.' })
+            ]),
             section('water', 'Water & air', ['fountain', 'bubbling'].map((k) => row(k, NATURE[k])).concat(Object.keys(WATER).map((k) => row(k, WATER[k][0])))),
             section('chalk', 'Chalk & writing', Object.keys(CHALK).map((k) => row(k, CHALK[k][0])),
                 [el('p', { className: 'hint', text: 'To hear chalk or keys in time with a title as it is written or typed, select the title and use Writing sound in its details.' })])
@@ -703,11 +807,11 @@
                     r.hidden = !hit;
                     any = any || hit;
                 });
-                sec.hidden = !(any && (cat === 'all' || sec.dataset.cat === cat || q));
+                sec.hidden = !(any && (cat === 'all' || sec.dataset.cat === cat || q)) || (sec.dataset.cat === 'generated' && cat !== 'generated' && !q);
             });
         };
         const chips = el('div', { className: 'sound-chips', role: 'group', 'aria-label': 'Kinds of sound' });
-        [['all', 'All'], ['nature', 'Nature'], ['effects', 'Effects'], ['animals', 'Animals'], ['water', 'Water & air'], ['chalk', 'Chalk & writing']].forEach(function (c, k) {
+        [['all', 'All'], ['nature', 'Nature'], ['effects', 'Effects'], ['animals', 'Animals'], ['water', 'Water & air'], ['chalk', 'Chalk & writing'], ['generated', 'Imitations']].forEach(function (c, k) {
             chips.append(el('button', { type: 'button', text: c[1], 'aria-pressed': String(!k), onclick: function (e) {
                 cat = c[0];
                 chips.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
@@ -718,17 +822,18 @@
         dialog = app.openDialog({
             title: 'Sound library',
             wide: true,
-            intro: 'Nature sounds, sound effects, animals, water and chalk — no music and no instruments, made on your device and free to use in any video.',
+            intro: 'Real animal recordings, nature sounds, water and writing effects — no music. Animals use CC0 recordings; other effects are generated on your device.',
             body: [search, chips].concat(sections, [
                 el('p', { className: 'hint', text: 'For a nasheed, record your own voice with Record voice, or import one you are allowed to use.' })
             ]),
-            onClose: function () { if (playing) { try { playing.stop(); } catch (err) { /* done */ } } }
+            onClose: stopPreview
         });
+        show();
     }
 
     const bar = document.querySelector('.studio-bar');
     if (bar) bar.append(el('button', { type: 'button', id: 'studio-sounds', text: 'Sounds', onclick: openSounds }));
     app.addTool({ section: 'Create', label: 'Sound library (no music)…', run: openSounds });
 
-    return { synth, writingSound, NATURE, EFFECTS, ANIMALS, WATER, CHALK, WRITING, RATE, openSounds, addSound, addWritingSound };
+    return { synth, writingSound, createRecordingLoader, RECORDINGS, NATURE, EFFECTS, ANIMALS, WATER, CHALK, WRITING, RATE, openSounds, addSound, addWritingSound, preview, stopPreview };
 }));
