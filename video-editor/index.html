@@ -438,6 +438,18 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .menubar #create { color: var(--text); }
 .topbar .moved { display: none !important; }
 .menu-item[disabled] { opacity: .4; }
+.menu-item .mi-label { flex: 1; }
+.menu-item .mi-key { margin-left: 18px; color: var(--muted); font-size: 12px; font-family: var(--mono); }
+.menu-item.menu-back { font-weight: 600; }
+.shortcut-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 16px; }
+.shortcut-row { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.shortcut-row kbd { min-width: 96px; font-family: var(--mono); font-size: 12px; color: var(--text); }
+.shortcut-row span { color: var(--muted); font-size: 13px; }
+.guide-steps { margin: 0 0 10px; padding-inline-start: 20px; line-height: 1.6; }
+.ref-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; max-height: 60vh; overflow: auto; }
+.ref-menu h3 { margin: 0 0 4px; font-size: 14px; color: var(--text); }
+.ref-section { margin-top: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
+.ref-item { font-size: 13px; color: var(--muted); padding: 1px 0; white-space: pre-wrap; }
 @media (max-width: 900px) { .menubar button { background: var(--panel-2); border-color: var(--line-2); color: var(--text); min-width: 38px; min-height: 38px; justify-content: center; padding: 6px 8px; } }
 /* The Create buttons now live in the Create menu; modules still register them here. */
 .studio-bar, .workspace-size-bar { display: none !important; }

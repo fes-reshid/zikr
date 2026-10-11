@@ -2452,11 +2452,113 @@
 
     function helpItems() {
         return [
-            { section: 'Help', label: 'User guide', run: openGuide },
+            { section: 'Help', label: 'Help & Tutorials (full page)', key: 'F1', run: openGuide },
+            { section: 'Help', label: 'Tutorials', sub: tutorialItems },
+            { section: 'Help', label: 'Menu Reference', run: showMenuReference },
+            { section: 'Help', label: 'Guide & Keyboard Shortcuts', key: '?', run: showGuide },
+            { section: 'Help', label: 'Keyboard Shortcuts…', run: showShortcuts },
             { section: 'Help', label: 'Take the tour', run: function () { if (window.ReelTour) window.ReelTour.start(); } },
-            { section: 'Help', label: 'Keyboard shortcuts', run: function () { window.open('help.html#keys', '_blank', 'noopener'); } },
-            { section: 'Help', label: 'About', run: showAbout }
+            { section: 'More', label: 'Install as an App…', run: installApp },
+            { section: 'More', label: 'About', run: showAbout }
         ];
+    }
+
+    const SHORTCUTS = [
+        ['Space', 'Play / pause'], ['S', 'Split at playhead'], ['Del', 'Delete'],
+        ['Shift+Del', 'Delete and close gap'], ['Ctrl+C / X / V', 'Copy, cut, paste'], ['Ctrl+D', 'Duplicate'],
+        ['Ctrl+A', 'Select all'], ['Shift+click', 'Add to selection'], ['T', 'Add title'], ['W', 'Title written by hand'], ['D', 'Draw'], ['M', 'Add marker'],
+        ['F', 'Freeze frame'], ['← →', 'Step a frame'], ['Shift+← →', 'Step a second'], ['Alt+← →', 'Nudge clip'],
+        ['Home / End', 'Start / end'], ['Ctrl+Z', 'Undo'], ['Ctrl+Shift+Z', 'Redo'], ['+ / −', 'Zoom'],
+        ['Ctrl+wheel', 'Zoom at pointer'], ['Pinch', 'Zoom (touch)'], ['Ctrl+S', 'Save as a file'], ['F1', 'Help & tutorials'], ['?', 'Guide & keyboard shortcuts']
+    ];
+
+    function shortcutTable(list) {
+        return el('div', { className: 'shortcut-grid' }, (list || SHORTCUTS).map((k) => el('div', { className: 'shortcut-row' }, [el('kbd', { text: k[0] }), el('span', { text: k[1] })])));
+    }
+
+    /** Help ▸ Tutorials: the tutorials on the help page, grouped as there. */
+    let tutorialList = null;
+    function tutorialItems() {
+        if (!tutorialList) {
+            tutorialList = fetch('help.html').then((r) => r.text()).then(function (html) {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const list = Array.from(doc.querySelectorAll('.card.tut[id]')).map((n) => ({
+                    section: n.dataset.tag || 'Tutorials', label: n.dataset.title || n.id,
+                    run: function () { window.open('help.html#' + n.id, '_blank', 'noopener'); }
+                }));
+                // One heading per topic, in the order topics first appear.
+                const order = [];
+                list.forEach((it) => { if (order.indexOf(it.section) === -1) order.push(it.section); });
+                return list.slice().sort((a, b) => order.indexOf(a.section) - order.indexOf(b.section));
+            }).catch(function () { tutorialList = null; return [{ section: 'Tutorials', label: 'Open the help page', run: openGuide }]; });
+        }
+        return tutorialList;
+    }
+
+    /** Help ▸ Guide & Keyboard Shortcuts: a short start, and the keys. */
+    function showGuide() {
+        openDialog({
+            title: 'Guide & keyboard shortcuts',
+            wide: true,
+            body: [
+                el('ol', { className: 'guide-steps' }, [
+                    'Import videos, pictures and sound (Import, or drop them on the page).',
+                    'Double-click a file, or drag it, to put it on the timeline.',
+                    'Press T for a title; click anything to change it in the details panel on the right.',
+                    'Split with S, trim by dragging a clip’s ends, and add transitions, sounds and effects.',
+                    'Press Export and choose where the video will be posted.'
+                ].map((t) => el('li', { text: t }))),
+                el('h3', { text: 'Keyboard shortcuts' }),
+                shortcutTable(),
+                el('p', { className: 'hint' }, [el('a', { href: 'help.html', target: '_blank', rel: 'noopener', text: 'Open the full help page with step-by-step tutorials' })])
+            ],
+            actions: [{ label: 'Close', primary: true }]
+        });
+    }
+
+    function showShortcuts() {
+        openDialog({ title: 'Keyboard shortcuts', wide: true, body: [shortcutTable()], actions: [{ label: 'Close', primary: true }] });
+    }
+
+    /** Help ▸ Menu Reference: every menu and what is in it. */
+    function showMenuReference() {
+        const names = { file: 'File', edit: 'Edit', view: 'View', create: 'Create', tools: 'Tools', help: 'Help' };
+        const blocks = Object.keys(names).map(function (which) {
+            const items = which === 'tools' ? tools.filter((t) => t.section !== 'Create' && t.section !== 'Project') : menuItems(which);
+            const rows = [];
+            let last = null;
+            items.forEach(function (it) {
+                if (it.section !== last && it.section !== names[which]) { rows.push(el('div', { className: 'ref-section', text: it.section })); }
+                last = it.section;
+                rows.push(el('div', { className: 'ref-item', text: it.label + (it.sub ? ' ›' : '') + (it.key ? '   ' + it.key : '') }));
+            });
+            return el('div', { className: 'ref-menu' }, [el('h3', { text: names[which] })].concat(rows));
+        });
+        openDialog({ title: 'Menu reference', wide: true, intro: 'Everything in the menus at the top, menu by menu.', body: [el('div', { className: 'ref-grid' }, blocks)], actions: [{ label: 'Close', primary: true }] });
+    }
+
+    /** Help ▸ Install as an App: the browser's own install, or how to do it. */
+    let installPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installPrompt = e; });
+    window.addEventListener('appinstalled', function () { installPrompt = null; toast('Installed. Open it from your apps or home screen.'); });
+    function installApp() {
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) { toast('The video editor is already open as an app.'); return; }
+        if (installPrompt) {
+            const pr = installPrompt;
+            installPrompt = null;
+            pr.prompt();
+            return;
+        }
+        openDialog({
+            title: 'Install as an app',
+            intro: 'Install the video editor to open it from your desktop or home screen, in its own window. It works offline too.',
+            body: [el('ul', null, [
+                el('li', { text: 'Chrome or Edge on a computer: the install icon at the right of the address bar, or ⋮ ▸ Cast, save and share ▸ Install page as app.' }),
+                el('li', { text: 'Android (Chrome): ⋮ ▸ Add to Home screen or Install app.' }),
+                el('li', { text: 'iPhone or iPad (Safari): the Share button ▸ Add to Home Screen.' })
+            ])],
+            actions: [{ label: 'Close', primary: true }]
+        });
     }
 
     /** What each drop-down menu holds. */
@@ -2479,18 +2581,7 @@
         closeMenus();
         const menu = $(which + '-menu');
         const button = $(which);
-        menu.textContent = '';
-        let last = null;
-        menuItems(which).forEach(function (it) {
-            if (it.section !== last) {
-                menu.append(el('div', { className: 'menu-section', text: it.section }));
-                last = it.section;
-            }
-            menu.append(el('button', {
-                role: 'menuitem', className: 'menu-item', text: it.label, disabled: !!it.disabled,
-                onclick: function () { closeMenus(); it.run(); }
-            }));
-        });
+        fillMenu(menu, menuItems(which), which);
         const r = button.getBoundingClientRect();
         menu.style.top = Math.round(r.bottom + 6) + 'px';
         menu.style.left = '8px';
@@ -2502,6 +2593,41 @@
         button.setAttribute('aria-expanded', 'true');
         const first = menu.querySelector('.menu-item');
         if (first) first.focus();
+    }
+
+    /** Puts `items` in `menu`: section headings, a key hint on the right, and › for a submenu. */
+    function fillMenu(menu, items, which) {
+        menu.textContent = '';
+        let last = null;
+        items.forEach(function (it) {
+            if (it.section !== last) {
+                menu.append(el('div', { className: 'menu-section', text: it.section }));
+                last = it.section;
+            }
+            menu.append(el('button', {
+                role: 'menuitem', className: 'menu-item' + (it.sub ? ' has-sub' : ''), 'aria-label': it.label, 'aria-haspopup': it.sub ? 'menu' : null, disabled: !!it.disabled,
+                onclick: function (e) {
+                    // The item is replaced by the submenu, so the page's "click outside closes menus" must not see it.
+                    if (it.sub) { e.stopPropagation(); openSubmenu(menu, it, which); return; }
+                    closeMenus(); it.run();
+                }
+            }, [el('span', { className: 'mi-label', text: it.label }), it.key ? el('span', { className: 'mi-key', text: it.key }) : it.sub ? el('span', { className: 'mi-key', text: '›' }) : null]));
+        });
+    }
+
+    async function openSubmenu(menu, item, which) {
+        menu.textContent = '';
+        menu.append(el('button', { role: 'menuitem', className: 'menu-item menu-back', 'aria-label': 'Back', onclick: function (e) { e.stopPropagation(); fillMenu(menu, menuItems(which), which); const f = menu.querySelector('.menu-item'); if (f) f.focus(); } }, [el('span', { className: 'mi-label', text: '‹ ' + item.label })]));
+        menu.append(el('div', { className: 'menu-section', text: 'Loading…' }));
+        const list = await item.sub();
+        if (menu.hidden) return;
+        const back = menu.firstChild;
+        fillMenu(menu, list, which);
+        menu.prepend(back);
+        // A longer list may be wider: keep it on screen.
+        const left = parseFloat(menu.style.left) || 8;
+        menu.style.left = Math.round(Math.max(8, Math.min(left, window.innerWidth - menu.offsetWidth - 8))) + 'px';
+        back.focus();
     }
 
     function closeMenus() {
@@ -3283,14 +3409,7 @@
             ]);
         });
 
-        const shortcuts = [
-            ['Space', 'Play / pause'], ['S', 'Split at playhead'], ['Del', 'Delete'],
-            ['Shift+Del', 'Delete and close gap'], ['Ctrl+C / X / V', 'Copy, cut, paste'], ['Ctrl+D', 'Duplicate'],
-            ['Ctrl+A', 'Select all'], ['Shift+click', 'Add to selection'], ['T', 'Add title'], ['W', 'Title written by hand'], ['D', 'Draw'], ['M', 'Add marker'],
-            ['F', 'Freeze frame'], ['← →', 'Step a frame'], ['Shift+← →', 'Step a second'], ['Alt+← →', 'Nudge clip'],
-            ['Home / End', 'Start / end'], ['Ctrl+Z', 'Undo'], ['Ctrl+Shift+Z', 'Redo'], ['+ / −', 'Zoom'],
-            ['Ctrl+wheel', 'Zoom at pointer'], ['Pinch', 'Zoom (touch)']
-        ];
+        const shortcuts = SHORTCUTS;
         box.append(
             el('div', { className: 'insp-title' }, [el('span', { className: 'chip', text: 'Project' }), el('span', { text: p.name })]),
             group('Project', [
@@ -4010,10 +4129,45 @@
         return true;
     }
 
-    function closeTab(i) {
-        if (tabs.length < 2) return;
+    /**
+     * Asks what to do with changes not saved to a file: resolves to 'save', 'discard' or 'cancel'.
+     * The editor's own window — browsers can silence their confirm box.
+     */
+    function askSave(name, closing) {
+        return new Promise(function (resolve) {
+            let answer = 'cancel';
+            openDialog({
+                title: 'Save your changes?',
+                intro: '“' + (name || 'Untitled project') + '” has changes that are not saved to a file. Save it before ' + (closing ? 'closing?' : 'starting a new project?'),
+                body: window.ReelLibrary ? [el('p', { className: 'hint', text: 'A copy also stays in File ▸ My projects in this browser.' })] : [],
+                onClose: function () { resolve(answer); },
+                actions: [
+                    { label: 'Cancel' },
+                    { label: 'Don’t save', run: function () { answer = 'discard'; return true; } },
+                    { label: 'Save', primary: true, run: function () { answer = 'save'; return true; } }
+                ]
+            });
+        });
+    }
+
+    /** Whether tab `i` has clips that were changed since it was last saved as a file. */
+    function unsaved(i) {
         const p = i === activeTab ? state.project : tabs[i].project;
-        if (p.clips.length && !window.confirm('Close “' + p.name + '”? It will be removed from this browser — Save it first to keep a copy.')) return;
+        return !!(p && p.clips.length && tabs[i].saved !== p);
+    }
+
+    async function closeTab(i) {
+        if (tabs.length < 2) return;
+        const tab = tabs[i];
+        const p = i === activeTab ? state.project : tab.project;
+        if (unsaved(i)) {
+            if (i === activeTab && window.ReelLibrary) window.ReelLibrary.rememberNow();
+            const answer = await askSave(p.name, true);
+            if (answer === 'cancel') return;
+            if (answer === 'save') { if (tabs.indexOf(tab) !== activeTab) switchTab(tabs.indexOf(tab)); saveProject(); }
+        }
+        i = tabs.indexOf(tab);
+        if (i === -1 || tabs.length < 2) return;
         if (i === activeTab) {
             const next = i === tabs.length - 1 ? i - 1 : i + 1;
             switchTab(next);
@@ -4051,8 +4205,13 @@
 
     /* ---------------------------------------------------------------- project */
 
-    function newProject() {
-        if (state.project.clips.length && !window.confirm('Start a new project? The current timeline will be cleared.')) return;
+    async function newProject() {
+        if (unsaved(activeTab)) {
+            if (window.ReelLibrary) window.ReelLibrary.rememberNow();
+            const answer = await askSave(state.project.name, false);
+            if (answer === 'cancel') return;
+            if (answer === 'save') saveProject();
+        }
         pause();
         const keep = { width: state.project.width, height: state.project.height, fps: state.project.fps };
         state.project = T.createProject(keep);
@@ -4067,6 +4226,7 @@
     function saveProject() {
         const blob = new Blob([T.serialize(state.project)], { type: 'application/json' });
         download(blob, safeName(state.project.name) + '.reel.json');
+        tabs[activeTab].saved = state.project;
         toast('Saved. Media files are not inside it — keep them alongside the project.');
     }
 
@@ -4821,6 +4981,8 @@
         else if (e.key === '=' || e.key === '+') setZoom(state.pps * 1.5);
         else if (e.key === '-' || e.key === '_') setZoom(state.pps / 1.5);
         else if (e.key === 'Escape') { selectOnly(null); selectMarker(null); }
+        else if (e.key === 'F1') openGuide();
+        else if (e.key === '?') showGuide();
         else handled = false;
         if (handled) e.preventDefault();
     });

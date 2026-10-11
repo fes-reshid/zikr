@@ -3,6 +3,18 @@
  * Add a row whenever new words appear in the editor; anything not listed stays in English.
  */
 window.REEL_AR = [
+    // Help menu and saving before closing
+    ['Help & Tutorials (full page)', 'المساعدة والشروحات (صفحة كاملة)'], ['Tutorials', 'الشروحات'], ['Menu Reference', 'مرجع القوائم'], ['Guide & Keyboard Shortcuts', 'الدليل واختصارات لوحة المفاتيح'],
+    ['Keyboard Shortcuts…', 'اختصارات لوحة المفاتيح…'], ['Install as an App…', 'التثبيت كتطبيق…'], ['More', 'المزيد'], ['Loading…', 'جارٍ التحميل…'],
+    ['Guide & keyboard shortcuts', 'الدليل واختصارات لوحة المفاتيح'], ['Menu reference', 'مرجع القوائم'], ['Everything in the menus at the top, menu by menu.', 'كل ما في القوائم بالأعلى، قائمة قائمة.'],
+    ['Install as an app', 'التثبيت كتطبيق'], ['Install the video editor to open it from your desktop or home screen, in its own window. It works offline too.', 'ثبّت محرر الفيديو لتفتحه من سطح المكتب أو الشاشة الرئيسية في نافذته الخاصة. ويعمل دون اتصال أيضًا.'],
+    ['Chrome or Edge on a computer: the install icon at the right of the address bar, or ⋮ ▸ Cast, save and share ▸ Install page as app.', 'كروم أو إيدج على الحاسوب: أيقونة التثبيت يمين شريط العنوان، أو ⋮ ▸ إرسال وحفظ ومشاركة ▸ تثبيت الصفحة كتطبيق.'],
+    ['Android (Chrome): ⋮ ▸ Add to Home screen or Install app.', 'أندرويد (كروم): ⋮ ▸ إضافة إلى الشاشة الرئيسية أو تثبيت التطبيق.'], ['iPhone or iPad (Safari): the Share button ▸ Add to Home Screen.', 'آيفون أو آيباد (سفاري): زر المشاركة ▸ إضافة إلى الشاشة الرئيسية.'],
+    ['Import videos, pictures and sound (Import, or drop them on the page).', 'استورد الفيديوهات والصور والصوت (استيراد، أو أفلتها على الصفحة).'], ['Double-click a file, or drag it, to put it on the timeline.', 'انقر الملف مرتين أو اسحبه لوضعه على الخط الزمني.'],
+    ['Press T for a title; click anything to change it in the details panel on the right.', 'اضغط T لإضافة عنوان؛ وانقر أي شيء لتغييره من لوحة التفاصيل على اليمين.'],
+    ['Split with S, trim by dragging a clip’s ends, and add transitions, sounds and effects.', 'قسّم بـ S، وقصّ بسحب طرفي المقطع، وأضف الانتقالات والأصوات والمؤثرات.'], ['Press Export and choose where the video will be posted.', 'اضغط «تصدير» واختر أين سيُنشر الفيديو.'],
+    ['Open the full help page with step-by-step tutorials', 'افتح صفحة المساعدة الكاملة مع الشروحات خطوة بخطوة'], ['Save as a file', 'حفظ كملف'], ['Help & tutorials', 'المساعدة والشروحات'],
+    ['Save your changes?', 'حفظ التغييرات؟'], ['Don’t save', 'لا تحفظ'], ['A copy also stays in File ▸ My projects in this browser.', 'تبقى نسخة أيضًا في ملف ▸ مشاريعي في هذا المتصفح.'],
     // PowerPoint
     ['Open a PowerPoint (.pptx) as a video…', 'افتح عرض باوربوينت (.pptx) كفيديو…'], ['Save as PowerPoint (.pptx)…', 'احفظ كباوربوينت (.pptx)…'], ['Save as PowerPoint…', 'احفظ كباوربوينت…'], ['Save as PowerPoint', 'احفظ كباوربوينت'],
     ['Save this video as a PowerPoint presentation instead', 'احفظ هذا الفيديو كعرض باوربوينت بدلًا من ذلك'], ['Open PowerPoint as a video', 'افتح الباوربوينت كفيديو'],
@@ -361,6 +373,7 @@ window.REEL_AR_PATTERNS = [
     [/^Post this video on (.+)$/, (m, tr) => 'نشر هذا الفيديو على ' + tr(m[1])],
     [/^Download (.+)$/, (m) => 'تنزيل ' + m[1]],
     [/^Remove (.+)$/, (m) => 'إزالة ' + m[1]],
+    [/^“(.+)” has changes that are not saved to a file\. Save it before (closing|starting a new project)\?$/, (m) => 'في «' + m[1] + '» تغييرات غير محفوظة في ملف. هل تحفظه قبل ' + (m[2] === 'closing' ? 'الإغلاق؟' : 'بدء مشروع جديد؟')],
     [/^(\d+) slides? found in (.+?)\. Each slide becomes editable parts of the video: its background, its pictures and every text box as a title you can change\.$/, (m) => 'وُجدت ' + m[1] + ' شريحة في ' + m[2] + '. تصبح كل شريحة أجزاءً قابلة للتعديل من الفيديو: خلفيتها وصورها وكل مربع نص كعنوان يمكنك تغييره.'],
     [/^Your video becomes a PowerPoint presentation: (\d+) slides?, one for each change of picture\.$/, (m) => 'يصبح الفيديو عرض باوربوينت: ' + m[1] + ' شريحة، واحدة لكل تغيير في الصورة.'],
     [/^Making slide (\d+) of (\d+)…$/, (m) => 'أصنع الشريحة ' + m[1] + ' من ' + m[2] + '…'],

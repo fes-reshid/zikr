@@ -960,7 +960,27 @@ async function probeFile(page, bytes) {
 
         // Help ▸ About.
         await page.click('#help');
-        check('the Help menu has the guide, the tour and About', (await page.locator('#help-menu .menu-item').allTextContents()).join('|') === 'User guide|Take the tour|Keyboard shortcuts|About');
+        const helpNames = await page.locator('#help-menu .menu-item').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+        check('the Help menu matches the audio editor’s: full help, tutorials, menu reference, guide, shortcuts, tour, install and About',
+            helpNames.join('|') === 'Help & Tutorials (full page)|Tutorials|Menu Reference|Guide & Keyboard Shortcuts|Keyboard Shortcuts…|Take the tour|Install as an App…|About' &&
+            /F1/.test(await page.locator('#help-menu .menu-item').first().textContent()), helpNames.join('|'));
+        await page.locator('#help-menu .menu-item', { hasText: 'Tutorials' }).filter({ hasNotText: 'Help' }).click();
+        await page.waitForSelector('#help-menu .menu-item[aria-label="Your first video in five minutes"]', { timeout: 10000 });
+        const tutPopup = page.waitForEvent('popup');
+        await page.locator('#help-menu .menu-item[aria-label="Your first video in five minutes"]').click();
+        const tutPage = await tutPopup;
+        check('Help ▸ Tutorials lists every tutorial and opens the one chosen', /help\.html#t-first$/.test(tutPage.url()), tutPage.url());
+        await tutPage.close();
+        await page.click('#help');
+        await page.locator('#help-menu .menu-item[aria-label="Menu Reference"]').click();
+        const refText = await page.locator('.modal.generic').textContent();
+        check('Help ▸ Menu Reference lists every menu and what is in it', /Menu reference/.test(refText) && ['File', 'Create', 'Tools', 'Save as PowerPoint (.pptx)…', 'Trending templates'].every((t) => refText.includes(t)));
+        await page.locator('.modal.generic').getByRole('button', { name: 'Close' }).click();
+        await page.locator('#timeline').focus();
+        await page.keyboard.press('?');
+        check('? opens the guide and keyboard shortcuts', /Keyboard shortcuts/.test(await page.locator('.modal.generic').textContent()) && await page.locator('.modal.generic kbd').count() > 15);
+        await page.locator('.modal.generic').getByRole('button', { name: 'Close' }).click();
+        await page.click('#help');
         await page.getByRole('menuitem', { name: 'About' }).click();
         const about = page.locator('.modal.generic');
         const aboutText = await about.innerText();
@@ -1329,7 +1349,14 @@ async function probeFile(page, bytes) {
         check('both tabs come back after a reload', await page.locator('.project-tab').count() === 2 &&
             (await project(page)).clips.some((c) => c.text === 'Second video'));
         await page.locator('.project-tab .tab-close').nth(1).click();
-        check('a tab can be closed, leaving the first project', await page.locator('.project-tab').count() === 1 && (await project(page)).clips.length === firstClips);
+        const askBox = page.locator('.modal.generic');
+        check('closing a tab with unsaved changes asks to save it first, in the editor’s own window',
+            await askBox.locator('h2').textContent() === 'Save your changes?' && /has changes that are not saved/.test(await askBox.textContent()));
+        await askBox.getByRole('button', { name: 'Cancel' }).click();
+        check('Cancel keeps the tab open', await page.locator('.project-tab').count() === 2);
+        await page.locator('.project-tab .tab-close').nth(1).click();
+        await page.locator('.modal.generic').getByRole('button', { name: 'Don’t save' }).click();
+        check('Don’t save closes it, leaving the first project', await page.locator('.project-tab').count() === 1 && (await project(page)).clips.length === firstClips);
 
         /* ------------------------------------------------------------- keyframes */
         const kfAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
@@ -1391,7 +1418,13 @@ async function probeFile(page, bytes) {
             p.width === 1080 && p.height === 1920 && approx(p.clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0), 7.5, 0.05) &&
             p.clips.some((c) => c.text === 'My first Short') && p.progressBar && !!p.brandLogo, p.width + 'x' + p.height);
         await page.locator('.project-tab .tab-close').last().click();
-        check('closing it goes back to the original video', (await project(page)).width === 1280);
+        const shortSave = page.waitForEvent('download', { timeout: 20000 });
+        await page.locator('.modal.generic').getByRole('button', { name: 'Save', exact: true }).click();
+        const shortFile = await shortSave;
+        // Headless Chromium names downloads with non-English characters (the Short's name has a ·) just "download".
+        const shortText = fs.readFileSync(await shortFile.path(), 'utf8');
+        check('Save downloads the project file, then closes the tab', /^(.*\.reel\.json|download)$/.test(shortFile.suggestedFilename()) && /"Short · /.test(shortText) &&
+            (await project(page)).width === 1280, shortFile.suggestedFilename());
 
         /* -------------------------------------------------------------- sounds */
         const soundAt = (await project(page)).clips.reduce((m, c) => Math.max(m, c.start + c.duration), 0) + 1;
@@ -1479,6 +1512,7 @@ async function probeFile(page, bytes) {
         await page.waitForSelector('.modal.generic', { state: 'detached' });
         check('and opened in a tab', /\(copy\)/.test((await project(page)).name) && await page.locator('.project-tab').count() === tabsBefore + 1);
         await page.locator('.project-tab .tab-close').last().click();
+        if (await page.locator('.modal.generic').count()) await page.locator('.modal.generic').getByRole('button', { name: 'Don’t save' }).click();
 
         /* ------------------------------------------------- sync to the voice */
         await page.setInputFiles('#import-input', [{ name: 'talk.wav', mimeType: 'audio/wav',
